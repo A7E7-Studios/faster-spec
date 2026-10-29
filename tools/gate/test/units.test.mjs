@@ -546,6 +546,11 @@ test('config: the starter config loads and is report-only; history rules match w
     }
     fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ ...cfg, overview: { excludeModules: 'dev/**' } }));
     assert.throws(() => loadConfig(path.join(dir, 'config.json')), /"overview\.excludeModules"/);
+    assert.deepEqual(cfg.overview.moduleMarkers, ['README.md', 'package.json', 'pyproject.toml', 'build.gradle', 'build.gradle.kts', '*.asmdef']);
+    for (const bad of ['go.mod', ['src/go.mod'], ['']]) {
+      write({ ...cfg, overview: { moduleMarkers: bad } });
+      assert.throws(() => loadConfig(path.join(dir, 'config.json')), /"overview\.moduleMarkers"/, JSON.stringify(bad));
+    }
     assert.deepEqual(cfg.humanChecks.map((h) => h.id), ['desk']);
     write({ ...cfg, humanChecks: [] });
     assert.deepEqual(loadConfig(path.join(dir, 'config.json')).humanChecks, [], 'a project may name no human check');

@@ -175,5 +175,6 @@ node tools/overview/overview.mjs --repo <id>=<checkout> --summary    # capabilit
 
 What the gate checks: [tools/gate](../tools/gate/README.md). The overview's options and output:
 [tools/overview](../tools/overview/README.md). The overview groups capabilities by module: a
-module is a folder holding a `README.md`, a Unity `*.asmdef` (not a test assembly) or a
-`package.json`, and each `code` path belongs to the nearest one up its tree.
+module is a folder holding a module marker (a `README.md`, a `package.json`, a `pyproject.toml`, a
+`build.gradle(.kts)`, a Unity `*.asmdef`, or the markers the project names), and each `code` path
+belongs to the nearest one up its tree.

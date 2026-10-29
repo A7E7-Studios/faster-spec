@@ -482,6 +482,44 @@ test('overview: a repository\'s human checks come from its config; a check it do
   assert.match(unknown.error, /unknown check "device" \(test, desk\)/);
 });
 
+test('overview: Python and Gradle folders are modules; a config\'s own markers replace the defaults', (t) => {
+  const r = makeRepo(
+    {
+      'README.md': '# Root\n\nThe root.\n',
+      'py/pyproject.toml': '[build-system]\nname = "not-this"\n\n[project]\nname = "notes-sync"\ndescription = "Keeps **notes** in step." # inline\n\n[[project.authors]]\nname = "Someone"\n',
+      'poetry/pyproject.toml': "[tool.poetry]\nname = 'old-style'\ndescription = 'Poetry metadata.'\n",
+      'android/app/build.gradle.kts': 'plugins { }\n',
+      'android/lib/build.gradle': 'apply plugin: "java"\n',
+      'android/lib/README.md': '# Lib\n\nThe shared library.\n',
+      'web/package.json': JSON.stringify({ name: 'web', description: 'The web app.' }),
+      'web/pyproject.toml': '[project]\nname = "web-py"\n',
+      'go/go.mod': 'module example\n',
+    },
+    { prefix: 'overview-markers-' },
+  );
+  t.after(() => r.cleanup());
+  const rows = (o) => o.modules.map((m) => [m.path, m.package, m.manifest, m.title, m.summary]);
+  let o = buildOverview([{ id: 'only', dir: r.dir, ref: 'main' }]);
+  assert.deepEqual(validate(JSON.parse(JSON.stringify(o)), SCHEMA), []);
+  assert.deepEqual(rows(o), [
+    ['.', null, null, 'Root', 'The root.'],
+    ['android/app', null, 'android/app/build.gradle.kts', 'app', ''],
+    ['android/lib', null, 'android/lib/build.gradle', 'Lib', 'The shared library.'],
+    ['poetry', 'old-style', 'poetry/pyproject.toml', 'old-style', 'Poetry metadata.'],
+    ['py', 'notes-sync', 'py/pyproject.toml', 'notes-sync', 'Keeps notes in step.'],
+    ['web', 'web', 'web/package.json', 'web', 'The web app.'],
+  ]);
+  r.write({ 'tools/gate/config.json': JSON.stringify({ overview: { moduleMarkers: ['go.mod', 'pyproject.toml'] } }) });
+  r.commit('chore: markers');
+  o = buildOverview([{ id: 'only', dir: r.dir, ref: 'main' }]);
+  assert.deepEqual(rows(o), [
+    ['go', null, 'go/go.mod', 'go', ''],
+    ['poetry', 'old-style', 'poetry/pyproject.toml', 'old-style', 'Poetry metadata.'],
+    ['py', 'notes-sync', 'py/pyproject.toml', 'notes-sync', 'Keeps notes in step.'],
+    ['web', 'web-py', 'web/pyproject.toml', 'web-py', ''],
+  ]);
+});
+
 test('overview: test assemblies are not modules', () => {
   for (const [name, folder] of [
     ['App.Collaboration.Tests', 'Assets/Scripts/Collaboration/Tests'],

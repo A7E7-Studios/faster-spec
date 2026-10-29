@@ -20,6 +20,8 @@ import { matches } from '../gate/lib/glob.mjs';
 export const MODULE_EXCLUDES = ['specs', 'changes', '.agents', '.github'];
 /** Module globs left out when a repository's tools/gate/config.json names no `overview.excludeModules`. */
 export const DEFAULT_EXCLUDE_MODULES = ['dev/**', 'docs/**', '**/proof/**', 'fixtures/**', '**/test/fixtures/**'];
+/** The file names that make a folder a module when a repository's tools/gate/config.json names no `overview.moduleMarkers`. */
+export const DEFAULT_MODULE_MARKERS = ['README.md', 'package.json', 'pyproject.toml', 'build.gradle', 'build.gradle.kts', '*.asmdef'];
 const REPO_ID = /^[a-z0-9][a-z0-9-]*$/;
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const LFS_POINTER = /^version https:\/\/git-lfs\.github\.com\/spec\/v1\r?\noid sha256:([0-9a-f]{64})\r?\nsize (\d+)\r?\n/;
@@ -82,40 +84,95 @@ export function isTestAssembly(name, folder) {
 }
 
 /**
- * The modules of a repository at `commit`: every folder holding a README.md, a non-test *.asmdef
- * or a package.json (never under node_modules), outside MODULE_EXCLUDES and the repository's own
- * `ignore` and `overview.excludeModules` globs (tools/gate/config.json; DEFAULT_EXCLUDE_MODULES
- * when it names none). Returns Map folder -> module.
+ * A pyproject.toml's `name` and `description`: from its [project] table, else its [tool.poetry]
+ * table; each null when absent. Reads one-line strings only, which is what these two keys hold.
+ */
+export function pyprojectInfo(text) {
+  const tables = { project: {}, 'tool.poetry': {} };
+  let table = null;
+  for (const raw of String(text ?? '').split(/\r?\n/)) {
+    const l = raw.trim();
+    const h = /^\[\[?\s*([^[\]]+?)\s*\]\]?\s*(?:#.*)?$/.exec(l);
+    if (h) {
+      table = h[1].replace(/\s*\.\s*/g, '.').replace(/"/g, '');
+      continue;
+    }
+    const kv = /^(name|description)\s*=\s*("(?:[^"\\]|\\.)*"|'[^']*')\s*(?:#.*)?$/.exec(l);
+    if (!kv || !(table in tables)) continue;
+    let v = kv[2].slice(1, -1);
+    if (kv[2][0] === '"') {
+      try {
+        v = JSON.parse(kv[2]);
+      } catch {
+        // a TOML escape JSON lacks: keep the text between the quotes
+      }
+    }
+    tables[table][kv[1]] ??= v;
+  }
+  const pick = (k) => tables.project[k] ?? tables['tool.poetry'][k] ?? null;
+  return { name: pick('name') || null, description: pick('description') || null };
+}
+
+/** A package manifest's `name` and `description`, for the manifests the overview can read; nulls otherwise. */
+function manifestInfo(repo, commit, p) {
+  const name = path.posix.basename(p);
+  if (name === 'package.json') {
+    const pkg = readJson(repo, commit, p) ?? {};
+    const s = (v) => (typeof v === 'string' && v ? v : null);
+    return { name: s(pkg.name), description: s(pkg.description) };
+  }
+  if (name === 'pyproject.toml') return pyprojectInfo(repo.text(commit, p));
+  return { name: null, description: null };
+}
+
+/**
+ * The modules of a repository at `commit`: every folder holding a file a module marker matches
+ * (tools/gate/config.json `overview.moduleMarkers`, file-name globs; DEFAULT_MODULE_MARKERS when it
+ * names none), a `*.asmdef` counting only when it is not a test assembly, never under node_modules,
+ * outside MODULE_EXCLUDES and the repository's own `ignore` and `overview.excludeModules` globs
+ * (DEFAULT_EXCLUDE_MODULES when it names none). Returns Map folder -> module.
  */
 export function findModules(repo, commit, repoId, config = readConfig(repo, commit)) {
   const ignore = Array.isArray(config.ignore) ? config.ignore : [];
   const exclude = Array.isArray(config.overview?.excludeModules) ? config.overview.excludeModules : DEFAULT_EXCLUDE_MODULES;
+  const markers = Array.isArray(config.overview?.moduleMarkers) ? config.overview.moduleMarkers : DEFAULT_MODULE_MARKERS;
+  const rank = (name) => markers.findIndex((m) => matches(name, m));
   const found = new Map();
   const at = (folder) => {
-    if (!found.has(folder)) found.set(folder, { readme: null, asmdefs: [], pkg: null });
+    if (!found.has(folder)) found.set(folder, { readme: null, asmdefs: [], manifests: [], marked: false });
     return found.get(folder);
   };
   for (const p of [...repo.tree(commit).files.keys()].sort(cmp)) {
     const name = path.posix.basename(p);
-    const kind = name === 'README.md' ? 'readme' : name === 'package.json' ? 'pkg' : name.endsWith('.asmdef') ? 'asmdef' : null;
-    if (!kind) continue;
+    const marker = rank(name) >= 0;
+    if (!marker && name !== 'README.md') continue;
     const folder = folderOf(p);
     if (MODULE_EXCLUDES.some((e) => folder === e || folder.startsWith(`${e}/`))) continue;
     if (p.split('/').includes('node_modules') || matches(p, ignore) || matches(p, exclude)) continue;
-    if (kind === 'readme') at(folder).readme = p;
-    else if (kind === 'pkg') at(folder).pkg = p;
-    else {
+    const f = at(folder);
+    if (name === 'README.md') {
+      // A module's README gives its title and summary even where README.md is no marker.
+      f.readme = p;
+      f.marked ||= marker;
+    } else if (name.endsWith('.asmdef')) {
       const asm = readJson(repo, commit, p);
       const asmName = typeof asm?.name === 'string' && asm.name ? asm.name : name.replace(/\.asmdef$/, '');
-      if (!isTestAssembly(asmName, folder)) at(folder).asmdefs.push(asmName);
+      if (isTestAssembly(asmName, folder)) continue;
+      f.asmdefs.push(asmName);
+      f.marked = true;
+    } else {
+      f.manifests.push(p);
+      f.marked = true;
     }
   }
   const modules = new Map();
   for (const [folder, f] of found) {
-    if (!f.readme && !f.asmdefs.length && !f.pkg) continue;
+    if (!f.marked) continue;
     const text = f.readme ? repo.text(commit, f.readme) ?? '' : '';
-    const pkg = f.pkg ? readJson(repo, commit, f.pkg) ?? {} : null;
-    const pkgName = pkg && typeof pkg.name === 'string' && pkg.name ? pkg.name : null;
+    const manifests = f.manifests.sort((a, b) => rank(path.posix.basename(a)) - rank(path.posix.basename(b)) || cmp(a, b));
+    const infos = manifests.map((m) => manifestInfo(repo, commit, m));
+    const pkgName = infos.find((i) => i.name)?.name ?? null;
+    const description = infos.find((i) => i.description)?.description ?? null;
     const assembly = f.asmdefs[0] ?? null;
     modules.set(folder, {
       repo: repoId,
@@ -123,8 +180,9 @@ export function findModules(repo, commit, repoId, config = readConfig(repo, comm
       readme: f.readme,
       assembly,
       package: pkgName,
+      manifest: manifests[0] ?? null,
       title: (f.readme && firstHeading(text)) || assembly || pkgName || (folder === '.' ? repoId : path.posix.basename(folder)),
-      summary: (f.readme && firstParagraph(text, 300)) || (pkg && typeof pkg.description === 'string' ? clip(plainText(pkg.description), 300) : ''),
+      summary: (f.readme && firstParagraph(text, 300)) || (description ? clip(plainText(description), 300) : ''),
       capabilities: [],
     });
   }

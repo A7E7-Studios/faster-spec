@@ -37,6 +37,8 @@ export function loadConfig(file = DEFAULT_CONFIG) {
   need(new Set(hc.map((h) => h.id)).size === hc.length, '"humanChecks" names each id once');
   const ex = c.overview?.excludeModules;
   need(ex === undefined || (Array.isArray(ex) && ex.every((g) => typeof g === 'string')), '"overview.excludeModules" is a list of globs');
+  const mm = c.overview?.moduleMarkers;
+  need(mm === undefined || (Array.isArray(mm) && mm.every((g) => typeof g === 'string' && g !== '' && !g.includes('/'))), '"overview.moduleMarkers" is a list of file-name globs, without /');
   return c;
 }
 

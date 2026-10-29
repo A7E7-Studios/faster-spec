@@ -67,6 +67,7 @@
     }
   ],
   "overview": {
-    "excludeModules": ["dev/**", "docs/**", "**/proof/**", "fixtures/**", "**/test/fixtures/**"]
+    "excludeModules": ["dev/**", "docs/**", "**/proof/**", "fixtures/**", "**/test/fixtures/**"],
+    "moduleMarkers": ["README.md", "package.json", "pyproject.toml", "build.gradle", "build.gradle.kts", "*.asmdef"]
   }
 }

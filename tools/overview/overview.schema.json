@@ -195,17 +195,18 @@
     },
     "module": {
       "type": "object",
-      "description": "A folder holding a README.md, a non-test *.asmdef or a package.json (never under node_modules).",
-      "required": ["repo", "path", "readme", "assembly", "package", "title", "summary", "capabilities"],
+      "description": "A folder holding a file a module marker matches (overview.moduleMarkers; README.md, package.json, pyproject.toml, build.gradle, build.gradle.kts, a non-test *.asmdef when the config names none), never under node_modules.",
+      "required": ["repo", "path", "readme", "assembly", "package", "manifest", "title", "summary", "capabilities"],
       "additionalProperties": false,
       "properties": {
         "repo": { "$ref": "#/$defs/repoId" },
         "path": { "type": "string", "description": "The folder; . for the root." },
         "readme": { "type": ["string", "null"], "description": "The folder's README.md, or null." },
         "assembly": { "type": ["string", "null"], "description": "The name of the folder's non-test *.asmdef, or null." },
-        "package": { "type": ["string", "null"], "description": "The name in the folder's package.json, or null." },
+        "package": { "type": ["string", "null"], "description": "The package name its manifest gives (package.json name, pyproject.toml [project] or [tool.poetry] name), or null." },
+        "manifest": { "type": ["string", "null"], "description": "The folder's first marker file other than README.md and *.asmdef, in marker order (package.json, pyproject.toml, build.gradle.kts, …), or null." },
         "title": { "type": "string", "description": "The README's first heading, else the assembly's name, else the package's name, else the folder's name." },
-        "summary": { "type": "string", "maxLength": 300, "description": "The README's first paragraph as plain text, else the package's description, else empty." },
+        "summary": { "type": "string", "maxLength": 300, "description": "The README's first paragraph as plain text, else the manifest's description, else empty." },
         "capabilities": { "type": "array", "items": { "type": "string" }, "description": "Capabilities with a code path whose nearest (deepest) module up its tree is this one." }
       }
     },

@@ -38,20 +38,25 @@ repository is `--assets` fetching a missing LFS object into its LFS cache (below
 | `specs/<domain>/<capability>/spec.md` | a capability; one entry per id across repositories, a side per repository |
 | `specs/<domain>/<capability>/look/<scenario-slug>.png` | the scenario's `look` |
 | `changes/<id>/` | a change waiting for review, one entry per id across repositories; `proposal.md`'s front matter (`removes` too: the capabilities it deletes), its files, `look/*`, `look/directions/*`, `evidence/*`, and `landed`: the newest first-parent commit on the ref that added `proposal.md` (a renamed folder lands with its rename), its date, and the PR number from a subject ending `(#<n>)` |
-| a folder holding a `README.md`, a `*.asmdef` or a `package.json` | a module (below) |
+| a folder holding a module marker (`README.md`, `package.json`, `pyproject.toml`, `build.gradle(.kts)`, a `*.asmdef`) | a module (below) |
 
 ## Modules
 
-A module is a folder (`.` for the root) that holds a `README.md`, a `*.asmdef` that is not a test
-assembly, or a `package.json` that is not under `node_modules`. A test assembly is one whose `name`
-or folder ends with `Tests` (`PlayTests`, `EditModeTests`, `PlayModeTests` included) or whose name
-holds `.Tests`.
+A module is a folder (`.` for the root), not under `node_modules`, that holds a file a module
+marker matches. The markers are file-name globs, `tools/gate/config.json` `overview.moduleMarkers`;
+a repository whose config names none gets `README.md`, `package.json`, `pyproject.toml`,
+`build.gradle`, `build.gradle.kts` and `*.asmdef`. A `*.asmdef` marks its folder only when it is not
+a test assembly: one whose `name` or folder ends with `Tests` (`PlayTests`, `EditModeTests`,
+`PlayModeTests` included) or whose name holds `.Tests`. A module's `README.md` gives its title and
+summary even where `README.md` is no marker.
 
 | Field | From |
 |---|---|
-| `readme`, `assembly`, `package` | the folder's `README.md` path, its asmdef's `name`, its `package.json` `name`; each null when absent |
+| `readme`, `assembly` | the folder's `README.md` path, its asmdef's `name`; each null when absent |
+| `manifest` | the folder's first other marker file, in marker order (`package.json`, `pyproject.toml`, `build.gradle.kts`, or one the config names), or null |
+| `package` | the package name a manifest gives: `package.json` `name`, `pyproject.toml` `[project]` (else `[tool.poetry]`) `name`; null otherwise |
 | `title` | the README's first heading, else the assembly's name, else the package's name, else the folder's name (the repository id for the root) |
-| `summary` | the README's first paragraph as plain text, else the package's `description`, else empty; at most 300 characters |
+| `summary` | the README's first paragraph as plain text, else the manifest's `description`, else empty; at most 300 characters |
 | `capabilities` | every capability with a `code` path whose nearest (deepest) module up its tree is this one; a path ending `/` starts at that folder |
 
 Left out: `specs/`, `changes/`, `.agents/`, `.github/`, and the repository's own
@@ -91,7 +96,7 @@ A side's `problems` lists each break of the spec format, and a capability with a
   changes:      [{ id, title, review, followUps,
                    sides: [{ repo, path, review, capabilities, removes, files, looks, directions, evidence,
                              landed: { commit, date, pr } | null }] }],
-  modules:      [{ repo, path, readme, assembly, package, title, summary, capabilities }],
+  modules:      [{ repo, path, readme, assembly, package, manifest, title, summary, capabilities }],
   totals:       { repos, domains, modules, capabilities: {..by state}, scenarios: {..by state, tested},
                   changes: { total, unreviewed, changesRequested } } }
 ```
