@@ -63,16 +63,24 @@ export function makeRepo(files = { 'README.md': '# Root\n\nThe root.\n' }, { pre
   return r;
 }
 
+/** The starter config, config.template.json, as a project copies it. */
+export function templateConfig() {
+  return JSON.parse(fs.readFileSync(path.join(GATE_DIR, 'config.template.json'), 'utf8'));
+}
+
 /**
  * The starter config (config.template.json) with report-only off, and the vendored trees, living
- * docs and budgets the tests write: the same in every repository that carries the gate.
+ * docs and budgets the tests write: the same in every repository that carries the gate. Its
+ * `design` block is left out, since a test repository holds no house style; a test of the design
+ * check passes `design` back in.
  */
 export function testConfig(overrides = {}) {
-  const base = JSON.parse(fs.readFileSync(path.join(GATE_DIR, 'config.template.json'), 'utf8'));
+  const { design, ...base } = templateConfig();
   const livingDocs = { include: ['specs/**/*.md', '**/README.md', '**/AGENTS.md', '**/ARCHITECTURE.md'], exclude: ['changes/**'] };
   const budgets = [
     { pattern: 'changes/**/*.md', bytes: 30720 },
     { pattern: 'specs/**/spec.md', bytes: 30720 },
+    { pattern: 'specs/**/looks/*.html', bytes: 30720 },
     { pattern: '**/AGENTS.md', bytes: 32768 },
     { pattern: '**/README.md', bytes: 40960 },
   ];
@@ -189,6 +197,18 @@ export function proposalText({ title = 'Cursors for collaborators', capabilities
     '## Review',
     '',
     'At a desk, with a second browser window.',
+    '',
+  ].join('\n');
+}
+
+/** A board: one self-contained HTML file, a <section> per id. */
+export function boardText(ids = ['main'], { extra = '' } = {}) {
+  return [
+    '<!doctype html>',
+    '<html><head><meta charset="utf-8"><style>section { padding: 1rem; }</style></head><body>',
+    ...ids.map((id) => `<section id="${id}"><p>The design of ${id}.</p></section>`),
+    extra,
+    '</body></html>',
     '',
   ].join('\n');
 }
