@@ -1,0 +1,27 @@
+[
+  {
+    "id": "formats",
+    "title": "Specs and changes",
+    "purpose": "How a capability's behaviour and its proof are written down, and how a change and the owner's review of it are carried: the spec and change formats and PROOF lines."
+  },
+  {
+    "id": "gate",
+    "title": "Formality gate",
+    "purpose": "The check every pull request passes: that it keeps the formats, writes no history into living docs, holds its budgets and links, keeps the kit copy as its lock says, and leaves what only the owner merges to the owner."
+  },
+  {
+    "id": "overview",
+    "title": "Overview index",
+    "purpose": "One map of a solution across its repositories: every capability and its review state, the changes waiting for the owner, and the modules the code falls into."
+  },
+  {
+    "id": "kit",
+    "title": "Taking the kit",
+    "purpose": "How a project takes the kit as real files pinned to one kit commit, keeps it in step, and is held to that copy."
+  },
+  {
+    "id": "agents",
+    "title": "Agent skills and setup",
+    "purpose": "The skills agents run every change with, and the setup that gives each checkout's agents the same skills."
+  }
+]

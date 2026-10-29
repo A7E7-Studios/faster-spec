@@ -39,6 +39,15 @@ test('an empty PR and a docs-only PR pass every check', (t) => {
 
 // --- specs -----------------------------------------------------------------------------------
 
+test('specs: a human check is one the project names in its config', (t) => {
+  const r = setup(t, { ...baseFiles(), [SPEC]: null });
+  r.branch('add').write({ [SPEC]: specText({ proofs: ['test: src/cursors/cursors.test.js', 'desk: open', 'two-devices: open'] }), [PROPOSAL]: proposalText() });
+  r.commit('feat: shared cursors');
+  assert.equal(check(gate(r), 'specs').status, 'pass', failText(gate(r), 'specs'));
+  const rep = gate(r, { config: testConfig({ humanChecks: [{ id: 'desk', how: 'at a computer', needs: 'a build' }] }) });
+  assert.match(failText(rep, 'specs'), /unknown check "two-devices" \(test, desk\)/);
+});
+
 test('specs: a new valid capability with its change folder passes', (t) => {
   const r = setup(t, { ...baseFiles(), [SPEC]: null });
   r.branch('add').write({ [SPEC]: specText(), [PROPOSAL]: proposalText() });
