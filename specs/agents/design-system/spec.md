@@ -24,10 +24,13 @@ tokens file and its brief exist, because a design built on missing tokens is bui
 #### Scenario: A design block naming a missing brief fails
 - **WHEN** the config's `design.brief` names a file that is not there
 - **THEN** the gate's design check fails and names the file
+- **PROOF** test: tools/gate/test/gate.test.mjs::design: skipped without a design block; with the starter's, its tokens file and brief are present at head
+- **PROOF** test: tools/gate/test/units.test.mjs::config: the design block names a tokens file and a brief, and optionally catalogues and a render command
 
 #### Scenario: No design block skips the check
 - **WHEN** the config has no `design` block
 - **THEN** the gate's design check is skipped
+- **PROOF** test: tools/gate/test/gate.test.mjs::design: skipped without a design block; with the starter's, its tokens file and brief are present at head
 
 ### Requirement: Directions are critiqued before the owner sees them
 When the design skill draws directions, it SHALL build them on the project's tokens, critique each

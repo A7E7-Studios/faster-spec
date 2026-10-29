@@ -23,11 +23,14 @@ approval covers only what the owner saw.
 - **GIVEN** a spec with `review: approved` on main
 - **WHEN** a pull request changes one of its scenarios and keeps `approved`
 - **THEN** the gate fails, saying the feature goes back to unreviewed
+- **PROOF** test: tools/gate/test/gate.test.mjs::review: a new spec is unreviewed
+- **PROOF** test: tools/gate/test/gate.test.mjs::review: a PR that changes a spec's text or its boards sets it back to unreviewed
 
 #### Scenario: A change folder naming an approved feature must reset it
 - **GIVEN** a spec with `review: approved` on main
 - **WHEN** a pull request carries a change folder naming it and changes only code
 - **THEN** the gate fails until the spec says `review: unreviewed`
+- **PROOF** test: tools/gate/test/gate.test.mjs::review: a PR that changes a spec's text or its boards sets it back to unreviewed
 
 ### Requirement: A verdict alone is shown
 When a pull request changes only a spec's `review`, the gate SHALL list the new verdict as a
@@ -36,3 +39,4 @@ notice, because the reviewer checks each one against the owner's words.
 #### Scenario: Triage approves a feature
 - **WHEN** a pull request sets a spec's `review` from `unreviewed` to `approved` and changes nothing else
 - **THEN** the gate passes and shows the verdict as a notice
+- **PROOF** test: tools/gate/test/gate.test.mjs::review: a triage PR sets review alone, shown as a notice; PROOF, code and re-wrapping change no review
