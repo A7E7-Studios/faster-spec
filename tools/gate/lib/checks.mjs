@@ -3,7 +3,7 @@
 import path from 'node:path';
 import { matches } from './glob.mjs';
 import { splitLines, fenceMask, stripInlineCode, anchors, links, PROOF_LINE } from './markdown.mjs';
-import { ID, SPEC_FILE, parseSpec, parseChange, requirementText, scenarioKey, scenarioText, isCapabilityId, humanCheckIds } from './spec.mjs';
+import { ID, SPEC_FILE, parseSpec, parseChange, requirementText, scenarioKey, scenarioText, isCapabilityId } from './spec.mjs';
 import { addedLines, isCode, isIgnored, nearestReadme } from './context.mjs';
 import { prSections } from './pr.mjs';
 import { LOCK_FILE, kitProblems, owns } from './kit.mjs';
@@ -100,8 +100,8 @@ function pathAtRev(tree, p) {
   return tree.dirs.has(p) ? `${p} is a folder; end it with /` : `no file ${p}`;
 }
 
-/** Everything wrong with one capability folder at `rev`, as [{ file, line?, message }]. `checks`: the human check ids. */
-export function capabilityProblems(repo, rev, folder, domainIds, checks = null) {
+/** Everything wrong with one capability folder at `rev`, as [{ file, line?, message }]. */
+export function capabilityProblems(repo, rev, folder, domainIds) {
   const out = [];
   const [, domain, cap] = folder.split('/');
   const spec = `${folder}/spec.md`;
@@ -113,7 +113,7 @@ export function capabilityProblems(repo, rev, folder, domainIds, checks = null) 
     out.push({ file: spec, message: `${folder}/ has no spec.md` });
     return out;
   }
-  const parsed = parseSpec(text, { checks });
+  const parsed = parseSpec(text);
   for (const p of parsed.problems) out.push({ file: spec, line: p.line, message: p.message });
   const tree = repo.tree(rev);
   for (const c of parsed.code) {
@@ -148,8 +148,6 @@ export function capabilityProblems(repo, rev, folder, domainIds, checks = null) 
 
 export function checkSpecs(ctx) {
   const { repo, head } = ctx;
-  const checks = humanCheckIds(ctx.config);
-  const parse = (text) => parseSpec(text, { checks });
   const layout = specsLayout(repo, head);
   const hasSpecs = layout.capabilities.size > 0 || repo.has(head, 'specs/domains.json');
   if (!hasSpecs && layout.stray.length === 0) return result('specs', 'specs', [], 'no specs at head');
@@ -170,7 +168,7 @@ export function checkSpecs(ctx) {
     });
   }
   for (const folder of layout.capabilities.keys()) {
-    units.push({ changed: touched(ctx, folder), at: (rev) => capabilityProblems(repo, rev, folder, domains(rev).ids, checks) });
+    units.push({ changed: touched(ctx, folder), at: (rev) => capabilityProblems(repo, rev, folder, domains(rev).ids) });
   }
   const findings = judge(ctx, units);
 
@@ -179,9 +177,9 @@ export function checkSpecs(ctx) {
   let changedScenarios = 0;
   for (const c of live(ctx)) {
     if (!SPEC_FILE.test(c.path)) continue;
-    const now = parse(repo.text(head, c.path));
+    const now = parseSpec(repo.text(head, c.path));
     const before = new Map();
-    for (const r of parse(repo.text(ctx.mergeBase, c.path) ?? '').requirements) for (const s of r.scenarios) before.set(scenarioKey(r, s), s);
+    for (const r of parseSpec(repo.text(ctx.mergeBase, c.path) ?? '').requirements) for (const s of r.scenarios) before.set(scenarioKey(r, s), s);
     for (const r of now.requirements) {
       for (const s of r.scenarios) {
         const key = scenarioKey(r, s);
@@ -209,7 +207,7 @@ export function checkSpecs(ctx) {
   }
   const scenarios = [...layout.capabilities.keys()].reduce((n, f) => {
     const t = repo.text(head, `${f}/spec.md`);
-    return n + (t ? parse(t).requirements.reduce((m, r) => m + r.scenarios.length, 0) : 0);
+    return n + (t ? parseSpec(t).requirements.reduce((m, r) => m + r.scenarios.length, 0) : 0);
   }, 0);
   return result('specs', 'specs', findings, `${layout.capabilities.size} capabilities, ${scenarios} scenarios, ${changedScenarios} new or changed in this PR`);
 }

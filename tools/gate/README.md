@@ -125,7 +125,6 @@ The JSON report lists what fails the run in `blocking`.
 | `livingDocs` | `{ include, exclude }`: globs of the living docs, the docs that state what IS and that the history lint reads. Change folders are planning, never living |
 | `budgets` | `[{ pattern, bytes }]`: the byte budget of the files a glob matches; the first matching entry wins, and `"bytes": null` means no budget, so a `null` entry placed first exempts what it matches from the entries after it |
 | `history` | `[{ id, message, pattern, flags?, skipProofLines? }]`, JavaScript regular expressions |
-| `humanChecks` | `[{ id, how, needs }]`: the human checks a PROOF line may name (`specs/README.md`), each id lowercase letters and `-` and never `test`, with how a person checks it and what the check needs (the build, the devices, the people, the accounts). The skills read them; a project may name none |
 | `overview.excludeModules` | globs of folders the overview lists no module from (planning and fixture folders); the gate does not read it |
 | `overview.moduleMarkers` | file-name globs (no `/`) that make a folder a module in the overview ([its Modules](../overview/README.md#modules)); without the key, its defaults. The gate does not read it |
 

@@ -6,8 +6,8 @@ import { stripBom } from './git.mjs';
 
 /** A domain, capability or change id. */
 export const ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-/** A human check's id: how a person checks a scenario. `test` is the automated kind, never a human check. */
-export const CHECK_ID = /^[a-z][a-z-]*$/;
+/** How a person checks a scenario. `test:` lines are the automated kind. */
+export const HUMAN_CHECKS = ['desk', 'headset', 'two-headsets', 'printed-card', 'live-tenant'];
 export const REVIEW_STATES = ['unreviewed', 'changes-requested'];
 export const STEP_KEYWORDS = ['GIVEN', 'WHEN', 'THEN', 'AND'];
 /** specs/<domain>/<capability>/spec.md */
@@ -118,20 +118,10 @@ function list(fm, key, problems, { required }) {
 }
 
 /**
- * The ids of the human checks a project's config names (`humanChecks`), or null when it names
- * none, as a repository read at a commit before it had them.
- */
-export function humanCheckIds(config) {
-  const list = config?.humanChecks;
-  return Array.isArray(list) ? list.map((h) => h?.id).filter((id) => typeof id === 'string') : null;
-}
-
-/**
  * Parses one PROOF line. Returns { check, state, path?, selector?, date?, build?, by?, note? }, with
- * `error` when the line breaks the format. state is 'test', 'open', 'pass' or 'fail'. `checks`
- * lists the human checks the project names (`humanCheckIds`); null reads any check id.
+ * `error` when the line breaks the format. state is 'test', 'open', 'pass' or 'fail'.
  */
-export function parseProof(line, checks = null) {
+export function parseProof(line) {
   const m = /^\s*[-*+]\s+\*\*PROOF\*\*\s*(.*?)\s*$/.exec(line);
   if (!m) return { error: 'not a PROOF line' };
   const kv = /^([a-z][a-z-]*):\s*(.*)$/.exec(m[1]);
@@ -148,7 +138,7 @@ export function parseProof(line, checks = null) {
     if (i >= 0 && !selector) return { check, state: 'test', path: p, error: 'test: an empty ::selector' };
     return { check, state: 'test', path: p, ...(selector ? { selector } : {}) };
   }
-  if (checks && !checks.includes(check)) return { check, error: `unknown check "${check}" (test${checks.map((c) => `, ${c}`).join('')})` };
+  if (!HUMAN_CHECKS.includes(check)) return { check, error: `unknown check "${check}" (test, ${HUMAN_CHECKS.join(', ')})` };
   if (value === 'open') return { check, state: 'open' };
   const r = /^(pass|fail) (\d{4}-\d{2}-\d{2}), build ([^,;]+), by ([^,;]+?)(?:;\s*(.*))?$/.exec(value);
   if (!r) {
@@ -169,9 +159,9 @@ export function parseProof(line, checks = null) {
  *   { title, code, purpose, requirements: [{ name, n, text, scenarios: [{ name, n, slug, steps:
  *     [{ keyword, text, n }], text, proofs: [{ n, raw, ...parseProof }] }] }], problems }
  * where `problems` ([{ line, message }]) lists every break of the format that the text alone shows.
- * `checks` is parseProof's. Whether `code` and `test:` paths exist is the caller's question.
+ * Whether `code` and `test:` paths exist is the caller's question.
  */
-export function parseSpec(text, { checks = null } = {}) {
+export function parseSpec(text) {
   const lines = splitLines(text);
   const fm = parseFrontMatter(text);
   const problems = [...fm.problems];
@@ -247,7 +237,7 @@ export function parseSpec(text, { checks = null } = {}) {
     if (sc) {
       if (blank) continue;
       if (proof) {
-        sc.proofs.push({ n, raw: l.trim(), ...parseProof(l, checks) });
+        sc.proofs.push({ n, raw: l.trim(), ...parseProof(l) });
         continue;
       }
       const step = mask[i] ? null : /^\s*[-*+]\s+\*\*([A-Za-z]+)\*\*\s*(.*?)\s*$/.exec(l);

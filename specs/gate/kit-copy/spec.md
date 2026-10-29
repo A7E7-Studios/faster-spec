@@ -26,7 +26,7 @@ kit unseen.
 - **AND** a pull request that changes only the project's own config, or a sync that changes the
   files and the lock together, passes
 - **PROOF** test: tools/gate/test/gate.test.mjs::kit: a copy as its lock says passes; an edited, missing or extra kit file fails; the project's own files are free
-- **PROOF** github: open
+- **PROOF** desk: open
 
 ### Requirement: A repository without a lock is not checked
 The gate SHALL skip the kit check where there is no lock, because the kit's own repository and a

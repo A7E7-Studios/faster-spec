@@ -12,7 +12,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Repo, runGit } from '../gate/lib/git.mjs';
-import { parseSpec, parseChange, SPEC_FILE, humanState, capabilityState, humanCheckIds } from '../gate/lib/spec.mjs';
+import { parseSpec, parseChange, SPEC_FILE, humanState, capabilityState } from '../gate/lib/spec.mjs';
 import { firstHeading, firstParagraph, plainText, clip } from '../gate/lib/markdown.mjs';
 import { matches } from '../gate/lib/glob.mjs';
 
@@ -64,14 +64,6 @@ function readJson(repo, rev, p) {
 function readConfig(repo, commit) {
   const c = readJson(repo, commit, 'tools/gate/config.json');
   return c && typeof c === 'object' && !Array.isArray(c) ? c : {};
-}
-
-/** The human checks a config names, as { id, how, needs }; null when it names none (any check id is read). */
-function humanChecksOut(config) {
-  if (!Array.isArray(config.humanChecks)) return null;
-  return config.humanChecks
-    .filter((h) => h && typeof h.id === 'string')
-    .map((h) => ({ id: h.id, how: String(h.how ?? ''), needs: String(h.needs ?? '') }));
 }
 
 /** The folder a file stands in: '.' for the root. */
@@ -213,8 +205,7 @@ export function buildOverview(repos, { now = new Date() } = {}) {
     if (!commit) throw new Error(`${r.id}: ${r.ref} does not resolve in ${r.dir} (git fetch first)`);
     handles.set(r.id, { repo, commit });
     const config = readConfig(repo, commit);
-    const checks = humanCheckIds(config);
-    out.repos.push({ id: r.id, name: repoName(repo, r.dir), ref: r.ref, commit, humanChecks: humanChecksOut(config) });
+    out.repos.push({ id: r.id, name: repoName(repo, r.dir), ref: r.ref, commit });
     const tree = repo.tree(commit);
 
     for (const d of readJson(repo, commit, 'specs/domains.json') ?? []) {
@@ -237,7 +228,7 @@ export function buildOverview(repos, { now = new Date() } = {}) {
       const m = SPEC_FILE.exec(p);
       if (!m) continue;
       const id = `${m[1]}/${m[2]}`;
-      const spec = parseSpec(repo.text(commit, p), { checks });
+      const spec = parseSpec(repo.text(commit, p));
       const mods = [];
       for (const c of spec.code) {
         const mod = moduleOf(c);

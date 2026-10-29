@@ -63,16 +63,9 @@ export function makeRepo(files = { 'README.md': '# Root\n\nThe root.\n' }, { pre
   return r;
 }
 
-/** The human checks the tests write. */
-export const TEST_CHECKS = [
-  { id: 'desk', how: 'at a computer', needs: 'a build with the change' },
-  { id: 'device', how: 'on one device', needs: 'a device build with the change' },
-  { id: 'two-devices', how: 'with two people on two devices, in one session', needs: 'two devices on that build' },
-];
-
 /**
  * The starter config (config.template.json) with report-only off, and the vendored trees, living
- * docs, budgets and human checks the tests write: the same in every repository that carries the gate.
+ * docs and budgets the tests write: the same in every repository that carries the gate.
  */
 export function testConfig(overrides = {}) {
   const base = JSON.parse(fs.readFileSync(path.join(GATE_DIR, 'config.template.json'), 'utf8'));
@@ -83,7 +76,7 @@ export function testConfig(overrides = {}) {
     { pattern: '**/AGENTS.md', bytes: 32768 },
     { pattern: '**/README.md', bytes: 40960 },
   ];
-  return { ...base, reportOnly: false, ignore: ['Packages/com.vendor.*/**', 'Packages/com.unity.*/**'], livingDocs, budgets, humanChecks: TEST_CHECKS, ...overrides };
+  return { ...base, reportOnly: false, ignore: ['Packages/com.vendor.*/**', 'Packages/com.unity.*/**'], livingDocs, budgets, ...overrides };
 }
 
 /** A tools/kit/lock.json for `files` ({ path: content }), as sync writes it. */
@@ -127,7 +120,7 @@ export const P = (v) => `- **PROOF** ${v}`;
 const SCENARIO = {
   name: 'A collaborator edits the same note',
   steps: ['GIVEN two users in one note', 'WHEN one user types in a paragraph', 'THEN the other sees a cursor where they type'],
-  proofs: ['test: src/cursors/cursors.test.js', 'two-devices: open'],
+  proofs: ['test: src/cursors/cursors.test.js', 'two-headsets: open'],
 };
 
 /** A spec in the contract's format; every part can be replaced. */

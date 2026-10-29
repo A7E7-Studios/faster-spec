@@ -24,8 +24,8 @@ project takes them as a vendored copy pinned by a lock.
 | **The overview**, `tools/overview/` | one JSON index (and a plain-text summary) of every capability, scenario, review state, pending change and module, across repositories. [Its README](tools/overview/README.md) |
 
 What stays each project's own: its `AGENTS.md` (the rules, the build route, the suites, the commit
-style), its `tools/gate/config.json` (the human checks a person makes, the protected paths, the
-vendored folders), `specs/domains.json`, and the specs and changes themselves.
+style), its `tools/gate/config.json` (the protected paths, the vendored folders, the module
+markers), `specs/domains.json`, and the specs and changes themselves.
 
 ## Taking it into a project
 
@@ -43,9 +43,9 @@ starts `tools/gate/config.json` from [the starter](tools/gate/config.template.js
 project has none, and records the kit commit and each file's git blob id in `tools/kit/lock.json`.
 Then, in the project:
 
-1. **Config.** In `tools/gate/config.json`, name the project's `humanChecks` (how a person checks a
-   scenario, and what that needs: a build, a device, two people, an account), its vendored folders
-   under `ignore`, and any owner-only paths under `protectedPaths`.
+1. **Config.** In `tools/gate/config.json`, name the project's vendored folders under `ignore`, any
+   owner-only paths under `protectedPaths`, and, when its modules are not README, `package.json`,
+   `pyproject.toml`, Gradle or Unity folders, its `overview.moduleMarkers`.
 2. **Domains.** Write `specs/domains.json`, `[{ "id", "title", "purpose" }]`: the few areas the
    product's capabilities fall into.
 3. **AGENTS.md.** The skills read the rules from it: how to make a worktree, the suites a change

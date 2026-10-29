@@ -26,12 +26,11 @@ import { blobSize } from '../lib/checks.mjs';
 import { loadConfig } from '../lib/index.mjs';
 import { parseCatFileBatch } from '../lib/git.mjs';
 import { blobId, parseLock, owns } from '../lib/kit.mjs';
-import { specText, proposalText, P, GATE_DIR, TEST_CHECKS } from './helpers.mjs';
+import { specText, proposalText, P, GATE_DIR } from './helpers.mjs';
 
 const REPO_ROOT = path.resolve(GATE_DIR, '..', '..');
 
-const CHECKS = TEST_CHECKS.map((c) => c.id);
-const problems = (text) => parseSpec(text, { checks: CHECKS }).problems.map((p) => p.message).join('\n');
+const problems = (text) => parseSpec(text).problems.map((p) => p.message).join('\n');
 
 test('globs: ** spans folders, * stays in one', () => {
   assert.ok(matches('README.md', '**/README.md'));
@@ -200,12 +199,11 @@ test('PROOF lines: every contract form parses', () => {
   });
   assert.deepEqual(parseProof(P('test: tools/x.sh')), { check: 'test', state: 'test', path: 'tools/x.sh' });
   assert.deepEqual(parseProof(P('test: Assets/TextMesh Pro/T.cs')).path, 'Assets/TextMesh Pro/T.cs');
-  for (const c of CHECKS) assert.deepEqual(parseProof(P(`${c}: open`), CHECKS), { check: c, state: 'open' });
-  for (const c of ['printed-card', 'live-tenant']) assert.deepEqual(parseProof(P(`${c}: open`)), { check: c, state: 'open' }, 'with no list of checks, any id reads');
-  assert.deepEqual(parseProof(P('device: pass 2026-10-30, build 1.4.2, by owner')), { check: 'device', state: 'pass', date: '2026-10-30', build: '1.4.2', by: 'owner' });
+  for (const c of ['desk', 'headset', 'two-headsets', 'printed-card', 'live-tenant']) assert.deepEqual(parseProof(P(`${c}: open`)), { check: c, state: 'open' });
+  assert.deepEqual(parseProof(P('headset: pass 2026-10-30, build 1.4.2, by owner')), { check: 'headset', state: 'pass', date: '2026-10-30', build: '1.4.2', by: 'owner' });
   assert.deepEqual(parseProof(P('desk: pass 2026-10-30, build 1.4.2, by owner; looked fine')).note, 'looked fine');
-  assert.deepEqual(parseProof(P('device: fail 2026-10-30, build 1.4.2 (stg), by owner; ring flickers')), {
-    check: 'device',
+  assert.deepEqual(parseProof(P('headset: fail 2026-10-30, build 1.4.2 (stg), by owner; ring flickers')), {
+    check: 'headset',
     state: 'fail',
     date: '2026-10-30',
     build: '1.4.2 (stg)',
@@ -215,13 +213,13 @@ test('PROOF lines: every contract form parses', () => {
 });
 
 test('PROOF lines: broken forms are errors', () => {
-  const err = (v) => parseProof(P(v), CHECKS).error;
-  assert.match(err('device: done'), /takes "open"/);
-  assert.match(err('tablet: open'), /unknown check "tablet" \(test, desk, device, two-devices\)/);
-  assert.match(err('device: fail 2026-10-30, build 1.4.2, by owner'), /says what failed/);
-  assert.match(err('device: pass 2026-02-30, build 1.4.2, by owner'), /not a calendar date/);
-  assert.match(err('device: pass 2026-10-30, build 1,4, by owner'), /takes "open"/);
-  assert.match(err('device: pass 2026-10-30, build 1.4, by a, b'), /takes "open"/);
+  const err = (v) => parseProof(P(v)).error;
+  assert.match(err('headset: done'), /takes "open"/);
+  assert.match(err('device: open'), /unknown check "device"/);
+  assert.match(err('headset: fail 2026-10-30, build 1.4.2, by owner'), /says what failed/);
+  assert.match(err('headset: pass 2026-02-30, build 1.4.2, by owner'), /not a calendar date/);
+  assert.match(err('headset: pass 2026-10-30, build 1,4, by owner'), /takes "open"/);
+  assert.match(err('headset: pass 2026-10-30, build 1.4, by a, b'), /takes "open"/);
   assert.match(err('test: `tools/x.sh`'), /without backticks/);
   assert.match(err('test: /abs/x.sh'), /absolute/);
   assert.match(err('test: tools\\x.sh'), /backslash/);
@@ -274,7 +272,7 @@ test('spec: the contract example parses with no problems', () => {
     '  slowly',
     '- **THEN** the other sees a cursor where they type',
     '- **PROOF** test: Assets/Scripts/Collaboration/Tests/SharedCursorTests.cs::SharedCursorTests.ShowsOthers',
-    '- **PROOF** two-devices: open',
+    '- **PROOF** two-headsets: open',
     '',
   ].join('\n');
   const s = parseSpec(text);
@@ -292,7 +290,7 @@ test('spec: the contract example parses with no problems', () => {
     sc.proofs.map((p) => [p.check, p.state]),
     [
       ['test', 'test'],
-      ['two-devices', 'open'],
+      ['two-headsets', 'open'],
     ],
   );
   assert.deepEqual(parseSpec(text.replace(/\n/g, '\r\n')).problems, [], 'CRLF reads the same');
@@ -346,7 +344,7 @@ test('spec: scenario and PROOF breaks', () => {
   assert.match(problems(one(['WHEN a', 'THEN b'], ['desk: open', 'desk: pass 2026-10-30, build 1, by o'])), /a second "desk:" line/);
   assert.match(problems(one(['WHEN a', 'THEN b'], ['desk: maybe'])), /takes "open"/);
   assert.deepEqual(parseSpec(one(['WHEN a', 'THEN b'], ['test: a.sh', 'test: b.sh', 'desk: open'])).problems, [], 'test: may repeat');
-  const late = specText().replace('- **PROOF** two-devices: open', '- **PROOF** two-devices: open\n- **AND** a late step');
+  const late = specText().replace('- **PROOF** two-headsets: open', '- **PROOF** two-headsets: open\n- **AND** a late step');
   assert.match(problems(late), /PROOF lines are the scenario's last bullets/);
   const prose = specText().replace('- **WHEN** one user', 'Some prose.\n- **WHEN** one user');
   assert.match(problems(prose), /a scenario holds only/);
@@ -358,7 +356,7 @@ test('spec: scenario and PROOF breaks', () => {
 
 test('spec: requirement text ignores PROOF lines and code, and sees every other word', () => {
   const base = requirementText(parseSpec(specText()));
-  assert.equal(requirementText(parseSpec(specText({ proofs: ['test: other.sh', 'device: pass 2026-10-30, build 1, by o'] }))), base);
+  assert.equal(requirementText(parseSpec(specText({ proofs: ['test: other.sh', 'headset: pass 2026-10-30, build 1, by o'] }))), base);
   assert.equal(requirementText(parseSpec(specText({ code: ['elsewhere/'] }))), base);
   assert.equal(requirementText(parseSpec(specText().replace('A cursor shows', 'A  cursor\nshows'))), base, 'whitespace is not text');
   assert.notEqual(requirementText(parseSpec(specText({ then: 'something else' }))), base);
@@ -411,30 +409,30 @@ test('the skills\' templates, filled in, parse with no problems', (t) => {
     [/<repo-relative folder ending in \/>/, 'src/cursors/'],
     [/<repo-relative file>/, 'src/cursors/cursors.js'],
     [/test: <[^>]+>::<[^>]+>/, 'test: src/cursors/cursors.test.js::Cursors.Others'],
-    [/<a human check id [^>]*>: open/, 'device: open'],
+    [/<desk \| headset[^>]*>: open/, 'headset: open'],
   ]);
   if (proposal === null || spec === null) return t.skip('the skills are not in this checkout');
   const c = parseChange(proposal);
   assert.deepEqual(c.problems, []);
   assert.deepEqual([c.capabilities, c.removes, c.review], [['collaboration/shared-cursors'], ['collaboration/old-cursors'], 'unreviewed']);
-  assert.deepEqual(parseSpec(spec, { checks: CHECKS }).problems, []);
+  assert.deepEqual(parseSpec(spec).problems, []);
 });
 
 test('derived states: a scenario from its PROOF lines, a capability from its scenarios', () => {
-  const p = (v) => parseProof(P(v), CHECKS);
+  const p = (v) => parseProof(P(v));
   assert.equal(humanState([p('test: a.sh')]), 'automated');
   assert.equal(humanState([]), 'automated');
-  assert.equal(humanState([p('test: a.sh'), p('device: pass 2026-10-30, build 1, by o')]), 'approved');
-  assert.equal(humanState([p('device: pass 2026-10-30, build 1, by o'), p('desk: open')]), 'open');
-  assert.equal(humanState([p('device: fail 2026-10-30, build 1, by o; x'), p('desk: open')]), 'failing');
+  assert.equal(humanState([p('test: a.sh'), p('headset: pass 2026-10-30, build 1, by o')]), 'approved');
+  assert.equal(humanState([p('headset: pass 2026-10-30, build 1, by o'), p('desk: open')]), 'open');
+  assert.equal(humanState([p('headset: fail 2026-10-30, build 1, by o; x'), p('desk: open')]), 'failing');
   // a malformed human line counts as open: never approved, never automated
-  for (const bad of ['device: maybe', 'Device: open', 'tablet: open', 'device: open.', 'device: pass 2026-02-30, build 1, by o', 'desk: fail 2026-10-30, build 1, by o']) {
+  for (const bad of ['headset: maybe', 'Headset: open', 'headset: open.', 'headset: pass 2026-02-30, build 1, by o', 'desk: fail 2026-10-30, build 1, by o']) {
     assert.ok(p(bad).error, bad);
     assert.equal(humanState([p('test: a.sh'), p(bad)]), 'open', bad);
-    assert.equal(humanState([p('device: pass 2026-10-30, build 1, by o'), p(bad)]), 'open', bad);
+    assert.equal(humanState([p('headset: pass 2026-10-30, build 1, by o'), p(bad)]), 'open', bad);
   }
   assert.equal(humanState([p('test: `a.sh`')]), 'automated', 'a broken test: line is not a human check');
-  assert.equal(humanState([p('device: fail 2026-10-30, build 1, by o; x'), p('desk: maybe')]), 'failing');
+  assert.equal(humanState([p('headset: fail 2026-10-30, build 1, by o; x'), p('desk: maybe')]), 'failing');
   assert.equal(capabilityState(['approved'], false, true), 'unreviewed', 'a spec that breaks the format is never approved');
   assert.equal(capabilityState(['automated'], false, true), 'unreviewed', 'nor automated');
   assert.equal(capabilityState(['failing'], false, true), 'failing');
@@ -553,16 +551,6 @@ test('config: the starter config loads and is report-only; history rules match w
       write({ ...cfg, overview: { moduleMarkers: bad } });
       assert.throws(() => loadConfig(path.join(dir, 'config.json')), /"overview\.moduleMarkers"/, JSON.stringify(bad));
     }
-    assert.deepEqual(cfg.humanChecks.map((h) => h.id), ['desk']);
-    write({ ...cfg, humanChecks: [] });
-    assert.deepEqual(loadConfig(path.join(dir, 'config.json')).humanChecks, [], 'a project may name no human check');
-    const one = { id: 'device', how: 'on one device', needs: 'a device build' };
-    for (const bad of [undefined, 'desk', [{ ...one, id: 'test' }], [{ ...one, id: 'Device' }], [{ ...one, how: '' }], [{ id: 'device', how: 'x' }]]) {
-      write({ ...cfg, humanChecks: bad });
-      assert.throws(() => loadConfig(path.join(dir, 'config.json')), /"humanChecks" is a list/, JSON.stringify(bad));
-    }
-    write({ ...cfg, humanChecks: [one, one] });
-    assert.throws(() => loadConfig(path.join(dir, 'config.json')), /each id once/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

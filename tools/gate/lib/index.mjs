@@ -5,7 +5,6 @@ import { fileURLToPath } from 'node:url';
 import { Repo } from './git.mjs';
 import { buildContext } from './context.mjs';
 import { CHECKS, ALWAYS_BLOCKING } from './checks.mjs';
-import { CHECK_ID } from './spec.mjs';
 
 export { Repo } from './git.mjs';
 export { formatSummary } from './report.mjs';
@@ -28,13 +27,6 @@ export function loadConfig(file = DEFAULT_CONFIG) {
   need(Array.isArray(c.history) && c.history.every((r) => r.id && r.message && typeof r.pattern === 'string'), '"history" is a list of { "id", "message", "pattern", "flags"?, "skipProofLines"? }');
   for (const r of c.history) new RegExp(r.pattern, r.flags ?? '');
   need(Array.isArray(c.protectedPaths) && c.protectedPaths.every((g) => typeof g === 'string'), '"protectedPaths" is a list of globs');
-  const hc = c.humanChecks;
-  const text = (v) => typeof v === 'string' && v.trim() !== '';
-  need(
-    Array.isArray(hc) && hc.every((h) => h && CHECK_ID.test(h.id ?? '') && h.id !== 'test' && text(h.how) && text(h.needs)),
-    '"humanChecks" is a list of { "id", "how", "needs" }: id lowercase letters and -, not "test"; how and needs non-empty',
-  );
-  need(new Set(hc.map((h) => h.id)).size === hc.length, '"humanChecks" names each id once');
   const ex = c.overview?.excludeModules;
   need(ex === undefined || (Array.isArray(ex) && ex.every((g) => typeof g === 'string')), '"overview.excludeModules" is a list of globs');
   const mm = c.overview?.moduleMarkers;

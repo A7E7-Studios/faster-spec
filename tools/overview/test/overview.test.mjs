@@ -120,7 +120,7 @@ function fixtures(t) {
     'specs/collaboration/shared-cursors/spec.md': specText({
       code: ['src/cursors/'],
       scenarios: [
-        sc('A collaborator edits the same note', ['GIVEN two users', 'WHEN one types', 'THEN the other sees a cursor'], ['test: src/cursors/cursors.test.js::Cursors.Others', PASS('two-devices')]),
+        sc('A collaborator edits the same note', ['GIVEN two users', 'WHEN one types', 'THEN the other sees a cursor'], ['test: src/cursors/cursors.test.js::Cursors.Others', PASS('two-headsets')]),
         sc('A collaborator leaves', ['WHEN a collaborator leaves', 'THEN its cursor goes'], ['test: src/cursors/cursors.test.js', 'test: src/cursors/gone.test.js']),
       ],
     }),
@@ -130,27 +130,27 @@ function fixtures(t) {
       code: ['src/quick/menu.js', 'src/collab/Editor/Tool.cs'],
       purpose: 'The menu opens on a long press.',
       scenarios: [
-        sc('A long press shows the menu', ['WHEN the user presses long', 'THEN the menu shows'], ['test: src/quick/menu.test.js', 'device: open']),
-        sc('Menu recall', ['WHEN the user presses again', 'THEN the menu comes back'], ['device: fail 2026-10-30, build 1.4.2, by owner; it lags', PASS('desk')]),
+        sc('A long press shows the menu', ['WHEN the user presses long', 'THEN the menu shows'], ['test: src/quick/menu.test.js', 'headset: open']),
+        sc('Menu recall', ['WHEN the user presses again', 'THEN the menu comes back'], ['headset: fail 2026-10-30, build 1.4.2, by owner; it lags', PASS('desk')]),
       ],
     }),
     'specs/layout/pages/spec.md': specText({
       title: 'Pages',
       code: ['src/pages.js'],
       purpose: 'A page holds its notes.',
-      scenarios: [sc('A page opens', ['WHEN a page is chosen', 'THEN it shows'], [PASS('device'), 'desk: pass 2026-10-30, build 1.4.2, by owner; crisp'])],
+      scenarios: [sc('A page opens', ['WHEN a page is chosen', 'THEN it shows'], [PASS('headset'), 'desk: pass 2026-10-30, build 1.4.2, by owner; crisp'])],
     }),
     'specs/reading/wake/spec.md': specText({
       title: 'Wake word',
       code: ['tools/voice/voice.py'],
       purpose: 'Saying the name wakes the assistant.',
-      scenarios: [sc('A shortcut starts it', ['WHEN the user presses the shortcut', 'THEN it listens'], [PASS('device')])],
+      scenarios: [sc('A shortcut starts it', ['WHEN the user presses the shortcut', 'THEN it listens'], [PASS('headset')])],
     }),
     'specs/reading/voice/spec.md': specText({
       title: 'Voice',
       code: ['tools/voice/'],
       purpose: 'The reader speaks.',
-      scenarios: [sc('It speaks', ['WHEN it answers', 'THEN it speaks'], ['test: tools/voice/voice.py', 'device: maybe'])],
+      scenarios: [sc('It speaks', ['WHEN it answers', 'THEN it speaks'], ['test: tools/voice/voice.py', 'headset: maybe'])],
     }),
     'specs/reading/transcript/spec.md': specText({
       title: 'Transcript',
@@ -163,7 +163,7 @@ function fixtures(t) {
       title: 'Sections',
       code: ['src/pages.js'],
       purpose: 'Sections stay where they are placed.',
-      scenarios: [sc('A section stays', ['WHEN a section is placed', 'THEN it shows'], [PASS('device')])],
+      scenarios: [sc('A section stays', ['WHEN a section is placed', 'THEN it shows'], [PASS('headset')])],
     }).replace('title: Sections\n', 'title: Sections\nowner: me\n'),
   });
   app.commit('feat: specs (#10)');
@@ -219,7 +219,6 @@ test('overview: two repositories merge into one index whose shape the schema des
     ],
   );
   assert.equal(o.repos[0].name, 'example-org/app');
-  assert.equal(o.repos[0].humanChecks, null, 'a config that names no human checks: any check id is read');
   assert.equal(o.repos[1].name, path.basename(f.backend.dir));
   assert.equal(o.domains.length, 7);
 
@@ -263,7 +262,7 @@ test('overview: two repositories merge into one index whose shape the schema des
   assert.equal(scenarios[1].look, null);
   assert.deepEqual(scenarios[0].proofs, [
     { check: 'test', state: 'test', path: 'src/cursors/cursors.test.js', selector: 'Cursors.Others', exists: true },
-    { check: 'two-devices', state: 'pass', date: '2026-10-30', build: '1.4.2', by: 'owner' },
+    { check: 'two-headsets', state: 'pass', date: '2026-10-30', build: '1.4.2', by: 'owner' },
   ]);
   assert.equal(scenarios[1].proofs[1].exists, false, 'a test path missing at the ref');
 
@@ -272,12 +271,12 @@ test('overview: two repositories merge into one index whose shape the schema des
     quick.map((s) => s.human),
     ['open', 'failing'],
   );
-  assert.deepEqual(quick[1].proofs[0], { check: 'device', state: 'fail', date: '2026-10-30', build: '1.4.2', by: 'owner', note: 'it lags' });
+  assert.deepEqual(quick[1].proofs[0], { check: 'headset', state: 'fail', date: '2026-10-30', build: '1.4.2', by: 'owner', note: 'it lags' });
   assert.equal(quick[1].tested, false);
   assert.equal(cap('layout/pages').requirements[0].scenarios[0].proofs[1].note, 'crisp');
   // a malformed human line counts as open; a spec that breaks the format is never approved
   const voice = cap('reading/voice');
-  assert.deepEqual(voice.requirements[0].scenarios[0].proofs[1], { check: 'device', state: 'invalid', error: voice.requirements[0].scenarios[0].proofs[1].error });
+  assert.deepEqual(voice.requirements[0].scenarios[0].proofs[1], { check: 'headset', state: 'invalid', error: voice.requirements[0].scenarios[0].proofs[1].error });
   assert.equal(voice.requirements[0].scenarios[0].human, 'open');
   assert.match(voice.sides[0].problems.join('\n'), /takes "open"/);
   const sections = cap('layout/sections');
@@ -459,27 +458,6 @@ test('overview: a repository with no specs yet still lists its modules', (t) => 
       ['a', 'A', 'The a module.'],
     ],
   );
-});
-
-test('overview: a repository\'s human checks come from its config; a check it does not name is invalid', (t) => {
-  const desk = { id: 'desk', how: 'at a computer', needs: 'a build with the change' };
-  const r = makeRepo(
-    {
-      'README.md': '# Root\n\nThe root.\n',
-      'specs/domains.json': DOMAINS,
-      'tools/gate/config.json': JSON.stringify({ humanChecks: [desk] }),
-      'specs/collaboration/shared-cursors/spec.md': specText({ code: ['README.md'], proofs: ['desk: open', 'device: open'] }),
-    },
-    { prefix: 'overview-checks-' },
-  );
-  t.after(() => r.cleanup());
-  const o = buildOverview([{ id: 'only', dir: r.dir, ref: 'main' }]);
-  assert.deepEqual(validate(JSON.parse(JSON.stringify(o)), SCHEMA), []);
-  assert.deepEqual(o.repos[0].humanChecks, [desk]);
-  const [ok, unknown] = o.capabilities[0].requirements[0].scenarios[0].proofs;
-  assert.deepEqual(ok, { check: 'desk', state: 'open' });
-  assert.equal(unknown.state, 'invalid');
-  assert.match(unknown.error, /unknown check "device" \(test, desk\)/);
 });
 
 test('overview: Python and Gradle folders are modules; a config\'s own markers replace the defaults', (t) => {

@@ -44,7 +44,7 @@ The workflow is the one the kit ships: [specs/README.md](specs/README.md),
 
 | Check | Here |
 |---|---|
-| Human checks | `desk` and `github`, in `tools/gate/config.json` `humanChecks` |
+| Human checks | `desk`: a tool's output at a computer, a gate run on GitHub; the gate's other checks have no use here |
 | A build | a commit of this repository: `build <short sha>`, its commit that sha |
 | A look | none: the kit draws nothing; a tool's output is checked at the desk |
 | The other repository | none; a project that carries the kit is no side of a kit change |

@@ -60,18 +60,6 @@
     },
     { "id": "todo", "message": "roadmap: TODO", "pattern": "\\bTODO\\b" }
   ],
-  "humanChecks": [
-    {
-      "id": "desk",
-      "how": "at a computer: a tool's output in a terminal, a page in a browser",
-      "needs": "a checkout of the kit, or a project synced to it, at a commit that contains the change"
-    },
-    {
-      "id": "github",
-      "how": "on GitHub: the gate workflow's run on a pull request, its summary and its verdict",
-      "needs": "a GitHub repository that carries the kit, and a pull request into its main"
-    }
-  ],
   "overview": {
     "excludeModules": ["**/test/fixtures/**"]
   }

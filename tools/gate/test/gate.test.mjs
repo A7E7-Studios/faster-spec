@@ -39,15 +39,6 @@ test('an empty PR and a docs-only PR pass every check', (t) => {
 
 // --- specs -----------------------------------------------------------------------------------
 
-test('specs: a human check is one the project names in its config', (t) => {
-  const r = setup(t, { ...baseFiles(), [SPEC]: null });
-  r.branch('add').write({ [SPEC]: specText({ proofs: ['test: src/cursors/cursors.test.js', 'desk: open', 'two-devices: open'] }), [PROPOSAL]: proposalText() });
-  r.commit('feat: shared cursors');
-  assert.equal(check(gate(r), 'specs').status, 'pass', failText(gate(r), 'specs'));
-  const rep = gate(r, { config: testConfig({ humanChecks: [{ id: 'desk', how: 'at a computer', needs: 'a build' }] }) });
-  assert.match(failText(rep, 'specs'), /unknown check "two-devices" \(test, desk\)/);
-});
-
 test('specs: a new valid capability with its change folder passes', (t) => {
   const r = setup(t, { ...baseFiles(), [SPEC]: null });
   r.branch('add').write({ [SPEC]: specText(), [PROPOSAL]: proposalText() });
@@ -63,7 +54,7 @@ test('specs: format, path, domain and missing paths fail on the spec that has th
   r.branch('bad').write({
     [SPEC]: specText({
       code: ['src/cursors/', 'src/gone.js', 'src/cursors/cursors.js/', 'src'],
-      proofs: ['test: src/missing.test.js', 'test: src/cursors/cursors.test.js/', 'test: src/cursors', 'test: src/cursors/', 'device: maybe'],
+      proofs: ['test: src/missing.test.js', 'test: src/cursors/cursors.test.js/', 'test: src/cursors', 'test: src/cursors/', 'headset: maybe'],
     }),
     'specs/no-such-domain/thing/spec.md': specText({ title: 'Thing' }),
     'specs/collaboration/Bad_Id/spec.md': specText({ title: 'Bad' }),
@@ -133,33 +124,33 @@ test('specs: a domains.json or spec saved with a byte-order mark reads like any 
 });
 
 test('specs: a changed or new scenario carries no pass or fail; an unchanged one keeps its owner\'s word', (t) => {
-  const PASS = 'two-devices: pass 2026-10-30, build 1.4.2, by owner';
+  const PASS = 'two-headsets: pass 2026-10-30, build 1.4.2, by owner';
   const r = setup(t, baseFiles({ [SPEC]: specText({ proofs: ['test: src/cursors/cursors.test.js', PASS] }) }));
   // triage: PROOF lines only, on an unchanged scenario
-  r.branch('triage').write({ [SPEC]: specText({ proofs: ['test: src/cursors/cursors.test.js', 'two-devices: fail 2026-10-31, build 1.4.3, by owner; cursor lags'] }) });
+  r.branch('triage').write({ [SPEC]: specText({ proofs: ['test: src/cursors/cursors.test.js', 'two-headsets: fail 2026-10-31, build 1.4.3, by owner; cursor lags'] }) });
   r.commit('docs: triage');
   let rep = gate(r);
   assert.equal(check(rep, 'specs').status, 'pass', failText(rep, 'specs'));
   assert.equal(check(rep, 'changes').status, 'pass', failText(rep, 'changes'));
   // the verdict written is a notice: scenario, check and value, first in the information
   const notice = infos(rep, 'specs').find((f) => f.notice);
-  assert.equal(notice.message, 'Cursors show where others type / A collaborator edits the same note: writes "two-devices: fail 2026-10-31, build 1.4.3, by owner; cursor lags"');
-  assert.match(formatSummary(rep), /### Information\n- specs: `specs\/collaboration\/shared-cursors\/spec\.md:\d+` Cursors show where others type \/ A collaborator edits the same note: writes "two-devices: fail/);
+  assert.equal(notice.message, 'Cursors show where others type / A collaborator edits the same note: writes "two-headsets: fail 2026-10-31, build 1.4.3, by owner; cursor lags"');
+  assert.match(formatSummary(rep), /### Information\n- specs: `specs\/collaboration\/shared-cursors\/spec\.md:\d+` Cursors show where others type \/ A collaborator edits the same note: writes "two-headsets: fail/);
   // a changed scenario keeps no fail either
-  r.branch('keeps-fail', 'triage').write({ [SPEC]: specText({ then: 'it glows', proofs: ['test: src/cursors/cursors.test.js', 'two-devices: fail 2026-10-31, build 1.4.3, by owner; cursor lags'] }), [PROPOSAL]: proposalText() });
+  r.branch('keeps-fail', 'triage').write({ [SPEC]: specText({ then: 'it glows', proofs: ['test: src/cursors/cursors.test.js', 'two-headsets: fail 2026-10-31, build 1.4.3, by owner; cursor lags'] }), [PROPOSAL]: proposalText() });
   r.commit('feat: glow');
-  assert.match(failText(gate(r, { base: 'triage' }), 'specs'), /"two-devices: fail" on a scenario whose text changed/);
+  assert.match(failText(gate(r, { base: 'triage' }), 'specs'), /"two-headsets: fail" on a scenario whose text changed/);
   // a changed scenario keeps every human check it had, as open; dropping one fails
   r.branch('drops', 'main').write({ [SPEC]: specText({ then: 'it glows', proofs: ['test: src/cursors/cursors.test.js'] }), [PROPOSAL]: proposalText() });
   r.commit('feat: glow, no check');
-  assert.match(failText(gate(r), 'specs'), /drops its "two-devices" check; a changed scenario keeps every human check it had at the merge base, as "two-devices: open"/);
+  assert.match(failText(gate(r), 'specs'), /drops its "two-headsets" check; a changed scenario keeps every human check it had at the merge base, as "two-headsets: open"/);
   // the scenario's text changes and keeps its pass
   r.branch('edit', 'main').write({ [SPEC]: specText({ then: 'the other sees a pulsing cursor', proofs: ['test: src/cursors/cursors.test.js', PASS] }), [PROPOSAL]: proposalText() });
   r.commit('feat: pulse');
   rep = gate(r);
-  assert.match(failText(rep, 'specs'), /"two-devices: pass" on a scenario whose text changed since the merge base/);
+  assert.match(failText(rep, 'specs'), /"two-headsets: pass" on a scenario whose text changed since the merge base/);
   // reset to open: fine
-  r.write({ [SPEC]: specText({ then: 'the other sees a pulsing cursor', proofs: ['test: src/cursors/cursors.test.js', 'two-devices: open'] }) });
+  r.write({ [SPEC]: specText({ then: 'the other sees a pulsing cursor', proofs: ['test: src/cursors/cursors.test.js', 'two-headsets: open'] }) });
   r.commit('feat: pulse, reset');
   rep = gate(r);
   assert.equal(check(rep, 'specs').status, 'pass', failText(rep, 'specs'));
@@ -236,7 +227,7 @@ test('changes: requirement text changed without a change folder that names it fa
   r.commit('feat: glow, folder gone');
   assert.match(failText(gate(r), 'changes'), /requirement text of collaboration\/shared-cursors, .*this PR adds or modifies no change folder/);
   for (const [name, files] of [
-    ['proof-only', { [SPEC]: specText({ proofs: ['test: src/cursors/cursors.test.js', 'two-devices: pass 2026-10-30, build 1, by owner'] }) }],
+    ['proof-only', { [SPEC]: specText({ proofs: ['test: src/cursors/cursors.test.js', 'two-headsets: pass 2026-10-30, build 1, by owner'] }) }],
     ['code-only', { [SPEC]: specText({ code: ['src/cursors/', 'src/README.md'] }) }],
     ['deletion-only', { [PROPOSAL]: null }],
   ]) {
@@ -307,7 +298,7 @@ test('history: each rule fails on an added living-doc line; code, PROOF dates, c
       '',
     ].join('\n'),
     'docs/a b/README.md': '# Spaced\n\nFixed in #77.\n',
-    [SPEC]: specText({ proofs: ['test: src/cursors/cursors.test.js', 'two-devices: pass 2026-10-30, build 1.4.2, by owner'] }),
+    [SPEC]: specText({ proofs: ['test: src/cursors/cursors.test.js', 'two-headsets: pass 2026-10-30, build 1.4.2, by owner'] }),
     [PROPOSAL]: `${proposalText()}\nDecided 2026-10-29 in #245; a follow-up, TODO.\n`,
     'Packages/com.unity.x/README.md': '# Vendor\n\nChanged in #12 on 2026-10-01, TODO.\n',
   });
@@ -470,7 +461,7 @@ test('links: deleting code or a whole folder fails the untouched docs that link 
     'src/cursors/cursors.js': null,
     'src/cursors/cursors.test.js': null,
     'src/README.md': '# Source\n\nNo cursors.\n',
-    [SPEC]: specText({ code: ['src/README.md'], proofs: ['two-devices: open'] }),
+    [SPEC]: specText({ code: ['src/README.md'], proofs: ['two-headsets: open'] }),
   });
   r.commit('refactor: drop the cursors code');
   const rep = gate(r);

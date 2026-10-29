@@ -33,7 +33,6 @@ repository is `--assets` fetching a missing LFS object into its LFS cache (below
 
 | Source | Becomes |
 |---|---|
-| `tools/gate/config.json` | `humanChecks`: the human checks its specs may name, null when it names none (then any check id is read); and the module globs below |
 | `specs/domains.json` | `domains`, from the first repository that has it |
 | `specs/<domain>/<capability>/spec.md` | a capability; one entry per id across repositories, a side per repository |
 | `specs/<domain>/<capability>/look/<scenario-slug>.png` | the scenario's `look` |
@@ -84,7 +83,7 @@ A side's `problems` lists each break of the spec format, and a capability with a
 
 ```
 { version: 1, generatedAt, assetsDir,
-  repos:        [{ id, name, ref, commit, humanChecks: [{ id, how, needs }] | null }],
+  repos:        [{ id, name, ref, commit }],
   domains:      [{ id, title, purpose }],
   capabilities: [{ id, domain, title, purpose,
                    sides: [{ repo, spec, code, modules, problems }],

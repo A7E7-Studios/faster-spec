@@ -60,13 +60,6 @@
     },
     { "id": "todo", "message": "roadmap: TODO", "pattern": "\\bTODO\\b" }
   ],
-  "humanChecks": [
-    {
-      "id": "desk",
-      "how": "at a computer: the running app, a page, a tool's output",
-      "needs": "a build or checkout that contains the change's landing commit"
-    }
-  ],
   "overview": {
     "excludeModules": ["dev/**", "docs/**", "**/proof/**", "fixtures/**", "**/test/fixtures/**"],
     "moduleMarkers": ["README.md", "package.json", "pyproject.toml", "build.gradle", "build.gradle.kts", "*.asmdef"]

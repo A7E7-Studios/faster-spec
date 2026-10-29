@@ -51,8 +51,9 @@ Skip to step 2 when nothing seen or heard changes.
 3. **`tasks.md`** from `templates/tasks.md`, when the work takes more than one step. Mark which
    groups depend on which: ship gives independent groups to separate sub-agents. New logic, as the
    ship skill's Build step defines it, gets unit-test tasks.
-4. **Questions.** A question the design raises goes to the owner like spec's: numbered after the
-   last one asked (Q<n+1>), with options and a recommended answer. Fold each answer into
+4. **Questions.** A question the design raises goes to the owner as spec's Rounds ask: through the
+   harness's question tool when there is one, else in spec's text format; numbered after the last
+   one asked (Q<n+1>), with options and the recommended one first. Fold each answer into
    `design.md`, and into `proposal.md`'s Settled questions and the spec when it changes a
    requirement.
 5. **Wait for approval.** Give the owner the decisions, the calls for the owner and the human

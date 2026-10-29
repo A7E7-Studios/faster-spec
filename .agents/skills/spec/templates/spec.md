@@ -22,4 +22,4 @@ The <app | site | service> SHALL <behaviour>, because <the reason it matters to 
 - **THEN** <what the person observes>
 - **AND** <a further observable outcome; optional>
 - **PROOF** test: <repo path to the test file>::<Class.Method>
-- **PROOF** <a human check id from tools/gate/config.json humanChecks>: open
+- **PROOF** <desk | headset | two-headsets | printed-card | live-tenant>: open

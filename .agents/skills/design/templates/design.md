@@ -34,7 +34,7 @@ Leave out a row that does not apply.
 
 | Scenario | Check | What the person looks at |
 |---|---|---|
-| <scenario name> | <a human check id from tools/gate/config.json humanChecks> | <what they do, and what passes> |
+| <scenario name> | <desk, headset, two-headsets, printed-card or live-tenant> | <what they do, and what passes> |
 
 ## Risks
 

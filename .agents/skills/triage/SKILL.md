@@ -20,15 +20,14 @@ or in a pull request body: describe the defect, never the model.
      (`landed` in the JSON), `review` state, its looks. Under it, each scenario it added or changed
      (`git show <landing commit> -- specs/`) with each human check and what the person looks at:
      `design.md`'s human checks, else the scenario's THEN steps and `proposal.md`'s What changes.
-   - **Then the other human checks** that are `open` or `fail`, grouped by check in the order the
-     project names them, each group headed with how the person checks it and what it needs: its
-     `how` and `needs` (`repos[].humanChecks` in the JSON, from each repository's
-     `tools/gate/config.json`; AGENTS.md may say more), and a build that contains the landing
-     commit.
+   - **Then the other human checks** that are `open` or `fail`, grouped by check (`desk`,
+     `headset`, `two-headsets`, `printed-card`, `live-tenant`), each group headed with what it
+     needs: a build that contains the landing commit, two headsets, the printed card, the tenant
+     and its account.
 4. Give it in chat, or as a local HTML page outside the repository. Never commit it.
-5. Suggest the recording: one CueReview session per source ("Record more" keeps the source, so
-   checks made on different sources, a computer's screen and a device, say, are separate
-   sessions), one take per change, each opening with the change's name said aloud.
+5. Suggest the recording: one CueReview session per source ("Record more" keeps the source, so the
+   desk checks and the headset checks are separate sessions), one take per change, each opening
+   with the change's name said aloud.
 
 ## B. With a review: the results
 

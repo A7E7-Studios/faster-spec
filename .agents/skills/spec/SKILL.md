@@ -37,20 +37,33 @@ The **frontier** is every decision whose prerequisites are settled. Ask the whol
 round, then wait for the answers. A question that depends on another in the same round waits for a
 later round.
 
+**Ask through the harness's question tool** when it has one. Claude Code's `AskUserQuestion` takes
+up to 4 questions per call and 2–4 options each: the recommended option first, its label ending
+"(Recommended)"; one short description per option; a preview on any option whose example the
+owner should compare. It adds "Other" itself. A round of more than 4 questions spans several calls.
+
+Only a harness without such a tool gets the questions as text. Each option is its own top-level
+list item, its details nested under it:
+
 ```
 **Q1 - <title>**: <the question>
-a) <option>   b) <option>   c) <option>
-Recommended: <letter>, <one line why>
+
+- **a) <option> (Recommended)**
+  - <what it means, what it costs, and why it is recommended>
+- **b) <option>**
+  - <what it means, what it costs>
 ```
 
-- Number questions across rounds (Q1, Q2, … never restarting). Word each so "yes" accepts your
-  recommendation.
+Never `a) … b) … c)` on one line, and never a plain line after a nested list: Markdown folds such
+a line into the last bullet.
+
+- Number questions across rounds (Q1, Q2, … never restarting), in the question tool too (its
+  header starts `Q<n>`). Word each so "yes" accepts your recommendation.
 - Cover, as the tree reaches them:
   - each observable outcome (each becomes a scenario) and its edges: empty, first use, repeated,
     offline, two people at once;
-  - which outcomes only a person can check, and how: the project's human checks, each with how a
-    person checks it and what it needs (`tools/gate/config.json` `humanChecks`; AGENTS.md may say
-    more), and never a check the project does not name;
+  - which outcomes only a person can check, and how: `desk`, `headset`, `two-headsets`,
+    `printed-card`, `live-tenant`;
   - whether anything seen or heard changes (design then draws it);
   - the other repository's side, the contracts between the two, stored data and its migration;
   - what is out of scope.

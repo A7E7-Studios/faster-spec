@@ -24,27 +24,13 @@
     "sha": { "type": "string", "pattern": "^[0-9a-f]{40}([0-9a-f]{24})?$" },
     "repo": {
       "type": "object",
-      "required": ["id", "name", "ref", "commit", "humanChecks"],
+      "required": ["id", "name", "ref", "commit"],
       "additionalProperties": false,
       "properties": {
         "id": { "$ref": "#/$defs/repoId" },
         "name": { "type": "string", "description": "owner/name from the origin URL, else the folder's name." },
         "ref": { "type": "string" },
-        "commit": { "$ref": "#/$defs/sha" },
-        "humanChecks": {
-          "type": ["array", "null"],
-          "description": "The human checks the repository's tools/gate/config.json names (humanChecks), in its order; null when it names none, and then any check id is read.",
-          "items": {
-            "type": "object",
-            "required": ["id", "how", "needs"],
-            "additionalProperties": false,
-            "properties": {
-              "id": { "type": "string" },
-              "how": { "type": "string", "description": "How a person checks a scenario this way." },
-              "needs": { "type": "string", "description": "What the check needs: the build, the devices, the people, the accounts." }
-            }
-          }
-        }
+        "commit": { "$ref": "#/$defs/sha" }
       }
     },
     "domain": {
@@ -132,7 +118,7 @@
       "required": ["check", "state"],
       "additionalProperties": false,
       "properties": {
-        "check": { "type": "string", "description": "test, or one of the human checks its repository names (repos[].humanChecks); unknown for an unreadable line." },
+        "check": { "type": "string", "description": "test, desk, headset, two-headsets, printed-card, live-tenant (unknown for an unreadable line)." },
         "state": { "enum": ["test", "open", "pass", "fail", "invalid"], "description": "invalid: the line breaks the format; unless its check is test, the scenario counts it as open." },
         "path": { "type": "string", "description": "test: the test's path." },
         "selector": { "type": "string", "description": "test: what follows ::" },

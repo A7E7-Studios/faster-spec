@@ -116,16 +116,15 @@ it never wraps.
 `test:` names an automated test that proves the scenario; a scenario may have none or several. The
 path is written bare (no backticks) and exists at the commit, a file or a folder; `::` is followed
 by a selector naming the test inside it (for example `Class.Method`), or left out. Every other line
-is a human check, named for how a **person** checks it. Each project names its own human checks in
-[`tools/gate/config.json`](../tools/gate/README.md#configjson) `humanChecks`: each one's `id`, `how`
-a person checks it, and what it `needs` (the build, the devices, the people, the accounts). The
-gate fails a check the project does not name. For example:
+is a human check, named for how a **person** checks it:
 
 | Check | The person checks it |
 |---|---|
-| `desk` | at a computer: the running app, a page, a tool's output |
-| `device` | on one phone or headset |
-| `two-devices` | with two people on two devices, in one session |
+| `desk` | at a computer: a web page, an editor, a tool's output |
+| `headset` | wearing one headset |
+| `two-headsets` | with two people in two headsets, in one session |
+| `printed-card` | with a printed code or card in the room |
+| `live-tenant` | against a live tenant and its account |
 
 - Each check appears at most once per scenario. The date is a calendar date; `<version>` and
   `<who>` are not empty and contain no `,` or `;`; a `fail` always carries its note.
