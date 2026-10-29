@@ -58,7 +58,7 @@ export function parseManifest(text) {
 export function publicUrl(url) {
   if (!url) return null;
   // scp-like: [user@]host:org/repo.git, where a one-letter host is a Windows drive
-  if (/^(?:[\w.-]+@)?[\w-][\w.-]+:(?![\\/])/.test(url)) return url;
+  if (/^(?:[\w.-]+@)?[\w-][\w.-]+:(?!\/\/)/.test(url)) return url;
   const scheme = /^([a-z][a-z0-9+.-]*):\/\//i.exec(url);
   if (!scheme || scheme[1].toLowerCase() === 'file') return null;
   return url.replace(/^([a-z][a-z0-9+.-]*:\/\/)[^@/]+@/i, '$1').replace(/[?#].*$/, '');
@@ -93,8 +93,9 @@ function dirtyPaths(projectDir, paths) {
 function ignoredPaths(projectDir, paths) {
   if (!paths.length) return new Set();
   const r = runGit(projectDir, ['check-ignore', '-z', '--stdin'], { input: paths.join('\0') + '\0', allowFail: true });
-  const out = typeof r === 'string' || Buffer.isBuffer(r) ? r : r.stdout ?? '';
-  return new Set(String(out).split('\0').filter(Boolean));
+  // 0: some are ignored, 1: none is; anything else stopped part way, and the rest would read as not ignored
+  if (r.status !== 0 && r.status !== 1) throw new Error(`git check-ignore failed in ${projectDir}: ${String(r.stderr).trim()}`);
+  return new Set(String(r.stdout).split('\0').filter(Boolean));
 }
 
 /** Files under the kit's paths in the project's working tree: tracked, and untracked but not ignored. */
@@ -166,7 +167,7 @@ export function planSync({ kit, commit, projectDir }) {
       return { path: target, from, bytes };
     });
   const blocked = [];
-  for (const p of ignoredPaths(projectDir, [...files.keys()])) {
+  for (const p of ignoredPaths(projectDir, [...files.keys(), ...starters.map((s) => s.path), LOCK_FILE])) {
     blocked.push({ path: p, why: 'is ignored by git, so the committed copy would lack it: un-ignore it (a !rule in .gitignore)' });
   }
   const root = path.resolve(projectDir);
@@ -175,7 +176,7 @@ export function planSync({ kit, commit, projectDir }) {
     try {
       assertInside(root, path.join(root, ...p.split('/')));
     } catch (e) {
-      blocked.push({ path: p, why: e.message });
+      blocked.push({ path: p, why: e.message.slice(p.length + 1) });
     }
   }
   return { manifest, files, actions, conflicts, blocked, stray, starters, oldLock };
@@ -195,7 +196,9 @@ function pruneEmpty(dir, stop) {
   }
 }
 
-const inside = (child, parent) => {
+const rel = (root, target) => path.relative(root, target).split(path.sep).join('/');
+
+export const inside = (child, parent) => {
   const rel = path.relative(parent, child);
   return rel === '' || (rel !== '..' && !rel.startsWith('..' + path.sep) && !path.isAbsolute(rel));
 };
@@ -211,11 +214,11 @@ export function assertInside(root, target) {
   try {
     st = fs.lstatSync(target);
   } catch {}
-  if (st?.isSymbolicLink()) throw new Error('is a link: sync writes and deletes only real files inside the project');
+  if (st?.isSymbolicLink()) throw new Error(`${rel(root, target)} is a link: sync writes and deletes only real files inside the project`);
   let d = path.dirname(target);
   while (!fs.existsSync(d)) d = path.dirname(d);
   const real = fs.realpathSync.native(d);
-  if (!inside(norm(real), realRoot)) throw new Error(`lies through a link outside the project (${real})`);
+  if (!inside(norm(real), realRoot)) throw new Error(`${rel(root, target)} lies through a link outside the project (${real})`);
 }
 
 /**
@@ -225,9 +228,14 @@ export function assertInside(root, target) {
 export function applySync(plan, { projectDir, repository, commit }) {
   const root = path.resolve(projectDir);
   const abs = (p) => path.join(root, ...p.split('/'));
-  for (const a of plan.actions) if (a.op !== 'same') assertInside(root, abs(a.path));
-  for (const s of plan.starters) assertInside(root, abs(s.path));
-  assertInside(root, abs(LOCK_FILE));
+  try {
+    for (const a of plan.actions) if (a.op !== 'same') assertInside(root, abs(a.path));
+    for (const s of plan.starters) assertInside(root, abs(s.path));
+    assertInside(root, abs(LOCK_FILE));
+  } catch (e) {
+    e.beforeWrite = true;
+    throw e;
+  }
   for (const a of plan.actions) {
     if (a.op === 'add' || a.op === 'update') {
       const f = plan.files.get(a.path);
@@ -394,7 +402,8 @@ export function main(argv, { log = console.log, err = console.error } = {}) {
     try {
       applySync(plan, { projectDir: project.dir, repository, commit });
     } catch (e) {
-      err(`sync: stopped part way (${e.message}): files before it may be written and ${LOCK_FILE} is not; git status shows them. Fix the cause and sync again`);
+      if (e.beforeWrite) err(`sync: ${e.message}: nothing written`);
+      else err(`sync: stopped part way (${e.message}): files before it may be written and ${LOCK_FILE} is not; git status shows them. Fix the cause and sync again`);
       return 1;
     }
   }

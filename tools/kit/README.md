@@ -24,7 +24,9 @@ node tools/kit/sync.mjs --check [--rev <rev>]                      # is the comm
 | `--check` | compare the project's copy at `--rev` (default `HEAD`) with its lock, as the gate does |
 
 Exit: **0** done, **1** refused (nothing written), a file under the kit's paths that the kit lacks
-(everything else written), or with `--check` a copy not as its lock says; **2** usage or setup error.
+(everything else written), a write that failed part way (it says so; `git status` shows what it
+wrote), or with `--check` a copy not as its lock says; **2** usage or setup error, a project that
+stores SHA-256 objects among them.
 
 ## What it does
 

@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { makeRepo, git, testConfig, check } from '../../gate/test/helpers.mjs';
 import { runGate, Repo } from '../../gate/lib/index.mjs';
 import { blobId } from '../../gate/lib/kit.mjs';
-import { parseManifest, publicUrl, lockUnprotected } from '../sync.mjs';
+import { parseManifest, publicUrl, lockUnprotected, assertInside, inside } from '../sync.mjs';
 
 const SYNC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'sync.mjs');
 const LOCK = 'tools/kit/lock.json';
@@ -235,6 +235,11 @@ test('sync: an ignored file where the kit writes stops the sync; a link out of t
   p.write({ 'specs/README.md': null });
   assert.equal(into(k, p).code, 1, 'ignored whether or not it is there yet');
   assert.ok(!exists(p, LOCK));
+  const l = project(t, { 'README.md': '# App\n', '.gitignore': 'tools/kit/lock.json\ntools/gate/config.json\n' });
+  res = into(k, l);
+  assert.equal(res.code, 1, 'the lock and a starter too');
+  assert.match(res.err, /^sync: tools\/kit\/lock\.json is ignored by git/m);
+  assert.match(res.err, /^sync: tools\/gate\/config\.json is ignored by git/m);
 
   const q = project(t);
   const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'kit-outside-'));
@@ -286,14 +291,11 @@ test('sync: a kit file that is itself a link is refused', (t) => {
 });
 
 test('sync: a folder named like ..cache is inside the project', (t) => {
-  const k = kitRepo(t);
   const p = project(t);
-  const m = { ...MANIFEST, paths: [...MANIFEST.paths, '..cache/'] };
-  k.write({ 'kit.json': JSON.stringify(m), '..cache/x.md': 'x\n' });
-  k.commit('feat: a dot-dot folder');
-  const res = into(k, p);
-  assert.equal(res.code, 0, res.out + res.err);
-  assert.equal(read(p, '..cache/x.md'), 'x\n');
+  fs.mkdirSync(path.join(p.dir, '..cache'));
+  assert.doesNotThrow(() => assertInside(p.dir, path.join(p.dir, '..cache', 'x.md')));
+  assert.ok(inside(path.join(p.dir, '..cache'), p.dir));
+  assert.ok(!inside(path.join(p.dir, '..'), p.dir) && !inside(path.join(p.dir, '..', 'sibling'), p.dir));
 });
 
 test('sync: a project that stores SHA-256 objects is refused', (t) => {
@@ -340,6 +342,7 @@ test('sync: kit.json and the repository URL', () => {
   assert.equal(publicUrl('ssh://git:secret@example.invalid/org/kit.git'), 'ssh://example.invalid/org/kit.git');
   for (const local of ['C:/Users/someone/kit', 'C:\\Users\\someone\\kit', '/home/someone/kit', '../kit', 'file:///C:/kit']) assert.equal(publicUrl(local), null, local);
   assert.equal(publicUrl('github.com:org/kit.git'), 'github.com:org/kit.git', 'scp-like with no user');
+  assert.equal(publicUrl('git@example.invalid:/srv/kit.git'), 'git@example.invalid:/srv/kit.git', 'scp-like with an absolute path');
   assert.equal(publicUrl('https://example.invalid/org/kit.git?token=x#y'), 'https://example.invalid/org/kit.git');
 });
 

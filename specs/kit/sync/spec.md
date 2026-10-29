@@ -42,6 +42,13 @@ in `tools/kit/lock.json`, because the lock is what the gate holds the copy to.
 - **THEN** the files the old lock lists there are deleted, and the project's own file stays, unreported
 - **PROOF** test: tools/kit/test/sync.test.mjs::sync: the kit takes back a file the project owned, and drops a folder
 
+#### Scenario: A project that stores SHA-256 objects
+- **GIVEN** a project whose git stores SHA-256 objects
+- **WHEN** someone syncs the kit into it or checks its copy
+- **THEN** the sync says it is not supported, writes nothing and exits 2, since the lock records
+  SHA-1 blob ids
+- **PROOF** test: tools/kit/test/sync.test.mjs::sync: a project that stores SHA-256 objects is refused
+
 ### Requirement: A sync never loses the project's work
 The sync SHALL write nothing when the project changed a kit file since the last sync or holds
 uncommitted changes to one, unless told to force, because such a change belongs in the kit and
