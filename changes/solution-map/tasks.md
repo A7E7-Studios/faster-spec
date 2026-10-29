@@ -19,8 +19,9 @@ scenario a person checks. A `test:` task is ticked when its test passes.
 ## 3. The page (after 2.1)
 
 - [x] 3.1 Direction A: Waiting for you, Explore by domain and by system, search, addresses, banners, both themes; test: tools/solution-map/test/view.test.mjs
-- [ ] 3.2 The board `specs/overview/solution-map/looks/solution-map.html`, self-contained and under 30720 bytes, sections `waiting`, `explore-system`, `banners`; test: node tools/gate/gate.mjs --local
-- [ ] 3.3 The page at phone width and with a keyboard only; check: the proposal's Review
+- [x] 3.2 The board `specs/overview/solution-map/looks/solution-map.html`, self-contained and under 30720 bytes, sections `waiting`, `explore-system`, `banners`, drawn from the page's own views and styles over the sample; test: node tools/gate/gate.mjs --local
+- [x] 3.3 The page at phone width and with a keyboard only; check: the proposal's Review
+- [x] 3.4 Start review opens CueReview in place of Copy for triage (Q15); test: tools/solution-map/test/server.test.mjs
 
 ## 4. Docs
 
