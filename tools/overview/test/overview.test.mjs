@@ -493,7 +493,7 @@ test('overview: a proposal\'s section as plain text', () => {
   assert.equal(sectionText('---\ntitle: X\n---\n## Review\n', 'Review'), '');
   // a fence's body is text, one paragraph, without its delimiters; an empty paragraph drops out
   const fenced = '---\ntitle: X\n---\n## Review\n\n<br>\n\n```js\n### not a heading\n\nstill code\n```\n\nafter\n';
-  assert.equal(sectionText(fenced, 'Review'), 'not a heading still code\n\nafter'.replace('not a heading', '### not a heading'));
+  assert.equal(sectionText(fenced, 'Review'), '### not a heading still code\n\nafter');
 });
 
 test('overview: --assets copies every board that exists into its folder', (t) => {
