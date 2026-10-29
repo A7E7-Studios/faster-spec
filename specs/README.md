@@ -148,7 +148,7 @@ The owner reviews a feature as a whole, and `review` in its front matter holds t
 | `approved` | the owner approved the feature as its spec and Looks state it |
 | `changes-requested` | the owner asked for changes; a change that answers them is to come |
 
-- **Seeding writes `unreviewed`.** A new spec is `unreviewed`.
+- **A new spec starts `unreviewed`**, one written over code that already exists included.
 - **A changed feature goes back to `unreviewed`.** A pull request that changes a spec's text (its
   title, Summary, Looks lines and boards, requirements or scenarios; not its `code` paths or PROOF
   lines) sets that spec's `review` to `unreviewed`, and so does one that adds or modifies a change

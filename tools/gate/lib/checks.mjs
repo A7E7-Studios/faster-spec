@@ -160,17 +160,39 @@ function pathAtRev(tree, p) {
 const lineAt = (text, index) => text.slice(0, index).split('\n').length;
 const escapeRx = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** Where a board loads something from the network: [{ line, url }] for http(s) in src=, href=, url(…) or @import. */
+/**
+ * Where a board loads something from outside itself: [{ line, url }] for every value of a
+ * src, srcset, poster, data or xlink:href attribute, a <link> element's href, a url(…) or an
+ * @import that is not a data: URL or a #fragment. A board is self-contained: nothing from the
+ * network, and no other file, so it shows the same wherever it is copied.
+ */
 export function networkLoads(html) {
   const out = [];
-  const rx = /\b(?:src|href)\s*=\s*["']?\s*(https?:\/\/[^\s"'>]*)|url\(\s*["']?\s*(https?:\/\/[^\s"')]*)|@import\s+["']\s*(https?:\/\/[^\s"']*)/gi;
-  for (const m of html.matchAll(rx)) out.push({ line: lineAt(html, m.index), url: m[1] ?? m[2] ?? m[3] });
-  return out;
+  const value = '(?:"([^"]*)"|\'([^\']*)\'|([^\\s>"\']+))';
+  const outside = (u) => !/^(?:data:|#|$)/i.test(u.trim());
+  const rules = [
+    new RegExp(`(?<![\\w:-])(?:src|srcset|poster|data|xlink:href)\\s*=\\s*${value}`, 'gi'),
+    new RegExp(`<link\\b[^>]*?(?<![\\w:-])href\\s*=\\s*${value}`, 'gi'),
+    /url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)/gi,
+    /@import\s+(?:url\(\s*)?(?:"([^"]*)"|'([^']*)'|([^\s;)]+))/gi,
+  ];
+  for (const rx of rules) {
+    for (const m of html.matchAll(rx)) {
+      const url = (m[1] ?? m[2] ?? m[3] ?? '').trim();
+      if (outside(url)) out.push({ index: m.index, line: lineAt(html, m.index), url });
+    }
+  }
+  const seen = new Set();
+  return out
+    .sort((a, b) => a.index - b.index)
+    .filter((o) => !seen.has(`${o.line} ${o.url}`) && seen.add(`${o.line} ${o.url}`))
+    .map(({ line, url }) => ({ line, url }));
 }
 
-/** Whether an HTML text holds an element with this id. */
+/** Whether an HTML text holds an element with this id, its value quoted or not. */
 export function holdsId(html, id) {
-  return new RegExp(`(?<![\\w:-])id\\s*=\\s*(["'])${escapeRx(id)}\\1`).test(html);
+  const v = escapeRx(id);
+  return new RegExp(`(?<![\\w:-])id\\s*=\\s*(?:(["'])${v}\\1|${v}(?=[\\s>/]))`).test(html);
 }
 
 /** Everything wrong with one capability folder at `rev`, as [{ file, line?, message }]. */
@@ -217,7 +239,7 @@ export function capabilityProblems(repo, rev, folder, domainIds) {
   for (const board of named) {
     const file = `${folder}/${board}`;
     for (const n of networkLoads(repo.text(rev, file) ?? '')) {
-      out.push({ file, line: n.line, message: `loads ${n.url} from the network: a board is self-contained, its CSS inline and nothing loaded` });
+      out.push({ file, line: n.line, message: `loads ${n.url} from outside the board: a board is self-contained, its CSS inline and nothing loaded from the network or another file` });
     }
   }
   for (const f of inFolder) {

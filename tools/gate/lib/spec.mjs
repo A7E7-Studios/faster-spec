@@ -323,6 +323,7 @@ export function parseSpec(text) {
     reqNames.set(r.name, r.n);
     const statement = paragraphs(r.statement);
     if (!statement) problems.push({ line: r.n, message: `${r.name}: a requirement opens with its statement` });
+    else if (statement.includes('\n\n')) problems.push({ line: r.n, message: `${r.name}: the statement is one paragraph, its reason in the same sentence` });
     else if (!/\bSHALL\b/.test(statement) || !/\bbecause\b/.test(statement)) {
       problems.push({ line: r.n, message: `${r.name}: the statement reads "When …, the app SHALL …, because …": it holds SHALL and its reason` });
     }
@@ -374,7 +375,7 @@ function tableOf(s, problems) {
 }
 
 /** Lines as paragraphs: each paragraph's lines joined by one space, paragraphs by a blank line. */
-function paragraphs(lines) {
+export function paragraphs(lines) {
   const out = [];
   let cur = [];
   for (const l of lines) {

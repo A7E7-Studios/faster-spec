@@ -366,6 +366,7 @@ test('spec: a statement holds SHALL and its reason, because', () => {
   assert.match(statement('The app SHALL keep a draft.'), /R: the statement reads "When …, the app SHALL …, because …": it holds SHALL and its reason/);
   assert.match(statement('The app keeps a draft, because a crash loses it.'), /holds SHALL and its reason/);
   assert.match(statement('The app shall keep a draft, because x.'), /holds SHALL/, 'SHALL in capitals');
+  assert.match(statement('The app SHALL keep a draft.\n\nThis is because a crash loses it.'), /R: the statement is one paragraph, its reason in the same sentence/);
 });
 
 test('spec: steps are optional; given any, one WHEN and one THEN, a GIVEN first, an AND after another step', () => {
@@ -526,19 +527,29 @@ test('boards: an element id in either quote; a network load in src=, href=, url(
   assert.ok(!holdsId('<section id="mainly">', 'main'));
   assert.ok(!holdsId('<section data-id="main">', 'main'));
   assert.ok(!holdsId('<a href="#main">', 'main'));
+  assert.ok(holdsId('<section id=idle>', 'idle') && holdsId('<p id=idle/>', 'idle'));
+  assert.ok(!holdsId('<section id=idler>', 'idle'));
   const html = [
     '<link rel="stylesheet" href="https://fonts.example.invalid/a.css">',
     '<img src=http://example.invalid/a.png>',
     '<style>body { background: url( "https://example.invalid/b.png" ) }',
     '@import "https://example.invalid/c.css";',
     '.ok { background: url(data:image/gif;base64,R0lGOD) } </style>',
-    '<a href="#main">in the page</a> <img src="local.png"> <a href="mailto:x@example.invalid">mail</a>',
+    '<a href="#main">in the page</a> <a href="mailto:x@example.invalid">mail</a> <a href="https://example.invalid/doc">a link</a>',
+    '<img src="local.png"> <script src="//cdn.example.invalid/x.js"></script>',
+    '<img srcset="https://example.invalid/2x.png 2x"> <video poster="https://example.invalid/p.png"></video>',
+    '<link rel=stylesheet href="../../../../tools/design/house-style/tokens.css"> <img data-src="lazy.png">',
   ].join('\n');
   assert.deepEqual(networkLoads(html), [
     { line: 1, url: 'https://fonts.example.invalid/a.css' },
     { line: 2, url: 'http://example.invalid/a.png' },
     { line: 3, url: 'https://example.invalid/b.png' },
     { line: 4, url: 'https://example.invalid/c.css' },
+    { line: 7, url: 'local.png' },
+    { line: 7, url: '//cdn.example.invalid/x.js' },
+    { line: 8, url: 'https://example.invalid/2x.png 2x' },
+    { line: 8, url: 'https://example.invalid/p.png' },
+    { line: 9, url: '../../../../tools/design/house-style/tokens.css' },
   ]);
   for (const f of ['a.png', 'b.JPG', 'c.jpeg', 'd.gif', 'e.webp', 'f.svg', 'g.mp4', 'h.mov', 'i.webm', 'j.tiff', 'k.heic', 'l.ico']) assert.ok(MEDIA.test(`specs/x/y/${f}`), f);
   for (const f of ['spec.md', 'looks/a.html', 'tokens.css', 'notes.txt', 'png.md']) assert.ok(!MEDIA.test(`specs/x/y/${f}`), f);

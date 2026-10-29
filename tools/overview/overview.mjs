@@ -12,7 +12,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Repo } from '../gate/lib/git.mjs';
-import { parseSpec, parseChange, parseFrontMatter, isTested, reviewState, REVIEW_STATES, SPEC_FILE, ID } from '../gate/lib/spec.mjs';
+import { parseSpec, parseChange, parseFrontMatter, paragraphs, isTested, reviewState, REVIEW_STATES, SPEC_FILE, ID } from '../gate/lib/spec.mjs';
+import { readSystems as readSystemsFile } from '../gate/lib/checks.mjs';
+import { prSections } from '../gate/lib/pr.mjs';
 import { firstHeading, firstParagraph, plainText, clip, splitLines, fenceMask } from '../gate/lib/markdown.mjs';
 import { matches } from '../gate/lib/glob.mjs';
 
@@ -192,21 +194,20 @@ export function findComponents(repo, commit, repoId, config = readConfig(repo, c
 }
 
 /**
- * A repository's specs/systems.json at `commit`: [{ id, title, purpose, paths }], keeping the
- * entries with a kebab-case id and at least one path (the gate judges the rest); [] when it has
- * none or it does not parse.
+ * A repository's specs/systems.json at `commit`, read by the gate's reader: [{ id, title,
+ * purpose, paths }] for the entries with a valid id, their string paths only (the gate judges the
+ * rest); [] when it has none or it does not parse.
  */
 export function readSystems(repo, commit) {
-  const list = readJson(repo, commit, 'specs/systems.json');
-  if (!Array.isArray(list)) return [];
-  const out = [];
-  for (const s of list) {
-    if (!s || typeof s.id !== 'string' || !ID.test(s.id) || !Array.isArray(s.paths)) continue;
-    const paths = s.paths.filter((p) => typeof p === 'string' && p.trim() !== '');
-    if (!paths.length) continue;
-    out.push({ id: s.id, title: typeof s.title === 'string' && s.title ? s.title : s.id, purpose: typeof s.purpose === 'string' ? s.purpose : '', paths });
-  }
-  return out;
+  const { systems } = readSystemsFile(repo, commit);
+  return (systems ?? [])
+    .map((s) => ({
+      id: s.id,
+      title: typeof s.title === 'string' && s.title.trim() ? s.title : s.id,
+      purpose: typeof s.purpose === 'string' ? s.purpose : '',
+      paths: Array.isArray(s.paths) ? s.paths.filter((p) => typeof p === 'string' && p.trim() !== '') : [],
+    }))
+    .filter((s) => s.paths.length);
 }
 
 /** The id of the nearest system declaring `p` or a folder above it (the deepest declared path), or null. */
@@ -240,40 +241,24 @@ function prNumber(subject) {
 }
 
 /**
- * The plain text of a proposal's `## <name>` section: its paragraphs, each paragraph's lines
- * joined by one space and its inline Markdown dropped, paragraphs joined by a blank line; null
- * when the section is absent.
+ * The plain text of a proposal's `## <name>` section (read as the gate reads a PR body's
+ * sections): its paragraphs, each paragraph's lines joined by one space and its inline Markdown
+ * dropped, a sub-heading a paragraph of its own, paragraphs joined by a blank line; null when the
+ * section is absent.
  */
 export function sectionText(text, name) {
-  const lines = splitLines(text);
-  const mask = fenceMask(lines);
-  const start = parseFrontMatter(text).bodyStart;
-  const heading = (l) => /^ {0,3}(#{1,6})(?:[ \t]+(.*?))?[ \t]*$/.exec(l);
-  let i = start;
-  for (; i < lines.length; i++) {
-    const h = mask[i] ? null : heading(lines[i]);
-    if (h && h[1].length === 2 && (h[2] ?? '').replace(/[ \t]+#+$/, '').trim() === name) break;
-  }
-  if (i >= lines.length) return null;
-  const paras = [];
-  let cur = [];
-  const flush = () => {
-    if (cur.length) paras.push(plainText(cur.join(' ')));
-    cur = [];
-  };
-  for (i++; i < lines.length; i++) {
-    const h = mask[i] ? null : heading(lines[i]);
-    if (h && h[1].length <= 2) break;
-    if (h) {
-      // a heading inside the section is a paragraph of its own
-      flush();
-      cur.push((h[2] ?? '').replace(/[ \t]+#+$/, ''));
-      flush();
-    } else if (lines[i].trim() === '') flush();
-    else cur.push(lines[i].trim());
-  }
-  flush();
-  return paras.filter(Boolean).join('\n\n');
+  const body = splitLines(text).slice(parseFrontMatter(text).bodyStart).join('\n');
+  const section = prSections(body).get(name);
+  if (section === undefined) return null;
+  const lines = splitLines(section).flatMap((l) => {
+    const h = /^ {0,3}#{3,6}[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/.exec(l);
+    return h ? ['', h[1], ''] : [l];
+  });
+  return paragraphs(lines)
+    .split('\n\n')
+    .filter(Boolean)
+    .map((p) => plainText(p))
+    .join('\n\n');
 }
 
 function proofOut(p, tree) {

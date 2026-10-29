@@ -130,8 +130,8 @@ test('specs: a board a Looks line names exists, holds the id and loads nothing f
   const msgs = failText(rep, 'specs');
   assert.match(msgs, /spec\.md:\d+ Looks: looks\/cursor\.html holds no element with id "typing"/);
   assert.match(msgs, /spec\.md:\d+ Looks: no board specs\/collaboration\/shared-cursors\/looks\/missing\.html/);
-  assert.match(msgs, /looks\/cursor\.html:\d+ loads https:\/\/fonts\.example\.invalid\/x\.css from the network: a board is self-contained/);
-  assert.match(msgs, /looks\/cursor\.html:\d+ loads http:\/\/example\.invalid\/a\.png from the network/);
+  assert.match(msgs, /looks\/cursor\.html:\d+ loads https:\/\/fonts\.example\.invalid\/x\.css from outside the board: a board is self-contained/);
+  assert.match(msgs, /looks\/cursor\.html:\d+ loads http:\/\/example\.invalid\/a\.png from outside the board/);
   assert.match(msgs, /looks\/unused\.html: board looks\/unused\.html is named by no Looks line of specs\/collaboration\/shared-cursors\/spec\.md/);
   assert.equal(fails(rep, 'specs').length, 5, msgs);
   // a board over its budget, like a spec

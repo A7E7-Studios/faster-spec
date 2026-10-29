@@ -15,7 +15,7 @@ read this file natively.
   as its docs give them. A rule that varies by project is project config
   (`tools/gate/config.json`) or that project's `AGENTS.md`, never kit text.
 - **This repository's own** files, never synced: this `AGENTS.md`, `kit.json`, `README.md`,
-  `LICENSE`, `specs/domains.json`, the specs and the changes, and `tools/gate/config.json`.
+  `LICENSE`, `specs/domains.json`, `specs/systems.json`, the specs and the changes, and `tools/gate/config.json`.
 - The tests run on `tools/gate/config.template.json`, never on a project's config, so they hold in
   every project that carries the kit.
 - `tools/solution-map/` is reserved for the local web viewer over the overview's JSON.
