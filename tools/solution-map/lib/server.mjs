@@ -30,9 +30,10 @@ function send(res, status, type, body, headers = {}) {
  * @param {object} o
  * @param {() => Promise<{ model, dirs, commits }>} o.build one build of the map
  * @param {string|null} [o.themeFile] the project's `kit-pages/theme.css`, served as `/theme.css` when it exists
+ * @param {() => Promise<{ ok: boolean, error?: string }>} [o.review] opens CueReview
  * @returns {{ server: http.Server, refresh: () => Promise<object>, listen: (port: number) => Promise<number> }}
  */
-export function createMapServer({ build, themeFile = null }) {
+export function createMapServer({ build, themeFile = null, review = async () => ({ ok: false, error: 'Start review is not set up here.' }) }) {
   let current = null;
   let pending = null;
   const refresh = () => {
@@ -46,7 +47,13 @@ export function createMapServer({ build, themeFile = null }) {
       const url = new URL(req.url, 'http://127.0.0.1');
       const p = decodeURIComponent(url.pathname);
       if (req.method === 'GET' && p === '/api/map') return send(res, 200, 'application/json; charset=utf-8', JSON.stringify((await latest()).model));
-      if (req.method === 'POST' && p === '/api/refresh') return send(res, 200, 'application/json; charset=utf-8', JSON.stringify((await refresh()).model));
+      if (req.method === 'POST') {
+        // Only the map's own page sends this header; a page of another site cannot without the
+        // browser asking this server first, which it never allows.
+        if (req.headers['x-solution-map'] !== '1') return send(res, 403, 'text/plain', 'only the map’s page may ask this');
+        if (p === '/api/refresh') return send(res, 200, 'application/json; charset=utf-8', JSON.stringify((await refresh()).model));
+        if (p === '/api/review') return send(res, 200, 'application/json; charset=utf-8', JSON.stringify(await review()));
+      }
       if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'text/plain', 'method not allowed');
       const b = BOARD.exec(p);
       if (b) {

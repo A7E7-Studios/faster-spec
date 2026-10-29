@@ -28,7 +28,10 @@ Exit: **2** on a usage error or a port it cannot listen on; otherwise it runs un
 { "solutionMap": { "repos": [{ "id": "app", "path": "." }, { "id": "api", "path": "../notes-api" }], "pages": "http://localhost:5173" } }
 ```
 
-`path` is relative to the repository the command runs in. `pages` is optional.
+`path` is relative to the repository the command runs in. `pages` is optional, and so is
+`review.app`, the CueReview program Start review opens; without it, CueReview's default install:
+`%LOCALAPPDATA%\Programs\CueReview\cuereview.exe` on Windows, the CueReview app on macOS,
+`cuereview` on PATH on Linux.
 
 ## What one build does
 
@@ -52,7 +55,8 @@ On start, on opening the page and on Refresh:
 | `lib/sources.mjs` | naming, fetching and reading the repositories |
 | `lib/build.mjs` | one build: fetch, overview, page probes, adapt |
 | `lib/adapt.mjs` | the overview's JSON to the view model: features, the queue, the groups, links, banners |
-| `lib/server.mjs` | the HTTP server: the page, `GET /api/map`, `POST /api/refresh`, `GET /board/<repo>/<path>?section=<id>` |
+| `lib/review.mjs` | Start review: where CueReview is, and opening it detached |
+| `lib/server.mjs` | the HTTP server: the page, `GET /api/map`, `POST /api/refresh`, `POST /api/review`, `GET /board/<repo>/<path>?section=<id>`; a POST needs the header `x-solution-map: 1`, which only the map's own page sends |
 | `page/` | the page: `index.html`, `style.css`, `view.mjs` (pure HTML from the view model), `app.mjs` (events and the address) |
 
 - **Addresses**: `/waiting/<feature>`, `/explore/<feature>`, `/explore/by-system/<system>/<feature>`,

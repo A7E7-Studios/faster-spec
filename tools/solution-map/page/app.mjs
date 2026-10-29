@@ -1,5 +1,8 @@
 // The page in the browser: loads the map, keeps the state in the address, and wires the events.
-import { renderPage, parseLocation, pathFor, settle, triageText } from './view.mjs';
+import { renderPage, parseLocation, pathFor, settle } from './view.mjs';
+
+/** A request only the map's own page may make (see lib/server.mjs). */
+const post = (url) => fetch(url, { method: 'POST', headers: { 'x-solution-map': '1' } });
 
 const root = document.getElementById('app');
 let vm = null;
@@ -41,7 +44,7 @@ async function load(url, method = 'GET') {
   st.refreshing = true;
   if (vm) render();
   try {
-    const r = await fetch(url, { method });
+    const r = await (method === 'POST' ? post(url) : fetch(url));
     vm = await r.json();
   } catch (e) {
     root.innerHTML = `<div class="banner req"><span class="bt">The map’s server doesn’t answer: ${String(e.message || e)}. Start it again with <span class="mono">node tools/solution-map/solution-map.mjs</span>.</span></div>`;
@@ -65,11 +68,13 @@ function toast(msg) {
 root.addEventListener('click', (e) => {
   const el = (sel) => e.target.closest(sel);
   let x;
-  if ((x = el('[data-copy]'))) {
-    const text = triageText(vm, x.dataset.copy);
-    navigator.clipboard.writeText(text).then(() => toast('Copied for triage. Paste it into a triage session.'), () => {
-      window.prompt('Copy for triage:', text);
-    });
+  if ((x = el('[data-review]'))) {
+    const id = x.dataset.review;
+    x.disabled = true;
+    post('/api/review').then((r) => r.json()).then((r) => {
+      if (r.ok) go({ started: id }, { push: false });
+      else { toast(r.error); x.disabled = false; }
+    }, () => { toast('The map’s server doesn’t answer.'); x.disabled = false; });
   } else if ((x = el('[data-act]'))) {
     if (x.dataset.act === 'refresh') load('/api/refresh', 'POST');
     if (x.dataset.act === 'theme') {

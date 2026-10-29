@@ -6,6 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { buildMap } from '../lib/build.mjs';
 import { createMapServer, withSection } from '../lib/server.mjs';
+import { reviewCommand, startReview } from '../lib/review.mjs';
+import { EventEmitter } from 'node:events';
 
 const ID = ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', '-c', 'init.defaultBranch=main'];
 const g = (dir, ...args) => execFileSync('git', ['-C', dir, ...ID, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -83,8 +85,8 @@ const standIn = (version = 3) => (repos) => ({
   domains: [], systems: [], capabilities: [], changes: [], uncovered: [],
 });
 
-async function serve(build) {
-  const s = createMapServer({ build });
+async function serve(build, more = {}) {
+  const s = createMapServer({ build, ...more });
   const port = await s.listen(0);
   const base = `http://127.0.0.1:${port}`;
   return { ...s, port, base, close: () => new Promise((r) => s.server.close(r)) };
@@ -119,10 +121,48 @@ test('Refresh fetches again and rebuilds the map', () => withTmp(async (tmp) => 
     assert.equal((await (await fetch(`${s.base}/api/map`)).json()).repos[0].commit, first);
     const landed = landElsewhere(tmp, origin);
     assert.equal((await (await fetch(`${s.base}/api/map`)).json()).repos[0].commit, first);
-    const after = await (await fetch(`${s.base}/api/refresh`, { method: 'POST' })).json();
+    assert.equal((await fetch(`${s.base}/api/refresh`, { method: 'POST' })).status, 403);
+    const after = await (await fetch(`${s.base}/api/refresh`, { method: 'POST', headers: { 'x-solution-map': '1' } })).json();
     assert.equal(after.repos[0].commit, landed);
   } finally { await s.close(); }
 }));
+
+test('Start review opens CueReview, and says so when it is missing', async () => {
+  // Where CueReview is looked for.
+  assert.deepEqual(reviewCommand({ platform: 'win32', env: { LOCALAPPDATA: 'C:\\Users\\me\\AppData\\Local' } }),
+    { command: 'C:\\Users\\me\\AppData\\Local\\Programs\\CueReview\\cuereview.exe', args: [], check: 'C:\\Users\\me\\AppData\\Local\\Programs\\CueReview\\cuereview.exe' });
+  assert.deepEqual(reviewCommand({ platform: 'darwin' }), { command: 'open', args: ['-a', 'CueReview'], check: null });
+  assert.deepEqual(reviewCommand({ platform: 'linux' }), { command: 'cuereview', args: [], check: null });
+  assert.deepEqual(reviewCommand({ platform: 'win32', config: { solutionMap: { review: { app: 'D:/Tools/cuereview.exe' } } } }).command, 'D:/Tools/cuereview.exe');
+
+  // Starting it: detached, and a missing program said in words.
+  const started = [];
+  const run = (command, args, opts) => {
+    started.push({ command, args, detached: opts.detached });
+    const child = new EventEmitter();
+    child.unref = () => {};
+    queueMicrotask(() => child.emit('spawn'));
+    return child;
+  };
+  const cmd = { command: 'C:/CueReview/cuereview.exe', args: [], check: 'C:/CueReview/cuereview.exe' };
+  assert.deepEqual(await startReview(cmd, { exists: () => true, run }), { ok: true });
+  assert.deepEqual(started, [{ command: 'C:/CueReview/cuereview.exe', args: [], detached: true }]);
+  const missing = await startReview(cmd, { exists: () => false, run });
+  assert.equal(missing.ok, false);
+  assert.match(missing.error, /CueReview isn't at C:\/CueReview\/cuereview\.exe\. Install it, or name it in solutionMap\.review\.app\./);
+  const failing = (command) => { const c = new EventEmitter(); queueMicrotask(() => c.emit('error', new Error(`spawn ${command} ENOENT`))); return c; };
+  assert.match((await startReview({ command: 'cuereview', args: [], check: null }, { run: failing })).error, /did not start: spawn cuereview ENOENT/);
+
+  // Through the server: only the map's own page may ask.
+  let asked = 0;
+  const s = await serve(async () => ({ model: {}, dirs: {}, commits: {} }), { review: async () => { asked++; return { ok: true }; } });
+  try {
+    assert.equal((await fetch(`${s.base}/api/review`, { method: 'POST' })).status, 403);
+    assert.equal(asked, 0);
+    assert.deepEqual(await (await fetch(`${s.base}/api/review`, { method: 'POST', headers: { 'x-solution-map': '1' } })).json(), { ok: true });
+    assert.equal(asked, 1);
+  } finally { await s.close(); }
+});
 
 test('a board section is served from the board by its id', () => withTmp(async (tmp) => {
   const { work } = repoPair(tmp, 'app');

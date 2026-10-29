@@ -21,9 +21,9 @@ whole.
 - Opening the page or pressing Refresh fetches again (Refresh shows what landed since the page
   opened).
 - The page opens on Waiting for you: every feature not approved, newest change first, with its
-  Summary, its Looks, what to look at, the changes since its last approval and Copy for triage
-  (The queue holds every feature not approved, newest change first; A feature in review shows what
-  to judge it by; Copy for triage hands the feature to a triage session; Nothing waits).
+  Summary, its Looks, what to look at, the changes since its last approval and Start review, which
+  opens CueReview (The queue holds every feature not approved, newest change first; A feature in
+  review shows what to judge it by; Start review opens CueReview; Nothing waits).
 - Explore lists the features by domain, or by the systems they ship in, with review state and
   tested coverage; a system no feature covers shows as such (Features by domain and by system; A
   system with no feature shows what the specs do not cover; An approved feature shows what it does
@@ -52,8 +52,8 @@ start it once with a repository folder that does not exist. Judge the page again
   each `origin/main` as it is now. Rejected: a snapshot at start; a build after every merge.
 - **Q3 Front page**: Waiting for you, every feature not approved, newest change first. Rejected:
   features by domain first; a dashboard of totals.
-- **Q4 Link to triage**: Copy for triage per feature puts a ready instruction on the clipboard;
-  the page writes nothing. Rejected: ticking verdicts in the page; the list without buttons.
+- **Q4 Link to triage**: a button per feature hands the review on, and the page writes nothing
+  (Q15 makes it Start review). Rejected: ticking verdicts in the page; the list without buttons.
 - **Q5 Grouping**: features under domains, the product view, and a declared list of systems that
   says what each feature ships in; Explore groups by either. Folder modules are not shown.
   Rejected: a Modules tab of every folder; systems as the only parent; domains only.
@@ -74,6 +74,9 @@ start it once with a repository folder that does not exist. Judge the page again
   the built feature beside the picked design only until approval, which needs rendered screenshots.
 - **Q14 Direction**: A, the review inbox: the queue beside one feature at a time. Rejected: B, a
   coverage map of tiles; C, a gallery of cards.
+- **Q15 The review button**: Start review replaces Copy for triage. The map's server opens
+  CueReview on this computer, and the page says to start the take with the feature's name; triage
+  then gets CueReview's Copy for agent. Rejected: keeping Copy for triage beside it.
 
 ## Calls for the owner
 
@@ -92,10 +95,16 @@ start it once with a repository folder that does not exist. Judge the page again
   The server asks each address once per build whether it answers.
 - **No dependencies**: Node's own HTTP server, a page of plain ES modules, the overview imported
   as a library. Alternative: a bundler and a UI framework, which every project would then carry.
+- **Where CueReview is**: its default install (`%LOCALAPPDATA%\Programs\CueReview\cuereview.exe`
+  on Windows, the CueReview app on macOS, `cuereview` on PATH on Linux), or
+  `solutionMap.review.app`. Only the map's own page may ask the server to open it: the request
+  needs a header another site's page cannot send unasked.
 
 ## Out of scope
 
 - The overview's version 3 and `specs/systems.json`: the format change that this map reads.
 - Writing anything: verdicts, specs and change folders are triage's and ship's.
+- Handing the feature to CueReview (its name, what to look at, the session to record into): a
+  change in CueReview, which has no way to take it yet.
 - Previewing a branch or a pull request; access from another device.
 - Screenshots of the built app.

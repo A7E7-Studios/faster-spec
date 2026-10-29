@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { resolveRepos, readConfig, git } from './lib/sources.mjs';
 import { buildMap } from './lib/build.mjs';
 import { createMapServer } from './lib/server.mjs';
+import { reviewCommand, startReview } from './lib/review.mjs';
 
 export const DEFAULT_PORT = 7317;
 const USAGE = `usage: node tools/solution-map/solution-map.mjs [--repo <id>=<folder>]... [--port <n>] [--pages <address>] [--no-open]
@@ -52,6 +53,7 @@ export async function main(argv) {
     const top = await git(process.cwd(), ['rev-parse', '--show-toplevel']);
     root = top.ok ? String(top.out).trim() : process.cwd();
     const config = readConfig(root);
+    o.config = config;
     o.pages ??= config?.solutionMap?.pages ?? null;
     if (o.from) {
       if (o.repoArgs.length) throw new Error('--from and --repo do not go together');
@@ -64,9 +66,11 @@ export async function main(argv) {
     console.error(`solution-map: ${e.message}\n${USAGE}`);
     return 2;
   }
+  const reviewCmd = reviewCommand({ config: o.config });
   const { listen, refresh } = createMapServer({
     build: o.build || (() => buildMap({ repos, pages: o.pages })),
     themeFile: path.join(root, 'kit-pages', 'theme.css'),
+    review: () => startReview(reviewCmd),
   });
   let port;
   try {

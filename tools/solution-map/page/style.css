@@ -100,6 +100,7 @@ figure.look { margin: 0; min-width: 0; }
 .box + .box { margin-top: 10px; }
 .box .bh { display: flex; align-items: center; gap: 8px; font-weight: 700; margin-bottom: 6px; }
 .box.prob { border-color: var(--req); background: var(--req-bg); margin-top: 14px; }
+.box.started { border-color: var(--accent); background: var(--accent-soft); margin-top: 14px; display: grid; gap: 4px; }
 .pre { white-space: pre-line; }
 .chg { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: baseline; padding: 6px 0; border-top: 1px solid var(--divider); }
 .chg:first-of-type { border-top: 0; }

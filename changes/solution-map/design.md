@@ -19,6 +19,7 @@ neutral (a notes app and its backend).
 | The page | plain ES modules served as files: `page/view.mjs` builds HTML strings from the view model (pure, imported by the tests), `page/app.mjs` wires events and the address | A framework or a bundler: dependencies and a build step in every project | MDN, JavaScript modules, https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules |
 | Addresses | the path names the view (`/waiting/<feature>`, `/explore/<domain>/<feature>`, `/explore/by-system/<system>/<feature>`, `/search?q=`), `history.pushState`, and the server answers every such path with the page | Hash routes: work too, but read worse in a pasted link | MDN, History API, https://developer.mozilla.org/en-US/docs/Web/API/History_API |
 | Boards | `GET /board/<repo>/<capability path>/looks/<name>.html` returns the board from git at the commit read; the page shows the section with the id in an `iframe` whose `src` ends `#<id>`, `sandbox` with no scripts | Inlining the section into the page: the board's CSS would leak into the page | MDN, `iframe` `sandbox`, https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe |
+| Start review | `POST /api/review` makes the server start CueReview detached (`lib/review.mjs`); a POST needs the header `x-solution-map: 1`, which a page of another origin cannot send without a CORS preflight this server never answers | A `cuereview:` link from the page: CueReview registers none; `cue record`: refuses to run beside the app and needs a source | Fetch standard, CORS preflight, https://fetch.spec.whatwg.org/#cors-preflight-fetch; CueReview's README, Agent CLI |
 | Live pages | the server asks each page line's address with a `HEAD` request (2 s) once per build; the page embeds an answering one in an `iframe`, else a placeholder | Asking from the browser: blocked by the page's own origin rules | — |
 | A failed fetch | keep the repository's existing `origin/main`; the banner gives the time of the last good fetch (`FETCH_HEAD`'s modification time) and its commit | Refusing to build: Q8 | git-fetch docs, https://git-scm.com/docs/git-fetch |
 | A missing repository | build from the others; the banner names the folder and `--repo <id>=<folder>` | — | — |
@@ -32,7 +33,7 @@ neutral (a notes app and its backend).
 | Modules and READMEs | `tools/solution-map/` (new): `solution-map.mjs` (command line), `lib/sources.mjs` (fetch and repository state), `lib/build.mjs` (overview, page probes, banners), `lib/adapt.mjs` (view model), `lib/server.mjs` (HTTP), `page/` (the page), `test/`, `README.md` |
 | Formats and contracts | reads the overview's JSON, version 3 only; writes nothing. The view model is internal to the map |
 | Storage | none in the repositories; the page keeps its theme and grouping in the browser's `localStorage` |
-| Config | `tools/gate/config.json` gains an optional `solutionMap` block (`repos`, `pages`); a project without it passes `--repo` |
+| Config | `tools/gate/config.json` gains an optional `solutionMap` block (`repos`, `pages`, `review.app`); a project without it passes `--repo` |
 
 ### What the map reads from version 3
 
@@ -61,8 +62,8 @@ shown as not served.
 | The repositories come from the project or the command line | `tools/solution-map/test/cli.test.mjs::reads the repositories from the config or the command line`, new |
 | Refresh shows what landed since the page opened | `tools/solution-map/test/server.test.mjs::Refresh fetches again and rebuilds the map`, new |
 | The queue, a feature in review, the groups, a system's gap, code links, format problems, an empty project | `tools/solution-map/test/adapt.test.mjs`, new, one test each |
-| Copy for triage, nothing waits, an approved feature, a page that does not answer, search, addresses | `tools/solution-map/test/view.test.mjs`, new, one test each |
-| Boards by id, a failed fetch, a missing repository, another overview version | `tools/solution-map/test/server.test.mjs`, new, one test each |
+| Start review's note, nothing waits, an approved feature, a page that does not answer, search, addresses | `tools/solution-map/test/view.test.mjs`, new, one test each |
+| Start review, boards by id, a failed fetch, a missing repository, another overview version | `tools/solution-map/test/server.test.mjs`, new, one test each |
 
 The server tests build throwaway repositories in the OS temp folder, as the overview's tests do.
 The board test runs the kit's own overview on a spec and `specs/systems.json` there; the others

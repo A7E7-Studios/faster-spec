@@ -77,13 +77,12 @@ export function searchFeatures(vm, q) {
   }).filter(Boolean);
 }
 
-/** The instruction Copy for triage puts on the clipboard. */
-export function triageText(vm, id) {
+/** What the page says once Start review has opened CueReview for a feature. */
+export function reviewStarted(vm, id) {
   const f = vm.features[id];
-  const names = f.repos.map((r) => vm.repos.find((x) => x.id === r)?.name || r).join(' and ');
-  const ch = f.changes.length ? ` Changes since the last approval: ${f.changes.map((c) => `${c.id}${c.pr ? ` (#${c.pr}, ${String(c.commit || '').slice(0, 7)})` : ''}`).join(', ')}.` : ' No change names it: its spec was written from the code.';
-  const look = f.reviewNote ? ` What to look at: ${f.reviewNote.text.replace(/\s+/g, ' ').trim()}` : '';
-  return `Triage the feature "${f.title}" (${f.id}), now ${WORD[f.review].toLowerCase()}, in ${names}.${ch}${look} My verdict follows: approved, or feedback.`;
+  return `<div class="box started" role="status"><div class="bh">▶ CueReview is opening</div>`
+    + `<div>Start the take by saying “${esc(f.title)}”, so triage knows which feature your remarks are about. One take per feature; a review at the desk and one on a device are separate sessions.</div>`
+    + '<div class="s-faint">When you are done, press Copy for agent in CueReview and give it to a triage session.</div></div>';
 }
 
 /* ---------- pieces ---------- */
@@ -195,13 +194,14 @@ function codeBlock(f) {
   return `<h3 class="s-h2">Spec and code</h3><div class="codel">${rows.map((c) => `<div>${repoChip(c.repo)}<span class="mono">${esc(c.path)}</span>${link(c.href, 'GitHub ↗')}</div>`).join('')}</div>`;
 }
 
-function copyBtn(id) { return `<button class="s-btn primary" data-copy="${esc(id)}">⧉ Copy for triage</button>`; }
+function reviewBtn(id) { return `<button class="s-btn primary" data-review="${esc(id)}" title="Opens CueReview to record your review">▶ Start review</button>`; }
 
 /** A feature waiting for the owner. */
 export function reviewBody(vm, id, ui) {
   const f = vm.features[id];
   return `<div class="d-head"><div class="d-title"><div class="row"><h2 class="s-h1">${esc(f.title)}</h2>${stt(f.review)}</div><div class="s-meta">${meta(f)}</div></div>`
-    + `<div class="s-actions">${copyBtn(id)}${ui.tab === 'waiting' ? '<span class="s-faint"><kbd>j</kbd> <kbd>k</kbd></span>' : ''}</div></div>`
+    + `<div class="s-actions">${reviewBtn(id)}${ui.tab === 'waiting' ? '<span class="s-faint"><kbd>j</kbd> <kbd>k</kbd></span>' : ''}</div></div>`
+    + (ui.started === id ? reviewStarted(vm, id) : '')
     + problemsBox(f)
     + `<p class="s-sum">${md(f.summary)}</p><h3 class="s-h2">Looks</h3>${looksBlock(f, true)}`
     + `<div class="a-two">${reviewNote(f)}<div>${sinceBox(f)}</div></div>`;

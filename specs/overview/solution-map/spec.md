@@ -11,8 +11,8 @@ code:
 A local web page over the overview's index: what waits for the owner's review, every feature by
 domain or by the system it ships in, and how well each is tested. One command on the owner's
 computer fetches the repositories, builds the index and opens the page; nothing is deployed and
-the page writes nothing. You meet it before a triage session and whenever you want to see what the
-product does.
+the page writes nothing. From a feature, Start review opens CueReview to record the review. You
+meet it before a review and whenever you want to see what the product does.
 
 ## Looks
 
@@ -65,11 +65,13 @@ newest change first, because the owner's next step is to review them.
   it), and the changes that landed since its last approval show
 - **PROOF** test: tools/solution-map/test/adapt.test.mjs::a feature in review carries its looks, review note and changes since approval
 
-#### Scenario: Copy for triage hands the feature to a triage session
-- **WHEN** the owner presses Copy for triage on a feature
-- **THEN** the clipboard holds an instruction naming the feature, its repositories, its changes
-  and what to look at, and nothing is written anywhere else
-- **PROOF** test: tools/solution-map/test/view.test.mjs::copy for triage names the feature, its changes and what to look at
+#### Scenario: Start review opens CueReview
+- **WHEN** the owner presses Start review on a feature
+- **THEN** CueReview, the review recorder, opens on this computer, and the page says to start the
+  take with the feature's name and to hand CueReview's Copy for agent to a triage session
+- **AND** when CueReview is not installed, the page says where it looked
+- **PROOF** test: tools/solution-map/test/server.test.mjs::Start review opens CueReview, and says so when it is missing
+- **PROOF** test: tools/solution-map/test/view.test.mjs::start review says what to say at the start of the take
 
 #### Scenario: Nothing waits
 - **GIVEN** every feature is `approved`

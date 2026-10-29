@@ -2,21 +2,22 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { adapt } from '../lib/adapt.mjs';
-import { renderPage, parseLocation, pathFor, searchFeatures, triageText, featurePage, settle } from '../page/view.mjs';
+import { renderPage, parseLocation, pathFor, searchFeatures, featurePage, settle } from '../page/view.mjs';
 
 const sample = () => JSON.parse(fs.readFileSync(new URL('./fixtures/overview-v3.json', import.meta.url), 'utf8'));
 const ui = (o = {}) => ({ tab: 'waiting', group: 'domain', sel: null, q: '', ...o });
 
-test('copy for triage names the feature, its changes and what to look at', () => {
+test('start review says what to say at the start of the take', () => {
   const vm = adapt(sample());
-  const t = triageText(vm, 'editing/offline-edits');
-  assert.match(t, /^Triage the feature "Offline edits" \(editing\/offline-edits\), now unreviewed, in /);
-  assert.match(t, /example\/notes-app and example\/notes-api/);
-  assert.match(t, /offline-banner-delay \(#41, a91c3e0\)/);
-  assert.match(t, /What to look at: At the desk: open a note/);
-  assert.match(triageText(vm, 'accounts/sign-in'), /No change names it/);
-  const html = renderPage(vm, ui({ sel: 'editing/offline-edits' }));
-  assert.match(html, /data-copy="editing\/offline-edits"/);
+  const before = renderPage(vm, ui({ sel: 'editing/offline-edits' }));
+  assert.match(before, /<button class="s-btn primary" data-review="editing\/offline-edits"[^>]*>▶ Start review<\/button>/);
+  assert.doesNotMatch(before, /CueReview is opening/);
+  assert.doesNotMatch(before, /Copy for triage/);
+  const after = renderPage(vm, ui({ sel: 'editing/offline-edits', started: 'editing/offline-edits' }));
+  assert.match(after, /CueReview is opening/);
+  assert.match(after, /Start the take by saying “Offline edits”/);
+  assert.match(after, /press Copy for agent in CueReview and give it to a triage session/);
+  assert.doesNotMatch(renderPage(vm, ui({ sel: 'sharing/share-links', started: 'editing/offline-edits' })), /CueReview is opening/);
   assert.match(renderPage(vm, ui({ sel: 'sharing/share-links' })), /The change that names it, share-links-expiry, has no Review section/);
   assert.match(renderPage(vm, ui({ sel: 'accounts/sign-in' })), /No change names this feature, so there is no review note/);
 });
