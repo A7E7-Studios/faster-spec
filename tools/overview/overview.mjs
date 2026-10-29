@@ -252,8 +252,10 @@ export function sectionText(text, name) {
   if (section === undefined) return null;
   const raw = splitLines(section);
   const mask = fenceMask(raw);
+  const fence = /^ {0,3}(?:`{3,}|~{3,})/;
   const lines = raw.flatMap((l, i) => {
-    const h = mask[i] ? null : /^ {0,3}#{3,6}[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/.exec(l);
+    if (mask[i]) return fence.test(l) || l.trim() === '' ? [] : [l];
+    const h = /^ {0,3}#{3,6}[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/.exec(l);
     return h ? ['', h[1], ''] : [l];
   });
   return paragraphs(lines)

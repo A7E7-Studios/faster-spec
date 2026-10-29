@@ -575,6 +575,19 @@ test('boards: an element id in either quote; a network load in src=, href=, url(
     { line: 3, url: 'a.png' },
     { line: 3, url: 'b.png' },
   ]);
+  // image-set by its own depth, srcset as a browser splits it, style values by their own lines
+  assert.deepEqual(networkLoads('<p style="background: image-set(url(\'a.png\') 1x, \'https://x.invalid/b.png\' 2x)">'), [
+    { line: 1, url: 'a.png' },
+    { line: 1, url: 'https://x.invalid/b.png' },
+  ]);
+  assert.deepEqual(networkLoads('<p style=\'background: image-set("data:image/avif;base64,AA" type("image/avif"), "c.jpg" type("image/jpeg"))\'>'), [{ line: 1, url: 'c.jpg' }]);
+  assert.deepEqual(networkLoads('<img srcset="data:image/png;base64,AAAA 1x, data:image/png;base64,BB,BB 2x">'), []);
+  assert.deepEqual(networkLoads('<div style="\n\n\nx: url(c.png)">'), [{ line: 4, url: 'c.png' }]);
+  // a comment or a tag inside raw text is text; a custom element is not style; template and textarea hold no markup
+  for (const before of ['<script>var s = "<style>";</script>', '<script>var s = "<!--";</script>', '<style>.a::before { content: "<!--" }</style>', '<p title="<!--">', '<style-card>x</style-card>']) {
+    assert.deepEqual(networkLoads(`${before}\n<img src="https://x.invalid/a.png">`), [{ line: 2, url: 'https://x.invalid/a.png' }], before);
+  }
+  assert.deepEqual(networkLoads('<template><img src=h.png></template><textarea><img src=o.png></textarea><title><img src=t.png></title>'), []);
   for (const f of ['a.png', 'b.JPG', 'c.jpeg', 'd.gif', 'e.webp', 'f.svg', 'g.mp4', 'h.mov', 'i.webm', 'j.tiff', 'k.heic', 'l.ico']) assert.ok(MEDIA.test(`specs/x/y/${f}`), f);
   for (const f of ['spec.md', 'looks/a.html', 'tokens.css', 'notes.txt', 'png.md']) assert.ok(!MEDIA.test(`specs/x/y/${f}`), f);
 });

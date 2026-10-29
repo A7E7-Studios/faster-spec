@@ -160,13 +160,63 @@ function pathAtRev(tree, p) {
 const lineAt = (text, index) => text.slice(0, index).split('\n').length;
 const escapeRx = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+/** Elements whose content is text, not markup: nothing in it loads (style's own CSS aside). */
+const RAW_TEXT = ['script', 'style', 'textarea', 'title', 'noscript', 'template'];
+const START_TAG = /<([A-Za-z][\w:-]*)(?=[\s/>])((?:[^>"']|"[^"]*"|'[^']*')*)>/y;
+const ATTRIBUTE = /([^\s=/>"']+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"']+)))?/g;
+
+/** A srcset's candidate URLs, read as a browser reads them: a URL up to whitespace, then its descriptors up to a comma. */
+function srcsetUrls(v) {
+  const out = [];
+  let i = 0;
+  while (i < v.length) {
+    while (i < v.length && /[\s,]/.test(v[i])) i++;
+    let j = i;
+    while (j < v.length && !/\s/.test(v[j])) j++;
+    let url = v.slice(i, j);
+    if (url.endsWith(',')) url = url.replace(/,+$/, '');
+    else {
+      let depth = 0;
+      for (; j < v.length; j++) {
+        if (v[j] === '(') depth++;
+        else if (v[j] === ')') depth--;
+        else if (v[j] === ',' && depth <= 0) break;
+      }
+    }
+    if (url) out.push({ at: i, url });
+    i = j;
+  }
+  return out;
+}
+
+/** The quoted image candidates of each image-set(…): strings at its own depth, not those in type(…) or url(…). */
+function imageSetUrls(css) {
+  const out = [];
+  for (const m of css.matchAll(/image-set\(/gi)) {
+    let depth = 1;
+    for (let i = m.index + m[0].length; i < css.length && depth > 0; i++) {
+      const c = css[i];
+      if (c === '(') depth++;
+      else if (c === ')') depth--;
+      else if (c === '"' || c === "'") {
+        const end = css.indexOf(c, i + 1);
+        const close = end < 0 ? css.length : end;
+        if (depth === 1) out.push({ at: i + 1, url: css.slice(i + 1, close) });
+        i = close;
+      }
+    }
+  }
+  return out;
+}
+
 /**
- * Where a board loads something from outside itself: [{ line, url }]. Read from start tags only
- * (comments and the text of script and style elements are not markup): src, poster, srcset and
- * imagesrcset, an object's data, and href or xlink:href on every element but a and area (a link
- * is followed, not loaded); and from CSS (style elements and style attributes, comments
- * dropped): url(…), @import and image-set(…). A value that is a data: URL or a #fragment stays
- * inside the board. A board is self-contained: nothing from the network, and no other file.
+ * Where a board loads something from outside itself: [{ line, url }]. The HTML is read left to
+ * right as a browser reads it: comments, and the text of script, style, textarea, title, noscript
+ * and template, are not markup. From each start tag: src, poster, srcset and imagesrcset, an
+ * object's data, and href or xlink:href on every element but a and area (a link is followed, not
+ * loaded); from CSS (style elements and style attributes, comments dropped): url(…), @import
+ * and image-set(…). A data: URL or a #fragment stays inside the board. A board is self-contained:
+ * nothing from the network, and no other file.
  */
 export function networkLoads(html) {
   const out = [];
@@ -174,33 +224,46 @@ export function networkLoads(html) {
     const u = String(url ?? '').trim();
     if (u && !/^(?:data:|#)/i.test(u)) out.push({ index, url: u });
   };
-  const blank = (s) => s.replace(/[^\n]/g, ' ');
-  const styles = [];
-  let text = html.replace(/<!--[\s\S]*?(?:-->|$)/g, blank);
-  text = text.replace(/(<style\b[^>]*>)([\s\S]*?)(<\/style\s*>|$)/gi, (m, open, body, close, at) => {
-    styles.push({ index: at + open.length, css: body });
-    return open + blank(body) + close;
-  });
-  text = text.replace(/(<script\b[^>]*>)([\s\S]*?)(<\/script\s*>|$)/gi, (m, open, body, close) => open + blank(body) + close);
-  for (const tag of text.matchAll(/<([A-Za-z][\w:-]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/g)) {
+  const css = (index, text) => {
+    const t = text.replace(/\/\*[\s\S]*?(?:\*\/|$)/g, (c) => c.replace(/[^\n]/g, ' '));
+    for (const m of t.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)/gi)) add(index + m.index, m[1] ?? m[2] ?? m[3]);
+    for (const m of t.matchAll(/@import\s+(?:"([^"]*)"|'([^']*)')/gi)) add(index + m.index, m[1] ?? m[2]);
+    for (const s of imageSetUrls(t)) add(index + s.at, s.url);
+  };
+  for (let i = 0; i < html.length; ) {
+    const lt = html.indexOf('<', i);
+    if (lt < 0) break;
+    if (html.startsWith('<!--', lt)) {
+      const end = html.indexOf('-->', lt + 4);
+      i = end < 0 ? html.length : end + 3;
+      continue;
+    }
+    START_TAG.lastIndex = lt;
+    const tag = START_TAG.exec(html);
+    if (!tag) {
+      i = lt + 1;
+      continue;
+    }
     const element = tag[1].toLowerCase();
-    const from = tag.index + 1 + tag[1].length;
-    for (const a of tag[2].matchAll(/([^\s=/>"']+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"']+)))?/g)) {
-      const name = a[1].toLowerCase();
+    const from = lt + 1 + tag[1].length;
+    for (const a of tag[2].matchAll(ATTRIBUTE)) {
       const value = a[2] ?? a[3] ?? a[4];
       if (value === undefined) continue;
-      const at = from + a.index;
-      if (name === 'style') styles.push({ index: at, css: value });
-      else if (name === 'srcset' || name === 'imagesrcset') for (const c of value.split(',')) add(at, c.trim().split(/\s+/)[0]);
+      const name = a[1].toLowerCase();
+      const at = from + a.index + a[0].length - value.length - (a[4] === undefined ? 1 : 0);
+      if (name === 'style') css(at, value);
+      else if (name === 'srcset' || name === 'imagesrcset') for (const c of srcsetUrls(value)) add(at + c.at, c.url);
       else if (name === 'src' || name === 'poster' || (name === 'data' && element === 'object')) add(at, value);
       else if ((name === 'href' || name === 'xlink:href') && element !== 'a' && element !== 'area') add(at, value);
     }
-  }
-  for (const s of styles) {
-    const css = s.css.replace(/\/\*[\s\S]*?(?:\*\/|$)/g, blank);
-    for (const m of css.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)/gi)) add(s.index + m.index, m[1] ?? m[2] ?? m[3]);
-    for (const m of css.matchAll(/@import\s+(?:"([^"]*)"|'([^']*)')/gi)) add(s.index + m.index, m[1] ?? m[2]);
-    for (const m of css.matchAll(/image-set\(([^)]*)\)/gi)) for (const q of m[1].matchAll(/"([^"]*)"|'([^']*)'/g)) add(s.index + m.index, q[1] ?? q[2]);
+    i = lt + tag[0].length;
+    if (RAW_TEXT.includes(element) && !tag[2].trimEnd().endsWith('/')) {
+      const close = new RegExp(String.raw`<\/${element}(?=[\s/>])`, 'i');
+      const m = close.exec(html.slice(i));
+      const end = m ? i + m.index : html.length;
+      if (element === 'style') css(i, html.slice(i, end));
+      i = end;
+    }
   }
   const seen = new Set();
   return out
