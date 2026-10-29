@@ -547,9 +547,33 @@ test('boards: an element id in either quote; a network load in src=, href=, url(
     { line: 4, url: 'https://example.invalid/c.css' },
     { line: 7, url: 'local.png' },
     { line: 7, url: '//cdn.example.invalid/x.js' },
-    { line: 8, url: 'https://example.invalid/2x.png 2x' },
+    { line: 8, url: 'https://example.invalid/2x.png' },
     { line: 8, url: 'https://example.invalid/p.png' },
     { line: 9, url: '../../../../tools/design/house-style/tokens.css' },
+  ]);
+  // text, script, comments and other attributes' values load nothing
+  const quiet = [
+    '<script>const data = { a: 1 }; let src = "abc";</script>',
+    '<p>Set src=foo.png, or use @import rules</p> <p title="data=1 src=x.png">t</p>',
+    '<style>/* @import nothing; url(gone.png) */ .g { fill: url(#grad) } :root { --c: #5b5bd6 }</style>',
+    '<!-- <img src="old.png"> -->',
+    '<svg><use href="#icon"/><a xlink:href="https://example.invalid/doc">a link</a></svg>',
+    '<object data="data:image/svg+xml;base64,PHN2Zz4="></object>',
+  ].join('\n');
+  assert.deepEqual(networkLoads(quiet), []);
+  const svg = [
+    '<svg><image href="pic.png"/><feImage href="https://example.invalid/f.png"/><use href="icons.svg#a"/></svg>',
+    '<link rel=preload as=image imagesrcset="hero.png 1x, hero@2x.png 2x">',
+    '<div style="background: image-set(\'a.png\' 1x, \'b.png\' 2x)"></div>',
+  ].join('\n');
+  assert.deepEqual(networkLoads(svg), [
+    { line: 1, url: 'pic.png' },
+    { line: 1, url: 'https://example.invalid/f.png' },
+    { line: 1, url: 'icons.svg#a' },
+    { line: 2, url: 'hero.png' },
+    { line: 2, url: 'hero@2x.png' },
+    { line: 3, url: 'a.png' },
+    { line: 3, url: 'b.png' },
   ]);
   for (const f of ['a.png', 'b.JPG', 'c.jpeg', 'd.gif', 'e.webp', 'f.svg', 'g.mp4', 'h.mov', 'i.webm', 'j.tiff', 'k.heic', 'l.ico']) assert.ok(MEDIA.test(`specs/x/y/${f}`), f);
   for (const f of ['spec.md', 'looks/a.html', 'tokens.css', 'notes.txt', 'png.md']) assert.ok(!MEDIA.test(`specs/x/y/${f}`), f);

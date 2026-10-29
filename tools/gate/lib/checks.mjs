@@ -161,32 +161,52 @@ const lineAt = (text, index) => text.slice(0, index).split('\n').length;
 const escapeRx = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
- * Where a board loads something from outside itself: [{ line, url }] for every value of a
- * src, srcset, poster, data or xlink:href attribute, a <link> element's href, a url(…) or an
- * @import that is not a data: URL or a #fragment. A board is self-contained: nothing from the
- * network, and no other file, so it shows the same wherever it is copied.
+ * Where a board loads something from outside itself: [{ line, url }]. Read from start tags only
+ * (comments and the text of script and style elements are not markup): src, poster, srcset and
+ * imagesrcset, an object's data, and href or xlink:href on every element but a and area (a link
+ * is followed, not loaded); and from CSS (style elements and style attributes, comments
+ * dropped): url(…), @import and image-set(…). A value that is a data: URL or a #fragment stays
+ * inside the board. A board is self-contained: nothing from the network, and no other file.
  */
 export function networkLoads(html) {
   const out = [];
-  const value = '(?:"([^"]*)"|\'([^\']*)\'|([^\\s>"\']+))';
-  const outside = (u) => !/^(?:data:|#|$)/i.test(u.trim());
-  const rules = [
-    new RegExp(`(?<![\\w:-])(?:src|srcset|poster|data|xlink:href)\\s*=\\s*${value}`, 'gi'),
-    new RegExp(`<link\\b[^>]*?(?<![\\w:-])href\\s*=\\s*${value}`, 'gi'),
-    /url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)/gi,
-    /@import\s+(?:url\(\s*)?(?:"([^"]*)"|'([^']*)'|([^\s;)]+))/gi,
-  ];
-  for (const rx of rules) {
-    for (const m of html.matchAll(rx)) {
-      const url = (m[1] ?? m[2] ?? m[3] ?? '').trim();
-      if (outside(url)) out.push({ index: m.index, line: lineAt(html, m.index), url });
+  const add = (index, url) => {
+    const u = String(url ?? '').trim();
+    if (u && !/^(?:data:|#)/i.test(u)) out.push({ index, url: u });
+  };
+  const blank = (s) => s.replace(/[^\n]/g, ' ');
+  const styles = [];
+  let text = html.replace(/<!--[\s\S]*?(?:-->|$)/g, blank);
+  text = text.replace(/(<style\b[^>]*>)([\s\S]*?)(<\/style\s*>|$)/gi, (m, open, body, close, at) => {
+    styles.push({ index: at + open.length, css: body });
+    return open + blank(body) + close;
+  });
+  text = text.replace(/(<script\b[^>]*>)([\s\S]*?)(<\/script\s*>|$)/gi, (m, open, body, close) => open + blank(body) + close);
+  for (const tag of text.matchAll(/<([A-Za-z][\w:-]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/g)) {
+    const element = tag[1].toLowerCase();
+    const from = tag.index + 1 + tag[1].length;
+    for (const a of tag[2].matchAll(/([^\s=/>"']+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"']+)))?/g)) {
+      const name = a[1].toLowerCase();
+      const value = a[2] ?? a[3] ?? a[4];
+      if (value === undefined) continue;
+      const at = from + a.index;
+      if (name === 'style') styles.push({ index: at, css: value });
+      else if (name === 'srcset' || name === 'imagesrcset') for (const c of value.split(',')) add(at, c.trim().split(/\s+/)[0]);
+      else if (name === 'src' || name === 'poster' || (name === 'data' && element === 'object')) add(at, value);
+      else if ((name === 'href' || name === 'xlink:href') && element !== 'a' && element !== 'area') add(at, value);
     }
+  }
+  for (const s of styles) {
+    const css = s.css.replace(/\/\*[\s\S]*?(?:\*\/|$)/g, blank);
+    for (const m of css.matchAll(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)/gi)) add(s.index + m.index, m[1] ?? m[2] ?? m[3]);
+    for (const m of css.matchAll(/@import\s+(?:"([^"]*)"|'([^']*)')/gi)) add(s.index + m.index, m[1] ?? m[2]);
+    for (const m of css.matchAll(/image-set\(([^)]*)\)/gi)) for (const q of m[1].matchAll(/"([^"]*)"|'([^']*)'/g)) add(s.index + m.index, q[1] ?? q[2]);
   }
   const seen = new Set();
   return out
     .sort((a, b) => a.index - b.index)
-    .filter((o) => !seen.has(`${o.line} ${o.url}`) && seen.add(`${o.line} ${o.url}`))
-    .map(({ line, url }) => ({ line, url }));
+    .map(({ index, url }) => ({ line: lineAt(html, index), url }))
+    .filter((o) => !seen.has(`${o.line}\u0000${o.url}`) && seen.add(`${o.line}\u0000${o.url}`));
 }
 
 /** Whether an HTML text holds an element with this id, its value quoted or not. */

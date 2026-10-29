@@ -137,7 +137,8 @@ Texts (a feature's `summary`, a requirement's `text`, a scenario's `text`) keep 
 Markdown; a scenario's text is one line per step, `GIVEN …`, `WHEN …`, `THEN …`, `AND …`, then one
 line per table row, `| a | b |`. A change side's `review` is its proposal's `## Review` section as
 plain text, each paragraph on one line and a heading inside the section a paragraph of its own,
-paragraphs joined by a blank line; null without `proposal.md` or the section. `pendingChanges`
+paragraphs joined by a blank line (a section repeated is read as one); null without
+`proposal.md` or the section. `pendingChanges`
 holds the ids of the change folders whose `capabilities` name the feature.
 
 A board's `asset` is null without `--assets` or when the board does not exist at the ref; with it,

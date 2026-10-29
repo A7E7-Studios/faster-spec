@@ -250,14 +250,16 @@ export function sectionText(text, name) {
   const body = splitLines(text).slice(parseFrontMatter(text).bodyStart).join('\n');
   const section = prSections(body).get(name);
   if (section === undefined) return null;
-  const lines = splitLines(section).flatMap((l) => {
-    const h = /^ {0,3}#{3,6}[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/.exec(l);
+  const raw = splitLines(section);
+  const mask = fenceMask(raw);
+  const lines = raw.flatMap((l, i) => {
+    const h = mask[i] ? null : /^ {0,3}#{3,6}[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/.exec(l);
     return h ? ['', h[1], ''] : [l];
   });
   return paragraphs(lines)
     .split('\n\n')
-    .filter(Boolean)
     .map((p) => plainText(p))
+    .filter(Boolean)
     .join('\n\n');
 }
 

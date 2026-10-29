@@ -77,27 +77,6 @@ an edited, missing or extra file under the kit's paths, or a deleted lock. With 
 protected (the starter config lists it; sync warns when a project's config does not), every sync
 is merged by the owner.
 
-### Specs written with human checks
-
-A project whose specs carry `## Purpose` and human-check PROOF lines moves them to the current
-format in the pull request that syncs the kit:
-
-1. **Config.** In `tools/gate/config.json`, rename `overview.moduleMarkers` to
-   `overview.componentMarkers` and `overview.excludeModules` to `overview.excludeComponents` (the
-   gate refuses the old names); add the budget `{ "pattern": "specs/**/looks/*.html", "bytes":
-   30720 }`, and a `design` block (the starter's points at the house style) if the project designs
-   screens. A Git LFS rule kept only for looks can go.
-2. **Each spec.** Add `review: unreviewed`; rename `## Purpose` to `## Summary`, saying when a
-   person meets the feature and why; delete every PROOF line other than `test:` (its scenario is
-   untested until a test proves it); give each requirement statement `SHALL` and its `because`;
-   keep one WHEN and one THEN per scenario (an extra one becomes an AND, or a scenario of its own).
-   Delete `look/*.png`; a feature with a visual side gets a board when the design skill next
-   draws it.
-3. **Each change folder.** Drop the `review` and `follow-ups` keys, add a `## Review` section, and
-   delete `look/` and `evidence/` files.
-4. **One change folder** in that pull request names every moved spec: the gate reads each as
-   changed, so each starts `unreviewed`, and the owner's approvals come back through triage.
-
 ## Layout
 
 | Path | What | Synced |
