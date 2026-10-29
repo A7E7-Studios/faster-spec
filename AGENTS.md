@@ -45,16 +45,17 @@ The workflow is the one the kit ships: [specs/README.md](specs/README.md),
 [changes/README.md](changes/README.md), the four skills in `.agents/skills/`. Run
 `node tools/setup-agents/setup.mjs` once per checkout or worktree.
 
-| Check | Here |
+| What | Here |
 |---|---|
-| Human checks | `desk`: a tool's output at a computer, a gate run on GitHub; the gate's other checks have no use here |
+| Where the owner reviews | at a desk: a tool's output at a computer, a gate run on GitHub |
 | A build | a commit of this repository: `build <short sha>`, its commit that sha |
-| A look | none: the kit draws nothing; a tool's output is checked at the desk |
+| Looks | none: the kit draws nothing, so its specs have no `## Looks` and it has no `design` block |
 | The other repository | none; a project that carries the kit is no side of a kit change |
 
 - **Every behaviour change carries a change folder** and edits the living spec in the same pull
   request. Which pull requests need none: [changes/README.md](changes/README.md#which-pull-requests-carry-a-change-folder).
-- **Only the owner's word sets `pass` or `fail`** on a PROOF line; agents write `test:` and `open`.
+- **Only the owner's word sets `review: approved` or `changes-requested`** on a spec; agents write
+  `unreviewed`, and `test:` PROOF lines.
 - **The owner merges.** Nearly every pull request here touches a protected path
   ([the list](tools/gate/README.md#protected-paths)), so the gate's `protected` check fails it and
   the owner merges it, never an agent.
