@@ -18,7 +18,6 @@ read this file natively.
   `LICENSE`, `specs/domains.json`, `specs/systems.json`, the specs and the changes, and `tools/gate/config.json`.
 - The tests run on `tools/gate/config.template.json`, never on a project's config, so they hold in
   every project that carries the kit.
-- `tools/solution-map/` is reserved for the local web viewer over the overview's JSON.
 
 ## Quality gate
 

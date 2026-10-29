@@ -26,4 +26,4 @@ scenario a person checks. A `test:` task is ticked when its test passes.
 ## 4. Docs
 
 - [x] 4.1 `tools/solution-map/README.md`; test: node tools/gate/gate.mjs --local
-- [ ] 4.2 The kit's README lists the Solution map, and `solutionMap` joins the config template, both protected paths the owner merges; test: node tools/gate/gate.mjs --local
+- [x] 4.2 The kit's README lists the Solution map, and `solutionMap` joins the config template, both protected paths the owner merges; test: node tools/gate/gate.mjs --local

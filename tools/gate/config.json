@@ -63,5 +63,8 @@
   ],
   "overview": {
     "excludeComponents": ["**/test/fixtures/**"]
+  },
+  "solutionMap": {
+    "repos": [{ "id": "kit", "path": "." }]
   }
 }
