@@ -3,13 +3,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { makeRepo, git, testConfig, check } from '../../gate/test/helpers.mjs';
 import { runGate, Repo } from '../../gate/lib/index.mjs';
 import { blobId } from '../../gate/lib/kit.mjs';
-import { parseManifest, publicUrl } from '../sync.mjs';
+import { parseManifest, publicUrl, lockUnprotected } from '../sync.mjs';
 
 const SYNC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'sync.mjs');
 const LOCK = 'tools/kit/lock.json';
@@ -189,6 +190,58 @@ test('sync: a checkout with CRLF line endings holds the same content', (t) => {
   assert.equal(sync(['--check'], p.dir).code, 0);
 });
 
+test('sync: the kit takes back a file the project owned, and drops a folder', (t) => {
+  const k = kitRepo(t);
+  const p = project(t);
+  assert.equal(into(k, p).code, 0);
+  p.write({ 'tools/gate/config.json': '{ "mine": true }\n' });
+  p.commit('chore: take the kit');
+  // the kit now ships tools/gate/config.json itself
+  k.write({ 'kit.json': JSON.stringify({ ...MANIFEST, projectOwned: ['tools/kit/lock.json'], starters: {} }) });
+  k.commit('feat: the kit owns the config');
+  let res = into(k, p);
+  assert.equal(res.code, 1, res.out + res.err);
+  assert.match(res.err, /^sync: tools\/gate\/config\.json is the project's own file$/m);
+  assert.equal(read(p, 'tools/gate/config.json'), '{ "mine": true }\n', 'nothing written');
+  res = into(k, p, '--force');
+  assert.equal(res.code, 0, res.out + res.err);
+  assert.equal(read(p, 'tools/gate/config.json'), '{ "the kit": "its own" }\n');
+  p.commit('chore: sync');
+  assert.equal(sync(['--check'], p.dir).code, 0, 'the lock and the copy agree');
+
+  // the kit drops tools/kit/ from its paths: its files go, the project's own file there stays and is no stray
+  p.write({ 'tools/kit/notes.md': 'mine\n' });
+  p.commit('docs: mine');
+  k.write({ 'kit.json': JSON.stringify({ ...MANIFEST, paths: ['.agents/skills/spec/', 'specs/README.md', 'tools/gate/'], projectOwned: [], starters: {} }) });
+  k.commit('feat: no tools/kit');
+  res = into(k, p, '--force');
+  assert.equal(res.code, 0, res.out + res.err);
+  assert.match(res.out, /^delete tools\/kit\/sync\.mjs$/m);
+  assert.doesNotMatch(res.err, /notes\.md/);
+  assert.equal(read(p, 'tools/kit/notes.md'), 'mine\n');
+});
+
+test('sync: an ignored file where the kit writes stops the sync; a link out of the project is never followed', (t) => {
+  const k = kitRepo(t);
+  const p = project(t, { 'README.md': '# App\n', '.gitignore': 'specs/README.md\n' });
+  p.write({ 'specs/README.md': '# Mine, ignored\n' });
+  let res = into(k, p);
+  assert.equal(res.code, 1, res.out + res.err);
+  assert.match(res.err, /^sync: specs\/README\.md has uncommitted changes$/m);
+  assert.equal(read(p, 'specs/README.md'), '# Mine, ignored\n');
+
+  const q = project(t);
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'kit-outside-'));
+  t.after(() => fs.rmSync(outside, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(q.dir, '.agents', 'skills'), { recursive: true });
+  fs.symlinkSync(outside, path.join(q.dir, '.agents', 'skills', 'spec'), 'junction');
+  res = into(k, q);
+  assert.equal(res.code, 1, res.out + res.err);
+  assert.match(res.err, /lies through a link outside the project/);
+  assert.deepEqual(fs.readdirSync(outside), [], 'nothing written outside');
+  assert.ok(!exists(q, LOCK), 'nothing written inside either');
+});
+
 test('sync: usage and setup errors exit 2', (t) => {
   const k = kitRepo(t);
   const p = project(t);
@@ -220,4 +273,15 @@ test('sync: kit.json and the repository URL', () => {
   assert.equal(publicUrl('https://user:token@github.com/org/kit.git'), 'https://github.com/org/kit.git');
   assert.equal(publicUrl('git@github.com:org/kit.git'), 'git@github.com:org/kit.git');
   assert.equal(publicUrl(null), null);
+  assert.equal(publicUrl('ssh://git:secret@example.invalid/org/kit.git'), 'ssh://example.invalid/org/kit.git');
+  for (const local of ['C:/Users/someone/kit', '/home/someone/kit', '../kit', 'file:///C:/kit']) assert.equal(publicUrl(local), null, local);
+});
+
+test('sync: a config that leaves the lock unprotected is reported', (t) => {
+  const p = project(t, { 'tools/gate/config.json': JSON.stringify({ protectedPaths: ['tools/gate/**'] }) });
+  assert.match(lockUnprotected(p.dir), /add "tools\/kit\/\*\*" to "protectedPaths"/);
+  p.write({ 'tools/gate/config.json': JSON.stringify({ protectedPaths: ['tools/kit/**'] }) });
+  assert.equal(lockUnprotected(p.dir), null);
+  p.write({ 'tools/gate/config.json': null });
+  assert.equal(lockUnprotected(p.dir), null, 'no config: the gate says so itself');
 });

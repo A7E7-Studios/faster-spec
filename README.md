@@ -68,8 +68,9 @@ node tools/kit/sync.mjs --check                                    # is the comm
 
 A sync refuses, writing nothing, when the project changed one of the kit's files; such a change
 belongs in the kit. The gate's `kit` check fails a pull request whose copy differs from its lock:
-an edited, missing or extra file under the kit's paths, or a deleted lock. `tools/kit/**` is
-protected, so every sync is merged by the owner.
+an edited, missing or extra file under the kit's paths, or a deleted lock. With `tools/kit/**`
+protected (the starter config lists it; sync warns when a project's config does not), every sync
+is merged by the owner.
 
 ## Layout
 

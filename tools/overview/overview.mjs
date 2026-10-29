@@ -186,7 +186,7 @@ export function findModules(repo, commit, repoId, config = readConfig(repo, comm
  * capability's title and purpose). Returns the overview object; assets stay null until copyAssets.
  */
 export function buildOverview(repos, { now = new Date() } = {}) {
-  const out = { version: 1, generatedAt: now.toISOString(), assetsDir: null, repos: [], domains: [], capabilities: [], changes: [], modules: [], totals: null };
+  const out = { version: 2, generatedAt: now.toISOString(), assetsDir: null, repos: [], domains: [], capabilities: [], changes: [], modules: [], totals: null };
   const domains = new Map();
   const caps = new Map();
   const changes = new Map();

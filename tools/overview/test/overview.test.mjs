@@ -208,7 +208,7 @@ test('overview: two repositories merge into one index whose shape the schema des
   const o = buildOverview([parseRepoArg(`app=${f.app.dir}@main`), parseRepoArg(`backend=${f.backend.dir}@main`)], { now: new Date('2026-10-29T12:00:00Z') });
   assert.deepEqual(validate(JSON.parse(JSON.stringify(o)), SCHEMA), []);
   for (const k of SCHEMA.required) assert.ok(k in o, k);
-  assert.equal(o.version, 1);
+  assert.equal(o.version, 2);
   assert.equal(o.generatedAt, '2026-10-29T12:00:00.000Z');
 
   assert.deepEqual(

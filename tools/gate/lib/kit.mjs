@@ -8,7 +8,10 @@ import { pathProblem } from './spec.mjs';
 export const LOCK_FILE = 'tools/kit/lock.json';
 export const LOCK_VERSION = 1;
 
-const SHA = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+const COMMIT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+/** blobId gives SHA-1 ids, so a lock's file ids are 40 hex. */
+const BLOB = /^[0-9a-f]{40}$/;
+const isId = (re, v) => typeof v === 'string' && re.test(v);
 
 /** The git blob id of `bytes` (SHA-1), what `git hash-object` prints for the same content. */
 export function blobId(bytes) {
@@ -55,7 +58,7 @@ export function parseLock(text) {
   const problems = [];
   if (o.version !== LOCK_VERSION) problems.push(`"version" is ${LOCK_VERSION}, not ${JSON.stringify(o.version)}`);
   const kit = o.kit;
-  if (!kit || typeof kit !== 'object' || !SHA.test(kit.commit ?? '') || !(kit.repository === null || typeof kit.repository === 'string')) {
+  if (!kit || typeof kit !== 'object' || !isId(COMMIT, kit.commit) || !(kit.repository === null || typeof kit.repository === 'string')) {
     problems.push('"kit" is { "repository": <url or null>, "commit": <the kit commit, full sha> }');
   }
   problems.push(...ownedPathProblems(o));
@@ -63,7 +66,7 @@ export function parseLock(text) {
   if (!files || typeof files !== 'object' || Array.isArray(files)) problems.push('"files" is { <path>: <git blob id> }');
   else {
     for (const [p, id] of Object.entries(files)) {
-      if (!SHA.test(id)) problems.push(`files: ${p} has no git blob id`);
+      if (!isId(BLOB, id)) problems.push(`files: ${p} has no git blob id (40 hex)`);
       if (pathProblem(p) || p.endsWith('/')) problems.push(`files: "${p}" is not a file path`);
       else if (Array.isArray(o.paths) && !owns(o.paths, p)) problems.push(`files: ${p} is not inside the kit's paths`);
     }

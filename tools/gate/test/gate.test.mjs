@@ -697,6 +697,12 @@ test('kit: a drift already on main is information for a PR that does not touch t
   r.commit('docs: edit');
   rep = gate(r);
   assert.equal(fails(rep, 'kit').length, 2, 'a PR that touches the kit answers for all of it');
+  // the project's own config sits inside tools/gate/ but is no part of the copy
+  r.branch('z', 'main').write({ 'tools/gate/config.json': '{ "mine": true }\n' });
+  r.commit('chore: config\n\nDoc-Impact: none; a test');
+  rep = gate(r);
+  assert.equal(check(rep, 'kit').status, 'pass', failText(rep, 'kit'));
+  assert.match(infos(rep, 'kit')[0].message, /^already at the merge base: differs from the kit/);
 });
 
 // --- the head is data --------------------------------------------------------------------------

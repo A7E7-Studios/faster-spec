@@ -22,9 +22,14 @@ owner's questions came as walls of text rather than through the harness's questi
 - A project takes it with `tools/kit/sync.mjs`, which writes the kit's files at one kit commit and
   records them in `tools/kit/lock.json`: *A project takes the kit for the first time*, *A project
   takes a newer kit*, *The project edited a kit file*, *A first sync over a hand copy*, *A CRLF
-  checkout syncs again*.
+  checkout syncs again*. It refuses over a file the project keeps and never follows a link out of
+  the project: *The kit takes back a project's file*, *An ignored file where the kit writes*, *A kit
+  folder links out of the project*, *A kit taken from a local folder*, *A config that predates the
+  kit*, *A kit that drops a folder*.
 - The gate's new `kit` check holds the copy to its lock: *A pull request edits a kit file*, *The
   kit's own repository*, *Main carries a drift*. `tools/kit/**` joins the protected paths.
+- The overview JSON is version 2: each module names its manifest (`modules[].manifest`); a
+  version 1 reader takes the new key and nothing else changes.
 - Python and Gradle folders are modules, and a project may name its own markers: *A Python and
   Gradle repository*, *A repository names its own markers*.
 - The spec and design skills ask the owner through the harness's question tool: *A round of five
@@ -54,6 +59,9 @@ owner's questions came as walls of text rather than through the harness's questi
 - **Q7 Questions**: through the harness's question tool (Claude Code's `AskUserQuestion`: 4
   questions a call, 2–4 options, recommended first); numbered text with one list item per option
   only without one.
+- **Q8 The review recorder**: the triage skill keeps CueReview, its `cue` CLI and its default
+  install path by name, the one product the kit names; AGENTS.md records it. Rejected: a
+  project-named recorder.
 
 ## Calls for the owner
 

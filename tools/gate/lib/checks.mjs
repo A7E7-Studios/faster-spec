@@ -544,7 +544,8 @@ export function checkKit(ctx) {
   if (!now && !was) return result('kit', title, [], `no ${LOCK_FILE}: not a synced copy of the kit`, 'skip');
   if (!now) return result('kit', title, [fail(`deletes ${LOCK_FILE}: a project that carries the kit keeps its lock, so its copy stays checked`, LOCK_FILE)], 'the lock is deleted');
   const locks = [now.lock, was?.lock].filter(Boolean);
-  const changed = ctx.changes.some((c) => c.path === LOCK_FILE || locks.some((l) => owns(l.paths, c.path)));
+  // The project's own files (its config) sit inside the kit's paths but are no part of the copy.
+  const changed = ctx.changes.some((c) => c.path === LOCK_FILE || locks.some((l) => owns(l.paths, c.path) && !l.projectOwned.includes(c.path)));
   const findings = judge(ctx, [{ changed, at: (rev) => (rev === head ? now.problems : was?.problems ?? []) }]);
   const summary = now.lock
     ? `${Object.keys(now.lock.files).length} file(s) of the kit at ${now.lock.kit.commit.slice(0, 9)}; ${now.problems.length} not as the lock says`

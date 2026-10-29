@@ -9,7 +9,9 @@ read this file natively.
 - **The kit** is every path `kit.json` lists; `node tools/kit/sync.mjs` copies exactly those into a
   project. What a project receives must hold in any project: **no product, company, customer,
   person or local-path names** in code, docs, tests or examples, and examples that are neutral (a
-  notes app, a backend, a device). A rule that varies by project is project config
+  notes app, a backend, a device). One name is the kit's own: CueReview, the open-source review
+  recorder the triage skill drives, named with its CLI and default install path as its docs give
+  them. A rule that varies by project is project config
   (`tools/gate/config.json`) or that project's `AGENTS.md`, never kit text.
 - **This repository's own** files, never synced: this `AGENTS.md`, `kit.json`, `README.md`,
   `LICENSE`, `specs/domains.json`, the specs and the changes, and `tools/gate/config.json`.

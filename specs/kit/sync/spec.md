@@ -48,12 +48,58 @@ would otherwise vanish.
 - **AND** with `--force` it takes the kit's files, and with `--dry-run` it only says what would change
 - **PROOF** test: tools/kit/test/sync.test.mjs::sync: a kit file the project changed stops the sync, unless --force; --dry-run writes nothing
 
+#### Scenario: The kit takes back a project's file
+- **GIVEN** a synced project that keeps its own copy of a file the kit owned as the project's
+- **WHEN** a newer kit ships that file itself and the project syncs
+- **THEN** the sync names the file as the project's own, writes nothing and exits 1
+- **AND** with `--force` it takes the kit's file, and the check passes after the commit
+- **PROOF** test: tools/kit/test/sync.test.mjs::sync: the kit takes back a file the project owned, and drops a folder
+
+#### Scenario: An ignored file where the kit writes
+- **GIVEN** a project holding a git-ignored file at a path the kit ships
+- **WHEN** someone syncs the kit into it
+- **THEN** the sync names the file, writes nothing and exits 1
+- **PROOF** test: tools/kit/test/sync.test.mjs::sync: an ignored file where the kit writes stops the sync; a link out of the project is never followed
+
 #### Scenario: A first sync over a hand copy
 - **GIVEN** a project that carries a committed hand copy of the kit and no lock
 - **WHEN** someone syncs the kit into it
 - **THEN** each differing file is replaced and printed as replaced, the project's own config is
   kept, and a file the kit lacks under the kit's paths is named and left as it is
 - **PROOF** test: tools/kit/test/sync.test.mjs::sync: the first sync replaces a hand copy it finds committed, refuses one with uncommitted changes, and reports a file the kit lacks
+
+### Requirement: A sync writes only inside the project
+The sync SHALL write and delete only real files inside the project, and record no local folder as
+the kit's repository, because a link or junction under the kit's paths would otherwise carry its
+writes elsewhere, and the lock is committed for everyone to read.
+
+#### Scenario: A kit folder links out of the project
+- **GIVEN** a project where a folder the kit writes into is a junction to a folder elsewhere
+- **WHEN** someone syncs the kit into it
+- **THEN** the sync names the path, writes nothing in the project or outside it, and exits 1
+- **PROOF** test: tools/kit/test/sync.test.mjs::sync: an ignored file where the kit writes stops the sync; a link out of the project is never followed
+
+#### Scenario: A kit taken from a local folder
+- **GIVEN** a kit checkout whose origin is a folder or a `file:` URL
+- **WHEN** someone syncs from it
+- **THEN** the lock records the repository as null; a URL's user and token are never recorded
+- **PROOF** test: tools/kit/test/sync.test.mjs::sync: kit.json and the repository URL
+
+### Requirement: A sync stays the owner's to merge
+The sync SHALL warn when the project's config protects no path that holds the lock, because only a
+protected lock makes every sync a pull request the owner merges.
+
+#### Scenario: A config that predates the kit
+- **GIVEN** a project whose `tools/gate/config.json` lists no protected path holding `tools/kit/lock.json`
+- **WHEN** someone syncs the kit into it
+- **THEN** the sync says to add `tools/kit/**` to `protectedPaths`
+- **PROOF** test: tools/kit/test/sync.test.mjs::sync: a config that leaves the lock unprotected is reported
+
+#### Scenario: A kit that drops a folder
+- **GIVEN** a synced project holding a file of its own in a folder the kit owns
+- **WHEN** a newer kit stops owning that folder and the project syncs
+- **THEN** the files the old lock lists there are deleted, and the project's own file stays, unreported
+- **PROOF** test: tools/kit/test/sync.test.mjs::sync: the kit takes back a file the project owned, and drops a folder
 
 ### Requirement: Line endings are no change
 The sync SHALL compare files as git stores them, because a checkout that writes CRLF holds the same

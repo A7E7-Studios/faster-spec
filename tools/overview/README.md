@@ -43,8 +43,8 @@ repository is `--assets` fetching a missing LFS object into its LFS cache (below
 
 A module is a folder (`.` for the root), not under `node_modules`, that holds a file a module
 marker matches. The markers are file-name globs, `tools/gate/config.json` `overview.moduleMarkers`;
-a repository whose config names none gets `README.md`, `package.json`, `pyproject.toml`,
-`build.gradle`, `build.gradle.kts` and `*.asmdef`. A `*.asmdef` marks its folder only when it is not
+a repository whose config has no such key gets `README.md`, `package.json`, `pyproject.toml`,
+`build.gradle`, `build.gradle.kts` and `*.asmdef` (an empty list marks no module). A `*.asmdef` marks its folder only when it is not
 a test assembly: one whose `name` or folder ends with `Tests` (`PlayTests`, `EditModeTests`,
 `PlayModeTests` included) or whose name holds `.Tests`. A module's `README.md` gives its title and
 summary even where `README.md` is no marker.
@@ -79,10 +79,10 @@ A side's `problems` lists each break of the spec format, and a capability with a
 
 ## Output
 
-[`overview.schema.json`](overview.schema.json) (JSON Schema 2020-12) describes version 1:
+[`overview.schema.json`](overview.schema.json) (JSON Schema 2020-12) describes version 2:
 
 ```
-{ version: 1, generatedAt, assetsDir,
+{ version: 2, generatedAt, assetsDir,
   repos:        [{ id, name, ref, commit }],
   domains:      [{ id, title, purpose }],
   capabilities: [{ id, domain, title, purpose,

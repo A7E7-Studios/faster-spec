@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Repo, runGit } from '../gate/lib/git.mjs';
+import { matches } from '../gate/lib/glob.mjs';
 import { LOCK_FILE, LOCK_VERSION, blobId, owns, ownedPathProblems, parseLock, kitProblems } from '../gate/lib/kit.mjs';
 
 /** The kit's manifest, at the root of the kit repository; never synced. */
@@ -50,10 +51,16 @@ export function parseManifest(text) {
   return { paths: o.paths, projectOwned: o.projectOwned, starters };
 }
 
-/** The repository URL without any user or token in it, or null. */
+/**
+ * The repository URL without any user or token in it, or null: a URL with no scheme or a file: URL
+ * is a folder on someone's machine, never written into a project's lock.
+ */
 export function publicUrl(url) {
   if (!url) return null;
-  return url.replace(/^(https?:\/\/)[^@/]+@/i, '$1');
+  if (/^[\w.-]+@[\w.-]+:(?!\/\/)/.test(url)) return url; // git@host:org/repo.git
+  const scheme = /^([a-z][a-z0-9+.-]*):\/\//i.exec(url);
+  if (!scheme || scheme[1].toLowerCase() === 'file') return null;
+  return url.replace(/^([a-z][a-z0-9+.-]*:\/\/)[^@/]+@/i, '$1');
 }
 
 /** The git blob ids of working-tree files, as git would store them (its clean filters applied: CRLF to LF). */
@@ -68,7 +75,8 @@ function workingIds(projectDir, paths) {
 
 /**
  * Paths under `paths` with uncommitted changes: differing from HEAD (staged or not, as git diff
- * sees content, so a checkout's line endings are no change), or untracked.
+ * sees content, so a checkout's line endings are no change), or untracked, ignored ones included
+ * (git holds no copy of those either).
  */
 function dirtyPaths(projectDir, paths) {
   if (!paths.length) return new Set();
@@ -78,6 +86,7 @@ function dirtyPaths(projectDir, paths) {
   return new Set([
     ...(hasHead ? list(['diff', '--name-only', '-z', '--no-renames', 'HEAD', ...specs]) : list(['ls-files', '-z', '--cached', ...specs])),
     ...list(['ls-files', '-z', '--others', '--exclude-standard', ...specs]),
+    ...list(['ls-files', '-z', '--others', '--ignored', '--exclude-standard', ...specs]),
   ]);
 }
 
@@ -109,9 +118,10 @@ export function planSync({ kit, commit, projectDir }) {
     if (!parsed.lock) throw new Error(`${LOCK_FILE} does not read (${parsed.problems.join('; ')}): fix it, or delete it and sync again`);
     oldLock = parsed.lock;
   }
-  const owned = [...new Set([...manifest.paths, ...(oldLock?.paths ?? [])])];
-  const disk = filesOnDisk(projectDir, owned);
-  const projectOwned = new Set([...manifest.projectOwned, ...(oldLock?.projectOwned ?? []), LOCK_FILE]);
+  // Stray files are judged by the paths the kit owns now; the old lock's files are only deleted.
+  // A file the project owned before and the kit now ships is a candidate like any other.
+  const disk = filesOnDisk(projectDir, manifest.paths);
+  const projectOwned = new Set([...manifest.projectOwned, LOCK_FILE]);
   const candidates = [...new Set([...files.keys(), ...Object.keys(oldLock?.files ?? {}), ...disk])].sort().filter((p) => !projectOwned.has(p));
   const ids = workingIds(projectDir, candidates);
   const dirty = dirtyPaths(projectDir, candidates);
@@ -163,10 +173,36 @@ function pruneEmpty(dir, stop) {
   }
 }
 
-/** Writes a plan into the project, then the lock. */
+const inside = (child, parent) => {
+  const rel = path.relative(parent, child);
+  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+};
+
+/**
+ * Throws unless writing or deleting `target` stays inside `root`: the target is no link, and its
+ * nearest existing folder resolves (links and junctions followed) inside the root's real path.
+ */
+export function assertInside(root, target) {
+  const norm = (p) => (process.platform === 'win32' ? p.toLowerCase() : p);
+  const realRoot = norm(fs.realpathSync.native(root));
+  let st = null;
+  try {
+    st = fs.lstatSync(target);
+  } catch {}
+  if (st?.isSymbolicLink()) throw new Error(`${path.relative(root, target)} is a link: sync writes and deletes only real files inside the project`);
+  let d = path.dirname(target);
+  while (!fs.existsSync(d)) d = path.dirname(d);
+  const real = fs.realpathSync.native(d);
+  if (!inside(norm(real), realRoot)) throw new Error(`${path.relative(root, target)} lies through a link outside the project (${real})`);
+}
+
+/** Writes a plan into the project, then the lock. Checks every target first, and writes nothing on a problem. */
 export function applySync(plan, { projectDir, repository, commit }) {
   const root = path.resolve(projectDir);
   const abs = (p) => path.join(root, ...p.split('/'));
+  for (const a of plan.actions) if (a.op !== 'same') assertInside(root, abs(a.path));
+  for (const s of plan.starters) assertInside(root, abs(s.path));
+  assertInside(root, abs(LOCK_FILE));
   for (const a of plan.actions) {
     if (a.op === 'add' || a.op === 'update') {
       const f = plan.files.get(a.path);
@@ -216,6 +252,22 @@ function parseArgs(argv) {
   if (o.check && (o.kit || o.ref || o.force || o.dryRun)) throw new Usage('--check takes only --project and --rev');
   if (!o.check && o.rev) throw new Usage('--rev goes with --check; the kit revision is --ref');
   return o;
+}
+
+/**
+ * Why the project's config leaves the lock unprotected, or null. A sync is merged by the owner only
+ * when a protected path covers `tools/kit/**`; the starter config has it, an older config may not.
+ */
+export function lockUnprotected(projectDir) {
+  let config;
+  try {
+    config = JSON.parse(fs.readFileSync(path.join(projectDir, 'tools', 'gate', 'config.json'), 'utf8'));
+  } catch {
+    return null; // the gate reports a missing or broken config itself
+  }
+  const globs = Array.isArray(config?.protectedPaths) ? config.protectedPaths : [];
+  if (matches(LOCK_FILE, globs, { ignoreCase: true })) return null;
+  return `tools/gate/config.json protects no path that holds ${LOCK_FILE}: add "tools/kit/**" to "protectedPaths", or an agent can change a kit file and the lock together and merge without the owner`;
 }
 
 const same = (a, b) => {
@@ -303,11 +355,20 @@ export function main(argv, { log = console.log, err = console.error } = {}) {
     if (a.op !== 'same') log(`${o.dryRun ? 'would ' : ''}${a.op === 'add' ? 'add' : a.op === 'delete' ? 'delete' : a.replaces ? 'replace' : 'update'} ${a.path}`);
   }
   for (const s of plan.starters) log(`${o.dryRun ? 'would ' : ''}start ${s.path} from ${s.from}: the project's own from now on`);
-  if (!o.dryRun) applySync(plan, { projectDir: project.dir, repository, commit });
+  if (!o.dryRun) {
+    try {
+      applySync(plan, { projectDir: project.dir, repository, commit });
+    } catch (e) {
+      err(`sync: ${e.message}: nothing written`);
+      return 1;
+    }
+  }
   log(
     `sync: ${o.dryRun ? 'would sync' : 'synced'} ${at}: ${count('add')} added, ${count('update')} updated, ${count('delete')} deleted, ${count('same')} unchanged` +
       (o.dryRun ? '; nothing written' : `; ${LOCK_FILE} written. Review and commit.`),
   );
+  const unprotected = lockUnprotected(project.dir);
+  if (unprotected) err(`sync: ${unprotected}`);
   if (plan.stray.length) {
     for (const p of plan.stray) err(`sync: ${p} is not in the kit; the gate's kit check fails on it until it moves out of the kit's paths or into the kit`);
     return 1;

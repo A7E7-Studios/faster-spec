@@ -34,29 +34,35 @@ Exit: **0** done, **1** refused (nothing written), a file under the kit's paths 
 2. Compares each kit file with the project's working tree, by git blob id as git would store the
    file (its clean filters applied, so a checkout's line endings are no change).
 3. **Refuses**, writing nothing, when the project changed a kit file: one that differs from what
-   the old lock records, or that has uncommitted changes. `--force` takes the kit's. On the first
-   sync, with no lock yet, a committed hand copy is replaced, and each such file is printed as
-   `replace`.
+   the old lock records, that has uncommitted changes, or that git does not track (an ignored file
+   included); a file the project owned that the kit now ships counts as the project's. `--force`
+   takes the kit's. On the first sync, with no lock yet, a committed hand copy is replaced, and each
+   such file is printed as `replace`. It also refuses when a file it would write or delete is a
+   link, or lies through a link or junction outside the project.
 4. Writes every kit file that differs, deletes the files the old lock lists that the kit no longer
    has (and folders they leave empty), and writes each starter that the project lacks
    (`tools/gate/config.json` from `config.template.json`); a project's own file is never
    overwritten.
-5. Reports any other file under the kit's paths, and leaves it: the gate's `kit` check fails on it
-   until it moves out or into the kit.
+5. Reports any other file under the paths the kit owns now, and leaves it: the gate's `kit` check
+   fails on it until it moves out or into the kit. A folder the kit no longer owns loses only the
+   files the old lock lists.
 6. Writes `tools/kit/lock.json`. The person reviews the diff and commits it.
+7. Warns when the project's `tools/gate/config.json` protects no path holding the lock (below).
 
 ## The lock
 
 ```
 { "version": 1,
-  "kit": { "repository": "<the kit's origin URL, no credentials, or null>", "commit": "<full sha>" },
+  "kit": { "repository": "<the kit's origin URL, no credentials; null for a local folder>", "commit": "<full sha>" },
   "paths": ["tools/gate/", "specs/README.md", …],
   "projectOwned": ["tools/gate/config.json", "tools/kit/lock.json"],
   "files": { "<path>": "<git blob id, what git hash-object prints>" } }
 ```
 
-The project owns the lock: sync writes it, nobody edits it. `tools/kit/**` is a protected path, so
-a pull request that moves the lock, and with it the kit's files, is merged by the owner.
+The project owns the lock: sync writes it, nobody edits it. With `tools/kit/**` among the
+project's protected paths, a pull request that moves the lock, and with it the kit's files, is
+merged by the owner. The starter config lists it; a project whose config predates the kit adds it,
+and sync warns until it does.
 
 ## Tests
 
@@ -66,4 +72,6 @@ cd tools/kit && npm test      # node --test; a throwaway kit and project in the 
 
 The tests sync a kit into a project, update it (added, updated, deleted, unchanged), refuse and
 force over a project's edit, dry-run, replace a hand copy on the first sync, keep a CRLF checkout
-unchanged, and check the gate's `kit` check and `--check` agree.
+unchanged, take back a project-owned file, drop a folder, refuse over an ignored file and a
+junction out of the project, keep local paths out of the lock, warn about an unprotected lock, and
+check the gate's `kit` check and `--check` agree.

@@ -572,6 +572,9 @@ test('kit: a blob id is what git hash-object prints; a lock reads only in its fo
   assert.match(bad({ projectOwned: ['elsewhere.json'] }), /projectOwned: elsewhere\.json is not inside/);
   assert.match(bad({ files: { 'src/x.js': 'b'.repeat(40) } }), /files: src\/x\.js is not inside/);
   assert.match(bad({ files: { 'tools/gate/x.mjs': 'nope' } }), /has no git blob id/);
+  assert.match(bad({ files: { 'tools/gate/x.mjs': ['b'.repeat(40)] } }), /has no git blob id/, 'a string, not a list holding one');
+  assert.match(bad({ files: { 'tools/gate/x.mjs': 'b'.repeat(64) } }), /has no git blob id \(40 hex\)/, 'blobId gives SHA-1 ids only');
+  assert.match(bad({ kit: { repository: null, commit: ['a'.repeat(40)] } }), /"kit" is/);
   assert.ok(owns(['tools/gate/', 'specs/README.md'], 'tools/gate/lib/a.mjs') && owns(['specs/README.md'], 'specs/README.md'));
   assert.ok(!owns(['tools/gate/'], 'tools/gates/a.mjs') && !owns(['specs/README.md'], 'specs/README.md.bak'));
 });
