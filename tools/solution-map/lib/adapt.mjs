@@ -78,16 +78,13 @@ export function adapt(ov, ctx = {}) {
     const scenarios = (c.requirements || []).flatMap((r) => r.scenarios || []);
     const changes = changesFor(c.id);
     const newest = changes.find((x) => x.review) || changes[0] || null;
-    const looks = sides.flatMap((s) => (s.looks || []).map((l) => {
-      const lrepo = l.repo || s.repo;
+    const looks = (c.looks || []).map((l) => {
       if (l.kind === 'board') {
-        // A board's path is the Looks line's (`looks/<name>.html`), or already repository-relative.
-        const p = l.path.startsWith('specs/') ? l.path : s.spec.replace(/[^/]+$/, '') + l.path;
-        return { kind: 'board', repo: lrepo, path: p, id: l.id, caption: l.caption, exists: l.exists !== false, src: `/board/${lrepo}/${p}?section=${encodeURIComponent(l.id)}` };
+        return { kind: 'board', repo: l.repo, path: l.path, id: l.id, caption: l.caption, exists: l.exists !== false, src: `/board/${l.repo}/${l.path}?section=${encodeURIComponent(l.id)}` };
       }
       const url = pageUrl(l.target);
-      return { kind: 'page', repo: lrepo, target: l.target, caption: l.caption, url, answers: url ? answers[url] !== false : false };
-    }));
+      return { kind: 'page', repo: l.repo, target: l.target, caption: l.caption, url, answers: url ? answers[url] !== false : false };
+    });
     features[c.id] = {
       id: c.id, domain: c.domain, domainTitle: domainTitle(c.domain), title: c.title, summary: c.summary || '',
       review: c.review || 'unreviewed',
@@ -105,7 +102,7 @@ export function adapt(ov, ctx = {}) {
         name: r.name, text: r.text || '',
         scenarios: (r.scenarios || []).map((s) => ({
           name: s.name, tested: !!s.tested,
-          proofs: (s.proofs || []).filter((p) => p.path).map((p) => ({ path: p.path, selector: p.selector || null, href: href(r.repo || sides[0]?.repo, p.path) })),
+          proofs: (s.proofs || []).filter((p) => p.state === 'test').map((p) => ({ path: p.path, selector: p.selector || null, href: href(r.repo || sides[0]?.repo, p.path) })),
         })),
       })),
       changes,

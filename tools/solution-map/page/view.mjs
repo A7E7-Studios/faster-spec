@@ -173,7 +173,8 @@ function sinceBox(f) {
 
 function reviewNote(f) {
   if (f.reviewNote) return `<div class="box"><div class="bh">What to look at</div><div class="pre">${md(f.reviewNote.text)}</div><div class="src">From the Review section of changes/${esc(f.reviewNote.change)}/proposal.md</div></div>`;
-  return '<div class="box"><div class="bh">What to look at</div><div class="s-muted">No change names this feature, so there is no review note. Judge it against its Summary and Looks; open it in Explore for its behaviour.</div></div>';
+  const why = f.changes.length ? `The change that names it, ${esc(f.changes[0].id)}, has no Review section in its proposal.` : 'No change names this feature, so there is no review note.';
+  return `<div class="box"><div class="bh">What to look at</div><div class="s-muted">${why} Judge it against its Summary and Looks; open it in Explore for its behaviour.</div></div>`;
 }
 
 function problemsBox(f) {

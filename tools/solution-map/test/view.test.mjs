@@ -17,6 +17,8 @@ test('copy for triage names the feature, its changes and what to look at', () =>
   assert.match(triageText(vm, 'accounts/sign-in'), /No change names it/);
   const html = renderPage(vm, ui({ sel: 'editing/offline-edits' }));
   assert.match(html, /data-copy="editing\/offline-edits"/);
+  assert.match(renderPage(vm, ui({ sel: 'sharing/share-links' })), /The change that names it, share-links-expiry, has no Review section/);
+  assert.match(renderPage(vm, ui({ sel: 'accounts/sign-in' })), /No change names this feature, so there is no review note/);
 });
 
 test('nothing waiting says so and points at untested scenarios', () => {

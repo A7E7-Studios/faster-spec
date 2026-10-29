@@ -2,9 +2,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { adapt, webBase, pathHref, parseProblem } from '../lib/adapt.mjs';
+import { validate, SCHEMA } from './schema.mjs';
 
 const sample = () => JSON.parse(fs.readFileSync(new URL('./fixtures/overview-v3.json', import.meta.url), 'utf8'));
 const webs = { app: 'https://github.com/example/notes-app', api: null };
+
+test('the sample holds to the overview schema the kit publishes', () => {
+  assert.equal(SCHEMA.properties.version.const, 3);
+  assert.deepEqual(validate(sample()), []);
+});
 
 test('the queue holds every feature not approved, newest change first', () => {
   const vm = adapt(sample());

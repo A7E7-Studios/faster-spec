@@ -11,7 +11,41 @@ const ID = ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', '
 const g = (dir, ...args) => execFileSync('git', ['-C', dir, ...ID, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 const BOARD = '<!doctype html><html><head><style>body{margin:0}</style></head><body><section id="banner">offline banner</section><section id="other">other</section></body></html>';
 
-/** A bare origin and a clone of it with one commit on main; returns both folders. */
+const SPEC = `---
+title: Offline edits
+review: unreviewed
+code:
+  - src/
+---
+# Offline edits
+
+## Summary
+
+You can keep writing when the connection drops, and a banner says you are offline.
+
+## Looks
+
+- looks/offline-banner.html#banner — The banner after five seconds offline
+
+## Requirements
+
+### Requirement: Edits made offline are kept
+When the connection drops, the app SHALL keep every edit, because a user otherwise loses work.
+
+#### Scenario: An edit made offline is kept
+- **WHEN** a user edits a note offline
+- **THEN** the edit is kept
+- **PROOF** test: src/offline.test.js
+`;
+const FILES = {
+  'specs/domains.json': JSON.stringify([{ id: 'editing', title: 'Editing', purpose: 'Writing and changing notes.' }]),
+  'specs/systems.json': JSON.stringify([{ id: 'editor', title: 'Editor', purpose: 'The app people write notes in.', paths: ['src/'] }]),
+  'specs/editing/offline-edits/spec.md': SPEC,
+  'specs/editing/offline-edits/looks/offline-banner.html': BOARD,
+  'src/offline.test.js': '// the test\n',
+};
+
+/** A bare origin and a clone of it with one commit on main, a notes app's spec in it; returns both folders. */
 function repoPair(tmp, name) {
   const origin = path.join(tmp, `${name}.git`);
   const work = path.join(tmp, name);
@@ -19,8 +53,10 @@ function repoPair(tmp, name) {
   g(origin, 'init', '--bare', '-q');
   fs.mkdirSync(work);
   g(work, 'init', '-q');
-  fs.mkdirSync(path.join(work, 'specs/editing/offline-edits/looks'), { recursive: true });
-  fs.writeFileSync(path.join(work, 'specs/editing/offline-edits/looks/offline-banner.html'), BOARD);
+  for (const [p, body] of Object.entries(FILES)) {
+    fs.mkdirSync(path.dirname(path.join(work, p)), { recursive: true });
+    fs.writeFileSync(path.join(work, p), body);
+  }
   g(work, 'add', '.');
   g(work, 'commit', '-q', '-m', 'first');
   g(work, 'remote', 'add', 'origin', origin);
@@ -90,8 +126,16 @@ test('Refresh fetches again and rebuilds the map', () => withTmp(async (tmp) => 
 
 test('a board section is served from the board by its id', () => withTmp(async (tmp) => {
   const { work } = repoPair(tmp, 'app');
-  const s = await serve(() => buildMap({ repos: [{ id: 'app', dir: work }], overview: standIn() }));
+  // The kit's own overview, version 3, reading the spec above.
+  const s = await serve(() => buildMap({ repos: [{ id: 'app', dir: work }] }));
   try {
+    const map = await (await fetch(`${s.base}/api/map`)).json();
+    const f = map.features['editing/offline-edits'];
+    assert.equal(f.review, 'unreviewed');
+    assert.deepEqual(map.waiting, ['editing/offline-edits']);
+    assert.deepEqual(f.systems.map((x) => x.title), ['Editor']);
+    assert.deepEqual(f.tested, [1, 1]);
+    assert.deepEqual(f.looks.map((l) => [l.kind, l.src, l.exists]), [['board', '/board/app/specs/editing/offline-edits/looks/offline-banner.html?section=banner', true]]);
     const url = `${s.base}/board/app/specs/editing/offline-edits/looks/offline-banner.html`;
     const r = await fetch(`${url}?section=banner`);
     assert.equal(r.status, 200);
