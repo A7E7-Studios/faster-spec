@@ -1,6 +1,6 @@
 ---
 name: ship
-description: Build an approved change end to end and merge it - worktree, sub-agents per independent task, a test per scenario, the suites AGENTS.md names, docs and looks, the formality gate, a pull request, an independent review by a fresh sub-agent, every finding fixed or answered, the branch brought up to date with main, then a squash merge. Use when the owner says to build, implement, ship or merge a specified change, a refactor, tooling or docs change that needs no change folder, or a results branch from triage.
+description: Build an approved change end to end and merge it - worktree, sub-agents per independent task, existing code reused before new code is written, a test per scenario, the suites AGENTS.md names, docs, the review reset, the formality gate, a pull request, an independent review by a fresh sub-agent, every finding fixed or answered, the branch brought up to date with main, then a squash merge. Use when the owner says to build, implement, ship or merge a specified change, a refactor, tooling or docs change that needs no change folder, or a results branch from triage.
 ---
 
 # Ship a change
@@ -14,7 +14,9 @@ independent review are clean. Formats: `specs/README.md`, `changes/README.md`.
 - The change's branch, in a worktree as AGENTS.md says, named for the change id. A change without
   a folder gets a new branch from a freshly fetched `origin/main`, its worktree made the same way.
 - Read `changes/<id>/` and the spec edits (`git diff origin/main...HEAD -- specs/`). A committed
-  `look.md` or `design.md` is approved.
+  board, `look.md` or `design.md` is approved.
+- A triage results branch (only `review` values and deleted change folders): no build; verify with
+  the gate alone (§3.2), then the pull request, the review and the merge.
 - No `tasks.md` and more than one step: write it from `../design/templates/tasks.md` (without a
   folder, keep the list in the pull request body).
 
@@ -23,19 +25,27 @@ independent review are clean. Formats: `specs/README.md`, `changes/README.md`.
 - **Sub-agents** per independent task group. Brief each with its task lines and their tests, the
   files, the AGENTS.md rules for those paths, and a task-unique prefix for scratch files. They share
   your git index and working tree: **only you commit**. Read what each returns before committing it.
+- **Reuse first.** Before writing code for a task, look for code that already does it or nearly
+  does: search the repository, the modules the change touches and the shared utilities. Integrate
+  into it, or refactor it so both uses share one implementation; never add a second version. Keep
+  the architecture clean: one home per concern, the existing structure and patterns followed. Brief
+  each sub-agent to do the same and to report what it reused.
 - **Per task:** the test first where one makes sense (it fails without the work), then the work,
   the test run, and the tick, as the tasks template says.
-- **Tests.** Every scenario the change adds or changes has its `test:`, or its human check `open`
-  when only a person can prove it; and new logic (pure functions, parsers, state machines, protocol
-  handling) has unit tests. Never write `pass` or `fail`; a fix for a `fail` check sets it to `open`.
+- **Tests.** Every scenario the change adds or changes has its `test:`, and new logic (pure
+  functions, parsers, state machines, protocol handling) has unit tests. A scenario no automation
+  reaches stays without one, untested, and the pull request names it under `## Not verified`. Never
+  write a human check, `pass` or `fail`.
 - **Specs match the code.** When the code cannot meet a scenario as written, stop and ask the
   owner; never weaken a scenario silently. The ruling goes into the spec and `proposal.md`.
 - **Docs, in the same commits.** The README nearest each changed code path states what the code
   IS; living docs carry no history; every byte budget holds. Every `code:` and `test:` path exists.
-- **Looks.** For each scenario whose look changes and that the running app can show (AGENTS.md's
-  render route): `specs/<domain>/<capability>/look/<scenario-slug>.png`, at most 1280 px wide. A
-  renamed scenario's look moves; a removed one's is deleted. Where the build differs from
-  `look.md`'s pick, say how in the pull request.
+- **Looks.** The look is the board the design skill committed; ship draws none. Where the build
+  differs from it, say how in the pull request. Every Looks line names a board and a section that
+  exist; a board stays self-contained (its CSS inline, nothing from the network). No image,
+  recording, clip or frame is ever committed.
+- **The review reset.** Every feature the change names (`capabilities` in `proposal.md`) is
+  `review: unreviewed`, whether or not its spec text changed: set it where it is not.
 
 ## 3. Verify
 
@@ -55,11 +65,12 @@ subject, so it follows AGENTS.md's commit style. The body:
 
 | Section | Holds |
 |---|---|
-| `## What and why` | what changes for the person using it, and why; the looks |
+| `## What and why` | what changes for the person using it, and why; the Looks lines |
+| `## Reuse` | where existing code was reused, or refactored so both uses share it; or `none: <what was searched>` |
 | `## Change` | the change id, or `none: <reason>`; the other repository's pull request, if any |
 | `## Tests` | each command run, its result, and the commit it ran on |
 | `## Review` | each review round: its findings, and how each was resolved |
-| `## Not verified` | what nothing has checked yet: the open human checks, anything not run |
+| `## Not verified` | what nothing has checked yet: the untested scenarios, anything not run |
 
 A change with a side in the other repository: open both pull requests, each linking the other.
 
@@ -84,7 +95,7 @@ A change with a side in the other repository: open both pull requests, each link
 
 1. **Up to date.** `git fetch origin`; when `origin/main` has moved, merge it in, resolve any
    conflict, rerun the gate and the suites the incoming commits or the resolution touch.
-2. **Lands.** The change's `proposal.md` says `review: unreviewed` and every task is ticked (a
+2. **Lands.** Every feature the change names is `review: unreviewed` and every task is ticked (a
    triage results branch keeps the `review` values triage wrote). Commit and push.
 3. **Reviewed head.** The final head may differ from the last reviewed head only by a clean merge
    of `origin/main` and the commit of step 2. Anything else gets a review round (§5).
@@ -115,5 +126,6 @@ side while it has no `specs/`; and never with `--admin` or any other bypass.
 ## 7. After the merge
 
 - `git push origin --delete <branch>`, then `git worktree remove <path>` from outside the worktree.
-- Hand back the pull request link and the merge commit. The change now waits on the owner's
-  to-review list (`changes/<id>/` on main): name the human checks and the looks to look at.
+- Hand back the pull request link and the merge commit. The features now wait on the owner's
+  to-review list: name them, what the proposal's `## Review` says the owner looks at and where,
+  and the scenarios left untested.

@@ -7,6 +7,7 @@
     ".github/workflows/gate.yml",
     "changes/README.md",
     "specs/README.md",
+    "tools/design/",
     "tools/gate/",
     "tools/kit/",
     "tools/overview/",

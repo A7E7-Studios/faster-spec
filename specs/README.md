@@ -151,8 +151,8 @@ The owner reviews a feature as a whole, and `review` in its front matter holds t
 - **Seeding writes `unreviewed`.** A new spec is `unreviewed`.
 - **A changed feature goes back to `unreviewed`.** A pull request that changes a spec's text (its
   title, Summary, Looks lines and boards, requirements or scenarios; not its `code` paths or PROOF
-  lines) sets that spec's `review` to `unreviewed`, and so does one that carries a change folder
-  naming the feature. The gate enforces both.
+  lines) sets that spec's `review` to `unreviewed`, and so does one that adds or modifies a change
+  folder naming the feature. The gate enforces both.
 - **Only the owner's word sets `approved` or `changes-requested`**, and the
   [triage skill](../.agents/skills/triage/SKILL.md) writes it, in a pull request that changes
   nothing else in the spec. The verdict is the whole record: no notes, build or reviewer in the
