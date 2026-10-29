@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Repo } from '../gate/lib/git.mjs';
-import { parseSpec, parseChange, parseFrontMatter, paragraphs, isTested, reviewState, REVIEW_STATES, SPEC_FILE, ID } from '../gate/lib/spec.mjs';
+import { parseSpec, parseChange, parseFrontMatter, isTested, reviewState, REVIEW_STATES, SPEC_FILE, ID } from '../gate/lib/spec.mjs';
 import { readSystems as readSystemsFile } from '../gate/lib/checks.mjs';
 import { prSections } from '../gate/lib/pr.mjs';
 import { firstHeading, firstParagraph, plainText, clip, splitLines, fenceMask } from '../gate/lib/markdown.mjs';
@@ -243,26 +243,46 @@ function prNumber(subject) {
 /**
  * The plain text of a proposal's `## <name>` section (read as the gate reads a PR body's
  * sections): its paragraphs, each paragraph's lines joined by one space and its inline Markdown
- * dropped, a sub-heading a paragraph of its own, paragraphs joined by a blank line; null when the
- * section is absent.
+ * dropped, a sub-heading a paragraph of its own, a fenced block one paragraph of its text as
+ * written (whitespace collapsed, its fences dropped), paragraphs joined by a blank line; null when
+ * the section is absent.
  */
 export function sectionText(text, name) {
   const body = splitLines(text).slice(parseFrontMatter(text).bodyStart).join('\n');
   const section = prSections(body).get(name);
   if (section === undefined) return null;
-  const raw = splitLines(section);
-  const mask = fenceMask(raw);
-  const fence = /^ {0,3}(?:`{3,}|~{3,})/;
-  const lines = raw.flatMap((l, i) => {
-    if (mask[i]) return fence.test(l) || l.trim() === '' ? [] : [l];
-    const h = /^ {0,3}#{3,6}[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/.exec(l);
-    return h ? ['', h[1], ''] : [l];
-  });
-  return paragraphs(lines)
-    .split('\n\n')
-    .map((p) => plainText(p))
-    .filter(Boolean)
-    .join('\n\n');
+  const lines = splitLines(section);
+  const mask = fenceMask(lines);
+  const closing = /^ {0,3}(?:`{3,}|~{3,})[ \t]*$/;
+  const out = [];
+  let cur = [];
+  const flush = () => {
+    const p = plainText(cur.join(' '));
+    if (p) out.push(p);
+    cur = [];
+  };
+  for (let i = 0; i < lines.length; i++) {
+    if (mask[i]) {
+      flush();
+      // lines[i] opens a fence, closed by a run of its own character at least as long (as fenceMask reads it)
+      const open = /^ {0,3}(`{3,}|~{3,})/.exec(lines[i])[1];
+      let j = i + 1;
+      while (j < lines.length && mask[j] && !(closing.test(lines[j]) && lines[j].trim()[0] === open[0] && lines[j].trim().length >= open.length)) j++;
+      const code = lines.slice(i + 1, j).join(' ').replace(/\s+/g, ' ').trim();
+      if (code) out.push(code);
+      i = j < lines.length && mask[j] ? j : j - 1;
+      continue;
+    }
+    const h = /^ {0,3}#{3,6}[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/.exec(lines[i]);
+    if (h) {
+      flush();
+      cur.push(h[1]);
+      flush();
+    } else if (lines[i].trim() === '') flush();
+    else cur.push(lines[i].trim());
+  }
+  flush();
+  return out.join('\n\n');
 }
 
 function proofOut(p, tree) {

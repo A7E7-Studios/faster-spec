@@ -165,6 +165,16 @@ const RAW_TEXT = ['script', 'style', 'textarea', 'title', 'noscript', 'template'
 const START_TAG = /<([A-Za-z][\w:-]*)(?=[\s/>])((?:[^>"']|"[^"]*"|'[^']*')*)>/y;
 const ATTRIBUTE = /([^\s=/>"']+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"']+)))?/g;
 
+/** An attribute value as the browser sees it: its character references decoded. */
+function decodeValue(v) {
+  const named = { quot: '"', apos: "'", amp: '&', lt: '<', gt: '>' };
+  return v.replace(/&(?:(quot|apos|amp|lt|gt)|#(\d+)|#x([0-9a-f]+));/gi, (m, name, dec, hex) => {
+    if (name) return named[name.toLowerCase()];
+    const code = dec ? Number(dec) : parseInt(hex, 16);
+    return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : m;
+  });
+}
+
 /** A srcset's candidate URLs, read as a browser reads them: a URL up to whitespace, then its descriptors up to a comma. */
 function srcsetUrls(v) {
   const out = [];
@@ -213,8 +223,8 @@ function imageSetUrls(css) {
  * Where a board loads something from outside itself: [{ line, url }]. The HTML is read left to
  * right as a browser reads it: comments, and the text of script, style, textarea, title, noscript
  * and template, are not markup. From each start tag: src, poster, srcset and imagesrcset, an
- * object's data, and href or xlink:href on every element but a and area (a link is followed, not
- * loaded); from CSS (style elements and style attributes, comments dropped): url(…), @import
+ * object's data, href or xlink:href on every element but a and area (a link is followed, not
+ * loaded), and what an iframe's srcdoc loads; values decoded as a browser decodes them; from CSS (style elements and style attributes, comments dropped): url(…), @import
  * and image-set(…). A data: URL or a #fragment stays inside the board. A board is self-contained:
  * nothing from the network, and no other file.
  */
@@ -247,14 +257,16 @@ export function networkLoads(html) {
     const element = tag[1].toLowerCase();
     const from = lt + 1 + tag[1].length;
     for (const a of tag[2].matchAll(ATTRIBUTE)) {
-      const value = a[2] ?? a[3] ?? a[4];
-      if (value === undefined) continue;
+      const written = a[2] ?? a[3] ?? a[4];
+      if (written === undefined) continue;
       const name = a[1].toLowerCase();
-      const at = from + a.index + a[0].length - value.length - (a[4] === undefined ? 1 : 0);
+      const at = from + a.index + a[0].length - written.length - (a[4] === undefined ? 1 : 0);
+      const value = decodeValue(written);
       if (name === 'style') css(at, value);
       else if (name === 'srcset' || name === 'imagesrcset') for (const c of srcsetUrls(value)) add(at + c.at, c.url);
       else if (name === 'src' || name === 'poster' || (name === 'data' && element === 'object')) add(at, value);
       else if ((name === 'href' || name === 'xlink:href') && element !== 'a' && element !== 'area') add(at, value);
+      else if (name === 'srcdoc') for (const l of networkLoads(value)) add(at, l.url);
     }
     i = lt + tag[0].length;
     if (RAW_TEXT.includes(element) && !tag[2].trimEnd().endsWith('/')) {

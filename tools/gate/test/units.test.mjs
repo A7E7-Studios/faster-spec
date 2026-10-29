@@ -588,6 +588,13 @@ test('boards: an element id in either quote; a network load in src=, href=, url(
     assert.deepEqual(networkLoads(`${before}\n<img src="https://x.invalid/a.png">`), [{ line: 2, url: 'https://x.invalid/a.png' }], before);
   }
   assert.deepEqual(networkLoads('<template><img src=h.png></template><textarea><img src=o.png></textarea><title><img src=t.png></title>'), []);
+  // values decoded as a browser decodes them; srcdoc is a document of its own
+  assert.deepEqual(networkLoads('<div style="background: url(&quot;data:image/png;base64,AA&quot;); fill: url(&quot;#g&quot;)">'), []);
+  assert.deepEqual(networkLoads('<div style="background: image-set(&quot;https://x.invalid/g.png&quot; 1x)"> <img src="&#104;ttps://x.invalid/h.png">'), [
+    { line: 1, url: 'https://x.invalid/g.png' },
+    { line: 1, url: 'https://x.invalid/h.png' },
+  ]);
+  assert.deepEqual(networkLoads('<iframe srcdoc="<img src=\'https://x.invalid/a.png\'>"></iframe>'), [{ line: 1, url: 'https://x.invalid/a.png' }]);
   for (const f of ['a.png', 'b.JPG', 'c.jpeg', 'd.gif', 'e.webp', 'f.svg', 'g.mp4', 'h.mov', 'i.webm', 'j.tiff', 'k.heic', 'l.ico']) assert.ok(MEDIA.test(`specs/x/y/${f}`), f);
   for (const f of ['spec.md', 'looks/a.html', 'tokens.css', 'notes.txt', 'png.md']) assert.ok(!MEDIA.test(`specs/x/y/${f}`), f);
 });
