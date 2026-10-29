@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "overview.schema.json",
+  "$id": "https://github.com/A7E7-Studios/faster-spec/blob/main/tools/overview/overview.schema.json",
   "title": "Overview index",
   "description": "The solution across repositories: capabilities with their scenarios and human review state, the changes waiting for the owner's review, and the modules. Written by tools/overview/overview.mjs; version 1.",
   "type": "object",

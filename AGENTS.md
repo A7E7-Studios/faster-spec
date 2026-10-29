@@ -1,4 +1,4 @@
-# Agent instructions — CueSpec
+# Agent instructions — faster-spec
 
 This repository is the kit: the spec workflow's skills, formats and tools that projects take as a
 vendored copy ([README.md](README.md)). It runs the same workflow on itself. Claude Code and Codex

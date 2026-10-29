@@ -34,8 +34,9 @@ owner's questions came as walls of text rather than through the harness's questi
 
 ## Settled questions
 
-- **Q1 Home and licence**: this repository under A7E7-Studios, MIT, holder as CueReview's; a fresh
-  history. Rejected: keeping it in one of the projects.
+- **Q1 Home, name and licence**: `A7E7-Studios/faster-spec`, private until the owner has read it,
+  MIT, holder as CueReview's; a fresh history. Rejected: keeping it in one of the projects; the
+  names CueSpec, Proofline, Signoff, Specwright and Proofmark.
 - **Q2 How a project takes it**: a vendored copy, one sync command, a lock with the kit commit and
   each file's hash, a gate check against drift. Rejected: a git submodule (the owner works in many
   worktrees, and the skills must be real files); an npm package (Python and Gradle projects have no
@@ -56,8 +57,6 @@ owner's questions came as walls of text rather than through the harness's questi
 
 ## Calls for the owner
 
-- **The name.** CueSpec, `A7E7-Studios/cue-spec`, as recommended; the README, the schema's `$id`
-  and the projects' locks carry it. Another name changes those and nothing else.
 - **The lock lives at `tools/kit/lock.json`, and its hash is the git blob id** (what
   `git hash-object` prints), so a checkout's line endings are no drift. Alternative: SHA-256 of the
   bytes; it would flag a CRLF checkout.

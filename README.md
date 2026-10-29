@@ -1,4 +1,4 @@
-# CueSpec
+# faster-spec
 
 **Say what it does. Prove it. Review it after it lands.** A small spec workflow for software that
 agents build and a person owns: living specs whose scenarios each end in their proof, change folders
@@ -34,8 +34,8 @@ files) and not a package (a Python or Gradle project has no `package.json`). Git
 later; `gh` for the skills.
 
 ```
-git clone https://github.com/A7E7-Studios/cue-spec ../cue-spec
-node ../cue-spec/tools/kit/sync.mjs --project .
+git clone https://github.com/A7E7-Studios/faster-spec ../faster-spec
+node ../faster-spec/tools/kit/sync.mjs --project .
 ```
 
 [`tools/kit/sync.mjs`](tools/kit/README.md) writes every file the kit owns (`kit.json` lists them),
@@ -62,7 +62,7 @@ Then, in the project:
 ## Keeping it in step
 
 ```
-node tools/kit/sync.mjs --kit ../cue-spec --ref <tag or commit>   # take a newer kit
+node tools/kit/sync.mjs --kit ../faster-spec --ref <tag or commit>   # take a newer kit
 node tools/kit/sync.mjs --check                                    # is the committed copy as the lock says?
 ```
 
