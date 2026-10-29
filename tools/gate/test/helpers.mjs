@@ -106,8 +106,8 @@ export const DOMAINS = JSON.stringify(
     ['collaboration', 'Collaboration'],
     ['library', 'Library'],
     ['layout', 'Layout'],
-    ['assistant', 'Assistant'],
-    ['learning', 'Learning'],
+    ['reading', 'Reading'],
+    ['search', 'Search'],
     ['account', 'Account'],
     ['tooling', 'Tooling'],
   ].map(([id, title]) => ({ id, title, purpose: `Everything about ${title.toLowerCase()}.` })),
@@ -120,14 +120,20 @@ export const P = (v) => `- **PROOF** ${v}`;
 const SCENARIO = {
   name: 'A collaborator edits the same note',
   steps: ['GIVEN two users in one note', 'WHEN one user types in a paragraph', 'THEN the other sees a cursor where they type'],
-  proofs: ['test: src/cursors/cursors.test.js', 'two-headsets: open'],
+  proofs: ['test: src/cursors/cursors.test.js'],
 };
 
-/** A spec in the contract's format; every part can be replaced. */
+/**
+ * A spec in the contract's format; every part can be replaced. A scenario is { name, steps,
+ * table?: [[header cells], [row cells], …], proofs }; `looks` is a list of Looks lines without
+ * their "- ".
+ */
 export function specText({
   title = 'Shared cursors',
+  review = 'unreviewed',
   code = ['src/cursors/'],
-  purpose = 'A cursor shows where each collaborator is typing.',
+  summary = 'A cursor shows where each collaborator is typing.',
+  looks = null,
   requirements,
   scenarios,
   proofs,
@@ -141,39 +147,48 @@ export function specText({
     },
   ];
   const reqs = requirements ?? [
-    { name: 'Cursors show where others type', text: 'The app SHALL show a cursor for each collaborator in the note, because a user otherwise loses track of who is where.', scenarios: sc },
+    {
+      name: 'Cursors show where others type',
+      text: 'When two users edit one note, the app SHALL show a cursor for each collaborator, because a user otherwise types over someone else\'s edit.',
+      scenarios: sc,
+    },
   ];
-  const lines = ['---', `title: ${title}`, 'code:', ...code.map((c) => `  - ${c}`), '---', `# ${title}`, '', '## Purpose', '', purpose, '', '## Requirements', ''];
+  const lines = ['---', `title: ${title}`, `review: ${review}`, 'code:', ...code.map((c) => `  - ${c}`), '---', `# ${title}`, '', '## Summary', '', summary, ''];
+  if (looks) lines.push('## Looks', '', ...looks.map((l) => `- ${l}`), '');
+  lines.push('## Requirements', '');
   for (const r of reqs) {
     lines.push(`### Requirement: ${r.name}`, r.text, '');
     for (const s of r.scenarios) {
       lines.push(`#### Scenario: ${s.name}`);
-      for (const st of s.steps) {
+      for (const st of s.steps ?? []) {
         const [k, ...rest] = st.split(' ');
         lines.push(`- **${k}** ${rest.join(' ')}`);
       }
-      lines.push(...s.proofs.map(P), '');
+      if (s.table) lines.push(`| ${s.table[0].join(' | ')} |`, `|${s.table[0].map(() => '---').join('|')}|`, ...s.table.slice(1).map((r) => `| ${r.join(' | ')} |`));
+      lines.push(...(s.proofs ?? []).map(P), '');
     }
   }
   return lines.join('\n');
 }
 
 /** A change proposal in the contract's format. */
-export function proposalText({ title = 'Cursors for collaborators', capabilities = ['collaboration/shared-cursors'], removes = null, review = 'unreviewed', followUps = null } = {}) {
+export function proposalText({ title = 'Cursors for collaborators', capabilities = ['collaboration/shared-cursors'], removes = null } = {}) {
   return [
     '---',
     `title: ${title}`,
     'capabilities:',
     ...capabilities.map((c) => `  - ${c}`),
     ...(removes ? ['removes:', ...removes.map((c) => `  - ${c}`)] : []),
-    `review: ${review}`,
-    ...(followUps ? ['follow-ups:', ...followUps.map((f) => `  - ${f}`)] : []),
     '---',
     `# ${title}`,
     '',
     '## Why',
     '',
-    'Wearers lose each other.',
+    'Writers type over each other.',
+    '',
+    '## Review',
+    '',
+    'At a desk, with a second browser window.',
     '',
   ].join('\n');
 }
