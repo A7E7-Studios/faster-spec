@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { blobId } from '../lib/kit.mjs';
 
 export const GATE_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -83,6 +84,12 @@ export function testConfig(overrides = {}) {
     { pattern: '**/README.md', bytes: 40960 },
   ];
   return { ...base, reportOnly: false, ignore: ['Packages/com.vendor.*/**', 'Packages/com.unity.*/**'], livingDocs, budgets, humanChecks: TEST_CHECKS, ...overrides };
+}
+
+/** A tools/kit/lock.json for `files` ({ path: content }), as sync writes it. */
+export function lockText(files, { paths = ['tools/gate/', 'tools/kit/', 'specs/README.md'], projectOwned = ['tools/gate/config.json', 'tools/kit/lock.json'], commit = 'c'.repeat(40) } = {}) {
+  const ids = Object.fromEntries(Object.entries(files).map(([p, content]) => [p, blobId(Buffer.from(content))]));
+  return JSON.stringify({ version: 1, kit: { repository: 'https://example.invalid/kit.git', commit }, paths, projectOwned, files: ids }, null, 2) + '\n';
 }
 
 export function check(report, id) {

@@ -6,6 +6,7 @@ import { splitLines, fenceMask, stripInlineCode, anchors, links, PROOF_LINE } fr
 import { ID, SPEC_FILE, parseSpec, parseChange, requirementText, scenarioKey, scenarioText, isCapabilityId, humanCheckIds } from './spec.mjs';
 import { addedLines, isCode, isIgnored, nearestReadme } from './context.mjs';
 import { prSections } from './pr.mjs';
+import { LOCK_FILE, kitProblems, owns } from './kit.mjs';
 
 function result(id, title, findings, summary, status) {
   const fails = findings.filter((f) => f.level === 'fail').length;
@@ -531,6 +532,30 @@ export function checkPr(ctx) {
 
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * A project that carries the kit keeps its copy as its lock records it (tools/kit/lock.json): every
+ * file the lock lists, byte for byte, and nothing else under the paths the kit owns but the
+ * project's own files. A repository with no lock (the kit itself, one that does not carry it) is
+ * skipped; one whose lock this PR deletes fails.
+ */
+export function checkKit(ctx) {
+  const { repo, head } = ctx;
+  const now = kitProblems(repo, head);
+  const was = kitProblems(repo, ctx.mergeBase);
+  const title = 'kit copy (tools/kit/lock.json)';
+  if (!now && !was) return result('kit', title, [], `no ${LOCK_FILE}: not a synced copy of the kit`, 'skip');
+  if (!now) return result('kit', title, [fail(`deletes ${LOCK_FILE}: a project that carries the kit keeps its lock, so its copy stays checked`, LOCK_FILE)], 'the lock is deleted');
+  const locks = [now.lock, was?.lock].filter(Boolean);
+  const changed = ctx.changes.some((c) => c.path === LOCK_FILE || locks.some((l) => owns(l.paths, c.path)));
+  const findings = judge(ctx, [{ changed, at: (rev) => (rev === head ? now.problems : was?.problems ?? []) }]);
+  const summary = now.lock
+    ? `${Object.keys(now.lock.files).length} file(s) of the kit at ${now.lock.kit.commit.slice(0, 9)}; ${now.problems.length} not as the lock says`
+    : `${LOCK_FILE} does not read`;
+  return result('kit', title, findings, summary);
+}
+
+// ---------------------------------------------------------------------------------------------
+
 export const PROTECTED_MESSAGE = 'the owner merges this PR; agents never do';
 
 /**
@@ -555,4 +580,4 @@ export function checkProtected(ctx) {
 /** Checks whose failure fails the run even when it is report-only: safety boundaries. */
 export const ALWAYS_BLOCKING = ['protected'];
 
-export const CHECKS = [checkSpecs, checkChanges, checkHistory, checkBudgets, checkLinks, checkReadme, checkPr, checkProtected];
+export const CHECKS = [checkSpecs, checkChanges, checkHistory, checkBudgets, checkLinks, checkReadme, checkPr, checkKit, checkProtected];

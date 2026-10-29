@@ -65,3 +65,12 @@ third removes what the other branch brought. `--no-renames` matters: without it 
 branch holds under `.claude/skills` and the other under `.agents/skills` reads as a rename and is
 not restored. `git status` then shows only your own edits; run
 `node tools/setup-agents/setup.mjs --unlink` and check out again.
+
+## Tests
+
+```
+cd tools/setup-agents && npm test   # node --test; throwaway checkouts in the OS temp folder
+```
+
+They copy the script into a throwaway checkout and check the links it makes and keeps, what it
+reports and leaves alone, and that `--unlink` removes only its links.

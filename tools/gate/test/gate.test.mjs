@@ -7,7 +7,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { runGate, Repo, formatSummary } from '../lib/index.mjs';
 import { BOM } from '../lib/git.mjs';
-import { GATE_DIR, makeRepo, testConfig, check, fails, failText, infos, specText, proposalText, baseFiles, git } from './helpers.mjs';
+import { GATE_DIR, makeRepo, testConfig, check, fails, failText, infos, specText, proposalText, baseFiles, git, lockText } from './helpers.mjs';
 
 const GATE = path.join(GATE_DIR, 'gate.mjs');
 const SPEC = 'specs/collaboration/shared-cursors/spec.md';
@@ -643,6 +643,60 @@ test('prefetch reads many blobs in one batch, each the same as its own read', (t
   batch.prefetch('main', paths);
   for (const p of paths) assert.deepEqual(batch.blob('main', p), one.blob('main', p), p);
   assert.equal(batch.text('main', 'docs/b.md'), '# B ü\n');
+});
+
+// --- kit ---------------------------------------------------------------------------------------
+
+const KIT = { 'tools/gate/x.mjs': 'x\n', 'tools/kit/sync.mjs': 'sync\n', 'specs/README.md': '# Specs\n' };
+const LOCK = 'tools/kit/lock.json';
+
+test('kit: a repository with no lock is skipped', (t) => {
+  const r = setup(t);
+  r.branch('x').write({ 'tools/gate/x.mjs': 'mine\n' });
+  r.commit('chore: x\n\nDoc-Impact: none; a test');
+  assert.equal(check(gate(r), 'kit').status, 'skip');
+});
+
+test('kit: a copy as its lock says passes; an edited, missing or extra kit file fails; the project\'s own files are free', (t) => {
+  const r = setup(t, baseFiles({ ...KIT, 'tools/gate/config.json': '{}\n', [LOCK]: lockText(KIT) }));
+  r.branch('ok').write({ 'src/cursors/cursors.js': 'export const cursors = 2;\n', 'tools/gate/config.json': '{ "mine": true }\n' });
+  r.commit('feat: two\n\nDoc-Impact: none; a test');
+  let rep = gate(r);
+  assert.equal(check(rep, 'kit').status, 'pass', failText(rep, 'kit'));
+  assert.match(check(rep, 'kit').summary, /^3 file\(s\) of the kit at c{9}; 0 not as the lock says$/);
+  for (const [name, change, want] of [
+    ['edited', { 'tools/gate/x.mjs': 'x, improved\n' }, /^tools\/gate\/x\.mjs: differs from the kit at c{9}, which tools\/kit\/lock\.json records/],
+    ['missing', { 'specs/README.md': null }, /^specs\/README\.md: missing: the kit at c{9} has it/],
+    ['extra', { 'tools/kit/extra.mjs': 'more\n' }, /^tools\/kit\/extra\.mjs: not in the kit at c{9}: a path the kit owns holds only the kit's files and the project's own \(tools\/gate\/config\.json, tools\/kit\/lock\.json\)/],
+    ['deleted-lock', { [LOCK]: null }, /^tools\/kit\/lock\.json: deletes tools\/kit\/lock\.json/],
+    ['broken-lock', { [LOCK]: '{' }, /^tools\/kit\/lock\.json: not JSON/],
+    ['bad-lock', { [LOCK]: lockText(KIT).replace('"version": 1', '"version": 2') }, /"version" is 1, not 2/],
+  ]) {
+    r.branch(name, 'main').write(change);
+    r.commit(`chore: ${name}\n\nDoc-Impact: none; a test`);
+    rep = gate(r);
+    assert.equal(check(rep, 'kit').status, 'fail', name);
+    assert.match(failText(rep, 'kit').replace(/^:/, '').trim(), want, name);
+  }
+  // a sync: the files and the lock change together
+  const next = { ...KIT, 'tools/gate/x.mjs': 'x 2\n' };
+  r.branch('sync', 'main').write({ 'tools/gate/x.mjs': 'x 2\n', [LOCK]: lockText(next, { commit: 'd'.repeat(40) }) });
+  r.commit('chore: sync the kit\n\nDoc-Impact: none; a test');
+  rep = gate(r);
+  assert.equal(check(rep, 'kit').status, 'pass', failText(rep, 'kit'));
+});
+
+test('kit: a drift already on main is information for a PR that does not touch the kit', (t) => {
+  const r = setup(t, baseFiles({ ...KIT, 'tools/gate/x.mjs': 'drifted\n', [LOCK]: lockText(KIT) }));
+  r.branch('x').write({ 'src/cursors/cursors.js': 'export const cursors = 2;\n' });
+  r.commit('feat: two\n\nDoc-Impact: none; a test');
+  let rep = gate(r);
+  assert.equal(check(rep, 'kit').status, 'pass', failText(rep, 'kit'));
+  assert.match(infos(rep, 'kit')[0].message, /^already at the merge base: differs from the kit/);
+  r.branch('y', 'main').write({ 'specs/README.md': '# Specs, edited\n' });
+  r.commit('docs: edit');
+  rep = gate(r);
+  assert.equal(fails(rep, 'kit').length, 2, 'a PR that touches the kit answers for all of it');
 });
 
 // --- the head is data --------------------------------------------------------------------------

@@ -1,10 +1,10 @@
 # Gate
 
-The deterministic formality gate: it checks that a branch keeps the repository's formats — specs,
-change folders, living docs, byte budgets, links, the nearest README and the PR description — and
-that it touches nothing only the owner may merge. It judges form, never whether the code is right;
-tests and the independent review do that. The formats it enforces are defined in
-`specs/README.md` and `changes/README.md`.
+The deterministic formality gate: it checks that a branch keeps the repository's formats (specs,
+change folders, living docs, byte budgets, links, the nearest README and the PR description), that
+a project's copy of the kit is as its lock says, and that the branch touches nothing only the owner
+may merge. It judges form, never whether the code is right; tests and the independent review do
+that. The formats it enforces are defined in `specs/README.md` and `changes/README.md`.
 
 No npm dependencies; Node 22 or later; nothing to install.
 
@@ -59,12 +59,13 @@ The PR description comes from `--pr-body`, else from the Actions event payload
 | `links` | a relative link or anchor on an added line of a changed `.md` does not resolve at head; or a link anywhere else that resolved at the merge base no longer does, because the PR deleted or renamed a file of any kind or a folder, or changed a doc's headings |
 | `readme` | code changed under a folder whose nearest `README.md` did not change, and no commit in range carries `Doc-Impact: none; <reason>`; or a `Doc-Impact` line reads otherwise |
 | `pr` | with `--pr` only: the PR changes code and its description lacks a non-empty `## Tests` or `## Review` |
+| `kit` | in a project that carries the kit (it has `tools/kit/lock.json`): a file the lock lists is missing or holds other bytes than its git blob id; a file under a path the kit owns is neither in the lock nor one the project owns (`projectOwned`, its `tools/gate/config.json` among them); or the PR deletes the lock. Skipped where there is no lock, the kit's own repository among them ([tools/kit](../kit/README.md)) |
 | `protected` | the PR touches a protected path: **the owner merges this PR; agents never do**. Never report-only; see [Protected paths](#protected-paths) |
 
 Rules the table leaves implicit:
 
-- **Old problems are not this PR's.** A capability folder, change folder or `specs/domains.json`
-  the PR touches answers for every problem it has. One it does not touch fails only on problems
+- **Old problems are not this PR's.** A capability folder, change folder, `specs/domains.json` or
+  kit copy the PR touches answers for every problem it has. One it does not touch fails only on problems
   it did not have at the merge base — a `code` or `test:` path this PR deleted, a capability a
   pending change names that this PR removed; the rest are listed as information. A PR that writes
   anything under `specs/` answers for `specs/domains.json`.
@@ -102,6 +103,7 @@ the globs below; one may add its own owner paths to its `config.json`.
 | `tools/gate/**` | this gate: its code and `config.json` |
 | `tools/overview/**` | the overview index, which the to-review list is read from |
 | `tools/setup-agents/**` | the setup that links the skills and configures the agents |
+| `tools/kit/**` | the sync command and the project's lock, which the `kit` check reads |
 | `.github/**` | what GitHub reads from the repository: the workflows (`gate.yml` among them), `CODEOWNERS`, templates |
 | `CODEOWNERS`, `docs/CODEOWNERS` | the other two places GitHub reads code owners from |
 | `**/.agents/skills/**` | the skills, at the root and in any subtree |
@@ -151,6 +153,7 @@ Globs: `**` spans folders, `*` and `?` stay inside one.
 | `lib/index.mjs` | `runGate()`, `loadConfig()` |
 | `lib/checks.mjs` | the checks |
 | `lib/context.mjs` | revisions, changed paths, the Markdown diff, commits, nearest README |
+| `lib/kit.mjs` | the lock: `parseLock`, `blobId`, `kitProblems`; shared with [`tools/kit`](../kit/README.md) |
 | `lib/spec.mjs` | `parseSpec`, `parseChange`, `parseProof`, front matter, scenario slugs and the derived states; shared with [`tools/overview`](../overview/README.md) |
 | `lib/git.mjs` | reads a repository at a revision through git objects |
 | `lib/markdown.mjs` | fences, inline code, heading anchors, links, a document's first heading and paragraph |

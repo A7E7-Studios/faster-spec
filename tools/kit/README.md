@@ -1,0 +1,69 @@
+# Kit sync
+
+A project takes the kit as a vendored copy: real files in its own tree, pinned to one kit commit by
+`tools/kit/lock.json`. `sync.mjs` writes that copy and the lock; the gate's
+[`kit` check](../gate/README.md#checks) fails a pull request whose copy differs from its lock. No
+submodule (every worktree holds real files, skills included) and no package manager (a project
+need not have one).
+
+No npm dependencies; Node 22 or later.
+
+```
+node tools/kit/sync.mjs --kit <kit checkout> [--ref <rev>]        # from a project that carries the kit
+node <kit checkout>/tools/kit/sync.mjs --project <dir> [--ref <rev>]  # the first time
+node tools/kit/sync.mjs --check [--rev <rev>]                      # is the committed copy as the lock says?
+```
+
+| Option | Does |
+|---|---|
+| `--kit <dir>` | the kit's checkout; default the checkout holding the script, when it is the kit (it has `kit.json`) |
+| `--ref <rev>` | the kit revision to take; default `origin/main`. Fetch first: nothing is fetched |
+| `--project <dir>` | the project; default the repository holding the current directory |
+| `--force` | take the kit's file over one the project changed |
+| `--dry-run` | print what would change, write nothing |
+| `--check` | compare the project's copy at `--rev` (default `HEAD`) with its lock, as the gate does |
+
+Exit: **0** done, **1** refused (nothing written), a file under the kit's paths that the kit lacks
+(everything else written), or with `--check` a copy not as its lock says; **2** usage or setup error.
+
+## What it does
+
+1. Reads the kit at `--ref` through git objects (its working tree never matters) and its
+   `kit.json`: the `paths` the kit owns (a folder ends `/`), the `projectOwned` files inside them
+   that each project keeps as its own, and the `starters` a project's own files begin from.
+2. Compares each kit file with the project's working tree, by git blob id as git would store the
+   file (its clean filters applied, so a checkout's line endings are no change).
+3. **Refuses**, writing nothing, when the project changed a kit file: one that differs from what
+   the old lock records, or that has uncommitted changes. `--force` takes the kit's. On the first
+   sync, with no lock yet, a committed hand copy is replaced, and each such file is printed as
+   `replace`.
+4. Writes every kit file that differs, deletes the files the old lock lists that the kit no longer
+   has (and folders they leave empty), and writes each starter that the project lacks
+   (`tools/gate/config.json` from `config.template.json`); a project's own file is never
+   overwritten.
+5. Reports any other file under the kit's paths, and leaves it: the gate's `kit` check fails on it
+   until it moves out or into the kit.
+6. Writes `tools/kit/lock.json`. The person reviews the diff and commits it.
+
+## The lock
+
+```
+{ "version": 1,
+  "kit": { "repository": "<the kit's origin URL, no credentials, or null>", "commit": "<full sha>" },
+  "paths": ["tools/gate/", "specs/README.md", …],
+  "projectOwned": ["tools/gate/config.json", "tools/kit/lock.json"],
+  "files": { "<path>": "<git blob id, what git hash-object prints>" } }
+```
+
+The project owns the lock: sync writes it, nobody edits it. `tools/kit/**` is a protected path, so
+a pull request that moves the lock, and with it the kit's files, is merged by the owner.
+
+## Tests
+
+```
+cd tools/kit && npm test      # node --test; a throwaway kit and project in the OS temp folder
+```
+
+The tests sync a kit into a project, update it (added, updated, deleted, unchanged), refuse and
+force over a project's edit, dry-run, replace a hand copy on the first sync, keep a CRLF checkout
+unchanged, and check the gate's `kit` check and `--check` agree.

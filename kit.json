@@ -1,0 +1,18 @@
+{
+  "paths": [
+    ".agents/skills/design/",
+    ".agents/skills/ship/",
+    ".agents/skills/spec/",
+    ".agents/skills/triage/",
+    ".github/workflows/gate.yml",
+    "changes/README.md",
+    "specs/README.md",
+    "tools/gate/",
+    "tools/kit/",
+    "tools/overview/",
+    "tools/setup-agents/",
+    "tools/solution-map/"
+  ],
+  "projectOwned": ["tools/gate/config.json", "tools/kit/lock.json"],
+  "starters": { "tools/gate/config.json": "tools/gate/config.template.json" }
+}

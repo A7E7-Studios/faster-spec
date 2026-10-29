@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { globToRegExp, matches } from '../lib/glob.mjs';
 import { parseUnifiedDiff } from '../lib/diff.mjs';
 import { slugify, anchors, links, fenceMask, stripInlineCode, splitLines, firstHeading, firstParagraph, plainText } from '../lib/markdown.mjs';
@@ -24,6 +25,7 @@ import { prSections } from '../lib/pr.mjs';
 import { blobSize } from '../lib/checks.mjs';
 import { loadConfig } from '../lib/index.mjs';
 import { parseCatFileBatch } from '../lib/git.mjs';
+import { blobId, parseLock, owns } from '../lib/kit.mjs';
 import { specText, proposalText, P, GATE_DIR, TEST_CHECKS } from './helpers.mjs';
 
 const REPO_ROOT = path.resolve(GATE_DIR, '..', '..');
@@ -492,7 +494,7 @@ test('budgets measure the git blob, the same on every OS', () => {
 
 const TEMPLATE = path.join(GATE_DIR, 'config.template.json');
 /** Every repository protects these; it may add its own owner paths. */
-const PROTECTED = ['tools/gate/**', 'tools/overview/**', 'tools/setup-agents/**', '.github/**', 'CODEOWNERS', 'docs/CODEOWNERS', '**/.agents/skills/**', '**/AGENTS.md', '**/CLAUDE.md', '**/CLAUDE.local.md', '**/.claude/**', '**/.mcp.json'];
+const PROTECTED = ['tools/gate/**', 'tools/overview/**', 'tools/setup-agents/**', 'tools/kit/**', '.github/**', 'CODEOWNERS', 'docs/CODEOWNERS', '**/.agents/skills/**', '**/AGENTS.md', '**/CLAUDE.md', '**/CLAUDE.local.md', '**/.claude/**', '**/.mcp.json'];
 
 test('config: this repository\'s config loads and protects what every repository protects', () => {
   const cfg = loadConfig();
@@ -564,4 +566,24 @@ test('config: the starter config loads and is report-only; history rules match w
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('kit: a blob id is what git hash-object prints; a lock reads only in its format', () => {
+  for (const s of ['', 'x\n', 'line\r\nends\n', 'ü\u0000bin']) {
+    const r = spawnSync('git', ['hash-object', '--no-filters', '--stdin'], { input: Buffer.from(s), encoding: 'utf8', windowsHide: true });
+    assert.equal(blobId(Buffer.from(s)), r.stdout.trim(), JSON.stringify(s));
+  }
+  const ok = { version: 1, kit: { repository: null, commit: 'a'.repeat(40) }, paths: ['tools/gate/', 'specs/README.md'], projectOwned: ['tools/gate/config.json'], files: { 'tools/gate/x.mjs': 'b'.repeat(40) } };
+  assert.deepEqual(parseLock(JSON.stringify(ok)), { lock: ok, problems: [] });
+  const bad = (o) => parseLock(JSON.stringify({ ...ok, ...o })).problems.join('\n');
+  assert.match(parseLock('{').problems[0], /not JSON/);
+  assert.match(bad({ version: 2 }), /"version" is 1/);
+  assert.match(bad({ kit: { commit: 'main' } }), /"kit" is/);
+  assert.match(bad({ paths: [] }), /"paths" is a non-empty list/);
+  assert.match(bad({ paths: ['../x/'] }), /paths: .*"\.\."/);
+  assert.match(bad({ projectOwned: ['elsewhere.json'] }), /projectOwned: elsewhere\.json is not inside/);
+  assert.match(bad({ files: { 'src/x.js': 'b'.repeat(40) } }), /files: src\/x\.js is not inside/);
+  assert.match(bad({ files: { 'tools/gate/x.mjs': 'nope' } }), /has no git blob id/);
+  assert.ok(owns(['tools/gate/', 'specs/README.md'], 'tools/gate/lib/a.mjs') && owns(['specs/README.md'], 'specs/README.md'));
+  assert.ok(!owns(['tools/gate/'], 'tools/gates/a.mjs') && !owns(['specs/README.md'], 'specs/README.md.bak'));
 });

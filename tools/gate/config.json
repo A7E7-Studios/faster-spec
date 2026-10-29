@@ -5,6 +5,7 @@
     "tools/gate/**",
     "tools/overview/**",
     "tools/setup-agents/**",
+    "tools/kit/**",
     ".github/**",
     "CODEOWNERS",
     "docs/CODEOWNERS",
