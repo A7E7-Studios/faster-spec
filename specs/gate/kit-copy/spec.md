@@ -1,12 +1,13 @@
 ---
 title: Kit copy check
+review: unreviewed
 code:
   - tools/gate/lib/checks.mjs
   - tools/gate/lib/kit.mjs
 ---
 # Kit copy check
 
-## Purpose
+## Summary
 
 The gate holds a project's copy of the kit to its lock, so the kit's files change in a project only
 through a sync the owner merges.
@@ -26,7 +27,6 @@ kit unseen.
 - **AND** a pull request that changes only the project's own config, or a sync that changes the
   files and the lock together, passes
 - **PROOF** test: tools/gate/test/gate.test.mjs::kit: a copy as its lock says passes; an edited, missing or extra kit file fails; the project's own files are free
-- **PROOF** desk: open
 
 ### Requirement: A repository without a lock is not checked
 The gate SHALL skip the kit check where there is no lock, because the kit's own repository and a

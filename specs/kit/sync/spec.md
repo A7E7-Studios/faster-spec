@@ -1,5 +1,6 @@
 ---
 title: Sync a project
+review: unreviewed
 code:
   - kit.json
   - tools/kit/
@@ -7,7 +8,7 @@ code:
 ---
 # Sync a project
 
-## Purpose
+## Summary
 
 A project takes the kit as real files in its own tree, pinned to one kit commit by a lock file, and
 takes a newer kit the same way, without ever losing a change the project made.
@@ -26,7 +27,6 @@ in `tools/kit/lock.json`, because the lock is what the gate holds the copy to.
   starter, and a lock naming the kit commit and each file's blob id
 - **AND** after the commit, the sync's check and the gate's kit check both pass
 - **PROOF** test: tools/kit/test/sync.test.mjs::sync: the first sync writes the kit, a starter config and the lock; --check and the gate agree
-- **PROOF** desk: open
 
 #### Scenario: A project takes a newer kit
 - **GIVEN** a project synced to one kit commit

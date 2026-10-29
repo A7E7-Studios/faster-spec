@@ -1,0 +1,8 @@
+[
+  { "id": "formats", "title": "Formats", "purpose": "The spec and change formats every project writes in.", "paths": ["specs/README.md", "changes/README.md"] },
+  { "id": "gate", "title": "Formality gate", "purpose": "The check every pull request passes, run locally and in CI.", "paths": ["tools/gate/", ".github/workflows/gate.yml"] },
+  { "id": "overview", "title": "Overview index", "purpose": "The JSON index and summary of a solution's features across repositories.", "paths": ["tools/overview/"] },
+  { "id": "kit-sync", "title": "Kit sync", "purpose": "The command that writes a pinned kit into a project and checks the copy.", "paths": ["tools/kit/"] },
+  { "id": "skills", "title": "Agent skills", "purpose": "The four skills agents run every change with, and the setup that links them.", "paths": [".agents/skills/", "tools/setup-agents/"] },
+  { "id": "house-style", "title": "House style", "purpose": "The starter design system: tokens and a style brief.", "paths": ["tools/design/"] }
+]

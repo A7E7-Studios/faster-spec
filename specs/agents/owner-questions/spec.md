@@ -1,12 +1,13 @@
 ---
 title: Questions to the owner
+review: unreviewed
 code:
   - .agents/skills/spec/SKILL.md
   - .agents/skills/design/SKILL.md
 ---
 # Questions to the owner
 
-## Purpose
+## Summary
 
 When an agent needs the owner's decision, the owner gets the questions as a picker with the
 recommended answer first, not a wall of text.
@@ -24,7 +25,6 @@ because answering a picker is faster and surer than answering a wall of text.
 - **WHEN** the spec skill asks them in Claude Code
 - **THEN** the owner gets two question pickers, one of four questions and one of one, each
   question headed with its number and its recommended option first
-- **PROOF** desk: open
 
 ### Requirement: Without a question tool, each option is its own list item
 The skills SHALL write the questions as text only for a harness without a question tool, each
@@ -37,4 +37,3 @@ into the last bullet.
 - **WHEN** the spec skill asks a round
 - **THEN** each question is numbered, each option a list item of its own with the recommended one
   first, and every line renders where it was written
-- **PROOF** desk: open
