@@ -36,6 +36,12 @@ in `tools/kit/lock.json`, because the lock is what the gate holds the copy to.
 - **AND** a second sync changes nothing
 - **PROOF** test: tools/kit/test/sync.test.mjs::sync: a kit update adds, updates and deletes; the project's own config stays; a second run changes nothing
 
+#### Scenario: A kit that drops a folder
+- **GIVEN** a synced project holding a file of its own in a folder the kit owns
+- **WHEN** a newer kit stops owning that folder and the project syncs
+- **THEN** the files the old lock lists there are deleted, and the project's own file stays, unreported
+- **PROOF** test: tools/kit/test/sync.test.mjs::sync: the kit takes back a file the project owned, and drops a folder
+
 ### Requirement: A sync never loses the project's work
 The sync SHALL write nothing when the project changed a kit file since the last sync or holds
 uncommitted changes to one, unless told to force, because such a change belongs in the kit and
@@ -57,8 +63,8 @@ would otherwise vanish.
 
 #### Scenario: An ignored file where the kit writes
 - **GIVEN** a project holding a git-ignored file at a path the kit ships
-- **WHEN** someone syncs the kit into it
-- **THEN** the sync names the file, writes nothing and exits 1
+- **WHEN** someone syncs the kit into it, with `--force` or without
+- **THEN** the sync names the file as ignored, writes nothing and exits 1
 - **PROOF** test: tools/kit/test/sync.test.mjs::sync: an ignored file where the kit writes stops the sync; a link out of the project is never followed
 
 #### Scenario: A first sync over a hand copy
@@ -77,6 +83,7 @@ writes elsewhere, and the lock is committed for everyone to read.
 - **GIVEN** a project where a folder the kit writes into is a junction to a folder elsewhere
 - **WHEN** someone syncs the kit into it
 - **THEN** the sync names the path, writes nothing in the project or outside it, and exits 1
+- **AND** a dry run says the same, and a file the kit drops behind such a link is never deleted
 - **PROOF** test: tools/kit/test/sync.test.mjs::sync: an ignored file where the kit writes stops the sync; a link out of the project is never followed
 
 #### Scenario: A kit taken from a local folder
@@ -94,12 +101,6 @@ protected lock makes every sync a pull request the owner merges.
 - **WHEN** someone syncs the kit into it
 - **THEN** the sync says to add `tools/kit/**` to `protectedPaths`
 - **PROOF** test: tools/kit/test/sync.test.mjs::sync: a config that leaves the lock unprotected is reported
-
-#### Scenario: A kit that drops a folder
-- **GIVEN** a synced project holding a file of its own in a folder the kit owns
-- **WHEN** a newer kit stops owning that folder and the project syncs
-- **THEN** the files the old lock lists there are deleted, and the project's own file stays, unreported
-- **PROOF** test: tools/kit/test/sync.test.mjs::sync: the kit takes back a file the project owned, and drops a folder
 
 ### Requirement: Line endings are no change
 The sync SHALL compare files as git stores them, because a checkout that writes CRLF holds the same

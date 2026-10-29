@@ -60,7 +60,8 @@ owner's questions came as walls of text rather than through the harness's questi
   questions a call, 2–4 options, recommended first); numbered text with one list item per option
   only without one.
 - **Q8 The review recorder**: the triage skill keeps CueReview, its `cue` CLI and its default
-  install path by name, the one product the kit names; AGENTS.md records it. Rejected: a
+  install path by name, the one product the kit names beside the tools and formats a project may
+  use (Unity, Gradle, Claude Code); AGENTS.md records it. Rejected: a
   project-named recorder.
 
 ## Calls for the owner

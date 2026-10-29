@@ -34,11 +34,12 @@ Exit: **0** done, **1** refused (nothing written), a file under the kit's paths 
 2. Compares each kit file with the project's working tree, by git blob id as git would store the
    file (its clean filters applied, so a checkout's line endings are no change).
 3. **Refuses**, writing nothing, when the project changed a kit file: one that differs from what
-   the old lock records, that has uncommitted changes, or that git does not track (an ignored file
-   included); a file the project owned that the kit now ships counts as the project's. `--force`
-   takes the kit's. On the first sync, with no lock yet, a committed hand copy is replaced, and each
-   such file is printed as `replace`. It also refuses when a file it would write or delete is a
-   link, or lies through a link or junction outside the project.
+   the old lock records, or that has uncommitted changes; a file the project owned that the kit
+   now ships counts as the project's. `--force` takes the kit's. On the first sync, with no lock
+   yet, a committed hand copy is replaced, and each such file is printed as `replace`. It refuses
+   even with `--force` (and `--dry-run` says so) when the project's git ignores a kit file, which
+   would never be committed, and when a file it would write or delete is a link or lies through a
+   link or junction outside the project. A project that stores SHA-256 objects is not supported.
 4. Writes every kit file that differs, deletes the files the old lock lists that the kit no longer
    has (and folders they leave empty), and writes each starter that the project lacks
    (`tools/gate/config.json` from `config.template.json`); a project's own file is never
@@ -72,6 +73,7 @@ cd tools/kit && npm test      # node --test; a throwaway kit and project in the 
 
 The tests sync a kit into a project, update it (added, updated, deleted, unchanged), refuse and
 force over a project's edit, dry-run, replace a hand copy on the first sync, keep a CRLF checkout
-unchanged, take back a project-owned file, drop a folder, refuse over an ignored file and a
-junction out of the project, keep local paths out of the lock, warn about an unprotected lock, and
-check the gate's `kit` check and `--check` agree.
+unchanged, take back a project-owned file, drop a folder, refuse over an ignored file, a file link,
+a junction out of the project (on a write, a delete and a dry run) and a SHA-256 project, keep local
+paths out of the lock, warn about an unprotected lock, and check the gate's `kit` check and
+`--check` agree.

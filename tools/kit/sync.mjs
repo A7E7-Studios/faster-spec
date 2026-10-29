@@ -57,10 +57,11 @@ export function parseManifest(text) {
  */
 export function publicUrl(url) {
   if (!url) return null;
-  if (/^[\w.-]+@[\w.-]+:(?!\/\/)/.test(url)) return url; // git@host:org/repo.git
+  // scp-like: [user@]host:org/repo.git, where a one-letter host is a Windows drive
+  if (/^(?:[\w.-]+@)?[\w-][\w.-]+:(?![\\/])/.test(url)) return url;
   const scheme = /^([a-z][a-z0-9+.-]*):\/\//i.exec(url);
   if (!scheme || scheme[1].toLowerCase() === 'file') return null;
-  return url.replace(/^([a-z][a-z0-9+.-]*:\/\/)[^@/]+@/i, '$1');
+  return url.replace(/^([a-z][a-z0-9+.-]*:\/\/)[^@/]+@/i, '$1').replace(/[?#].*$/, '');
 }
 
 /** The git blob ids of working-tree files, as git would store them (its clean filters applied: CRLF to LF). */
@@ -75,8 +76,7 @@ function workingIds(projectDir, paths) {
 
 /**
  * Paths under `paths` with uncommitted changes: differing from HEAD (staged or not, as git diff
- * sees content, so a checkout's line endings are no change), or untracked, ignored ones included
- * (git holds no copy of those either).
+ * sees content, so a checkout's line endings are no change), or untracked.
  */
 function dirtyPaths(projectDir, paths) {
   if (!paths.length) return new Set();
@@ -86,8 +86,15 @@ function dirtyPaths(projectDir, paths) {
   return new Set([
     ...(hasHead ? list(['diff', '--name-only', '-z', '--no-renames', 'HEAD', ...specs]) : list(['ls-files', '-z', '--cached', ...specs])),
     ...list(['ls-files', '-z', '--others', '--exclude-standard', ...specs]),
-    ...list(['ls-files', '-z', '--others', '--ignored', '--exclude-standard', ...specs]),
   ]);
+}
+
+/** The kit files the project's git ignores and does not track: written, they would never be committed. */
+function ignoredPaths(projectDir, paths) {
+  if (!paths.length) return new Set();
+  const r = runGit(projectDir, ['check-ignore', '-z', '--stdin'], { input: paths.join('\0') + '\0', allowFail: true });
+  const out = typeof r === 'string' || Buffer.isBuffer(r) ? r : r.stdout ?? '';
+  return new Set(String(out).split('\0').filter(Boolean));
 }
 
 /** Files under the kit's paths in the project's working tree: tracked, and untracked but not ignored. */
@@ -98,8 +105,10 @@ function filesOnDisk(projectDir, paths) {
 
 /**
  * Plans a sync of the kit at `commit` into the project. Returns
- * { manifest, files: Map path -> { bytes, id, mode }, actions: [{ path, op, ... }], conflicts, stray, starters, oldLock }
- * where op is add | update | same | delete, and nothing is written.
+ * { manifest, files: Map path -> { bytes, id, mode }, actions: [{ path, op, ... }], conflicts, blocked, stray, starters, oldLock }
+ * where op is add | update | same | delete, and nothing is written. `conflicts` are the project's
+ * changes, which --force overrides; `blocked` are refusals nothing overrides (an ignored kit file,
+ * a target that is a link or lies through one out of the project).
  */
 export function planSync({ kit, commit, projectDir }) {
   const manifestText = kit.text(commit, MANIFEST);
@@ -156,7 +165,20 @@ export function planSync({ kit, commit, projectDir }) {
       if (bytes === null) throw new Error(`${MANIFEST}: the starter ${from} is not in the kit at ${commit.slice(0, 9)}`);
       return { path: target, from, bytes };
     });
-  return { manifest, files, actions, conflicts, stray, starters, oldLock };
+  const blocked = [];
+  for (const p of ignoredPaths(projectDir, [...files.keys()])) {
+    blocked.push({ path: p, why: 'is ignored by git, so the committed copy would lack it: un-ignore it (a !rule in .gitignore)' });
+  }
+  const root = path.resolve(projectDir);
+  const targets = [...actions.filter((a) => a.op !== 'same').map((a) => a.path), ...starters.map((s) => s.path), LOCK_FILE];
+  for (const p of targets) {
+    try {
+      assertInside(root, path.join(root, ...p.split('/')));
+    } catch (e) {
+      blocked.push({ path: p, why: e.message });
+    }
+  }
+  return { manifest, files, actions, conflicts, blocked, stray, starters, oldLock };
 }
 
 /** Removes `dir` and its parents while they are empty, never `stop` or above. */
@@ -175,7 +197,7 @@ function pruneEmpty(dir, stop) {
 
 const inside = (child, parent) => {
   const rel = path.relative(parent, child);
-  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+  return rel === '' || (rel !== '..' && !rel.startsWith('..' + path.sep) && !path.isAbsolute(rel));
 };
 
 /**
@@ -189,14 +211,17 @@ export function assertInside(root, target) {
   try {
     st = fs.lstatSync(target);
   } catch {}
-  if (st?.isSymbolicLink()) throw new Error(`${path.relative(root, target)} is a link: sync writes and deletes only real files inside the project`);
+  if (st?.isSymbolicLink()) throw new Error('is a link: sync writes and deletes only real files inside the project');
   let d = path.dirname(target);
   while (!fs.existsSync(d)) d = path.dirname(d);
   const real = fs.realpathSync.native(d);
-  if (!inside(norm(real), realRoot)) throw new Error(`${path.relative(root, target)} lies through a link outside the project (${real})`);
+  if (!inside(norm(real), realRoot)) throw new Error(`lies through a link outside the project (${real})`);
 }
 
-/** Writes a plan into the project, then the lock. Checks every target first, and writes nothing on a problem. */
+/**
+ * Writes a plan into the project, then the lock. planSync has checked every target (`blocked`);
+ * the check runs again here, before the first write, in case the tree changed since.
+ */
 export function applySync(plan, { projectDir, repository, commit }) {
   const root = path.resolve(projectDir);
   const abs = (p) => path.join(root, ...p.split('/'));
@@ -295,6 +320,11 @@ export function main(argv, { log = console.log, err = console.error } = {}) {
     return 2;
   }
 
+  if (project.config('extensions.objectformat') === 'sha256') {
+    err(`sync: ${project.dir} stores SHA-256 objects, and the lock records SHA-1 blob ids: not supported`);
+    return 2;
+  }
+
   if (o.check) {
     const rev = o.rev ?? 'HEAD';
     const sha = project.resolve(rev);
@@ -346,6 +376,11 @@ export function main(argv, { log = console.log, err = console.error } = {}) {
   }
   const count = (op) => plan.actions.filter((a) => a.op === op).length;
   const at = `the kit at ${commit.slice(0, 9)} (${ref}${repository ? `, ${repository}` : ''})`;
+  if (plan.blocked.length) {
+    for (const b of plan.blocked) err(`sync: ${b.path} ${b.why}`);
+    err(`sync: nothing written: ${plan.blocked.length} path(s) sync cannot write, with or without --force`);
+    return 1;
+  }
   if (plan.conflicts.length && !o.force) {
     for (const c of plan.conflicts) err(`sync: ${c.path} ${c.why}`);
     err(`sync: nothing written: ${plan.conflicts.length} file(s) the project changed; commit or move the change, or pass --force to take ${at}`);
@@ -359,7 +394,7 @@ export function main(argv, { log = console.log, err = console.error } = {}) {
     try {
       applySync(plan, { projectDir: project.dir, repository, commit });
     } catch (e) {
-      err(`sync: ${e.message}: nothing written`);
+      err(`sync: stopped part way (${e.message}): files before it may be written and ${LOCK_FILE} is not; git status shows them. Fix the cause and sync again`);
       return 1;
     }
   }
