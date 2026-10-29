@@ -26,10 +26,10 @@ Gradle project otherwise shows almost no components.
 - **WHEN** the overview reads it
 - **THEN** each such folder is a component, its manifest named, its name and description read from
   `pyproject.toml`'s `[project]` or `[tool.poetry]` table
-- **PROOF** test: tools/overview/test/overview.test.mjs::overview: Python and Gradle folders are modules; a config's own markers replace the defaults
+- **PROOF** test: tools/overview/test/overview.test.mjs::overview: Python and Gradle folders are components; a config's own markers replace the defaults
 
 #### Scenario: A repository names its own markers
 - **GIVEN** a repository whose config names `go.mod` and `pyproject.toml` as its markers
 - **WHEN** the overview reads it
 - **THEN** only folders holding one of those are components
-- **PROOF** test: tools/overview/test/overview.test.mjs::overview: Python and Gradle folders are modules; a config's own markers replace the defaults
+- **PROOF** test: tools/overview/test/overview.test.mjs::overview: Python and Gradle folders are components; a config's own markers replace the defaults

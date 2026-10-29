@@ -25,10 +25,13 @@ the coverage gaps are read from these.
 - **GIVEN** a feature approved in one repository and changes-requested in the other
 - **WHEN** the overview reads both
 - **THEN** the feature is changes-requested
+- **PROOF** test: tools/overview/test/overview.test.mjs::overview: one side asks for changes: the feature is changes-requested
+- **PROOF** test: tools/overview/test/overview.test.mjs::overview: reviewed is the first-parent commit that last set review, a merged verdict its merge
 
 #### Scenario: An untested scenario is a gap, not a review item
 - **WHEN** a scenario has no `test:` line
 - **THEN** the overview counts it untested and leaves the feature's review state as its spec says
+- **PROOF** test: tools/overview/test/overview.test.mjs::overview: an untested scenario is a gap, not a review item
 
 ### Requirement: Each feature names its systems
 When a repository declares systems, the overview SHALL give each feature the systems its code
@@ -38,3 +41,4 @@ because a system with no feature shows where the next spec belongs.
 #### Scenario: A feature in two systems
 - **WHEN** a feature's code paths lie in two systems
 - **THEN** both list the feature, and the feature lists both
+- **PROOF** test: tools/overview/test/overview.test.mjs::overview: a feature in two systems: both list it, and it lists both

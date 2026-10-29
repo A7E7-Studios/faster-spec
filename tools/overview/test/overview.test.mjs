@@ -620,7 +620,7 @@ test('overview: a repository with no specs and no systems still lists its compon
   assert.equal(formatSummary(o).includes('\nSystems (0)\n  (none declared)\n'), true);
 });
 
-test('overview: Python and Gradle folders are modules; a config\'s own markers replace the defaults', (t) => {
+test('overview: Python and Gradle folders are components; a config\'s own markers replace the defaults', (t) => {
   const r = makeRepo(
     {
       'README.md': '# Root\n\nThe root.\n',
