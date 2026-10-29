@@ -3,9 +3,8 @@ title: The kit in its own repository, synced into each project
 capabilities:
   - kit/sync
   - gate/kit-copy
-  - overview/modules
+  - overview/components
   - agents/owner-questions
-review: unreviewed
 ---
 # The kit in its own repository, synced into each project
 
@@ -36,6 +35,11 @@ owner's questions came as walls of text rather than through the harness's questi
   questions in Claude Code*, *A round asked as text*.
 - `setup-agents` gains tests; the tests run on `tools/gate/config.template.json`, never a project's
   config, so they hold in every project.
+
+## Review
+
+At a desk: sync the kit into a throwaway project and back, run `--check` and the gate there, and
+read the README and `tools/kit/README.md`.
 
 ## Settled questions
 
