@@ -20,20 +20,21 @@ or in a pull request body: describe the defect, never the model.
      (`landed` in the JSON), `review` state, its looks. Under it, each scenario it added or changed
      (`git show <landing commit> -- specs/`) with each human check and what the person looks at:
      `design.md`'s human checks, else the scenario's THEN steps and `proposal.md`'s What changes.
-   - **Then the other human checks** that are `open` or `fail`, grouped by check (`desk`,
-     `headset`, `two-headsets`, `printed-card`, `live-tenant`), each group headed with what it
-     needs: a build that contains the landing commit, two headsets, the printed card, the tenant
-     and its account.
+   - **Then the other human checks** that are `open` or `fail`, grouped by check in the order the
+     project names them, each group headed with how the person checks it and what it needs: its
+     `how` and `needs` (`repos[].humanChecks` in the JSON, from each repository's
+     `tools/gate/config.json`; AGENTS.md may say more), and a build that contains the landing
+     commit.
 4. Give it in chat, or as a local HTML page outside the repository. Never commit it.
-5. Suggest the recording: one CueReview session per source ("Record more" keeps the source, so the
-   desk checks and the headset checks are separate sessions), one take per change, each opening
-   with the change's name said aloud.
+5. Suggest the recording: one CueReview session per source ("Record more" keeps the source, so
+   checks made on different sources, a computer's screen and a device, say, are separate
+   sessions), one take per change, each opening with the change's name said aloud.
 
 ## B. With a review: the results
 
 Input: one or more CueReview sessions (each one's "Copy for agent" text: the `cue` executable's
 path, the session id, `CUEREVIEW_DATA_DIR`), session ids, or the owner's notes or feedback.
-CueReview runs only on the workstation; on Windows, `cue` is
+CueReview runs on the owner's computer; on Windows, `cue` is
 `%LOCALAPPDATA%\Programs\CueReview\cue.exe` unless the copied text says otherwise.
 
 1. **Read each session**, with `CUEREVIEW_DATA_DIR` set as the copied text says:
@@ -41,10 +42,11 @@ CueReview runs only on the workstation; on Windows, `cue` is
    - `cue transcript ID --segments`: the whole review; each take starts at a
      `── Take N · m:ss ──` divider.
    - `cue frames ID --per-segment --max-width 1600 --mark-cursor`: one frame per segment; look at
-     each. A headset source: `--max-width 3200` (it never upscales), since each frame holds both eyes
-     side by side; read one eye.
-   - `cue moments ID`: the spoken pointing ("here", "this") with the cursor and the clicks. A headset
-     or Android source has no cursor track: the pointing is the hand or the gaze in the frame.
+     each. A stereo source (a headset whose frames hold both eyes side by side):
+     `--max-width 3200` (it never upscales); read one eye.
+   - `cue moments ID`: the spoken pointing ("here", "this") with the cursor and the clicks. A device
+     source (a headset, a phone) has no cursor track: the pointing is the hand, the finger or the
+     gaze in the frame.
    - `cue frame ID --at-ms MS` and `cue clip ID --start-ms A --end-ms B` where a remark needs a
      closer look. Times are estimates: check the neighbouring frames. Names may be misspelled
      despite the vocabulary setting; `cue find ID --phrase TEXT` locates a phrase.
@@ -92,7 +94,7 @@ CueReview runs only on the workstation; on Windows, `cue` is
 8. **The follow-up changes**, one per fix (related items may share one), each under the id step 6
    gave it: **spec**, with the owner's items as settled questions, quoted with their times, asking
    only what is still unclear; spec's hand-over then decides between design and ship. Copy each
-   frame a change cites into `changes/<new-id>/evidence/<what-it-shows>.png` (a headset frame
+   frame a change cites into `changes/<new-id>/evidence/<what-it-shows>.png` (a stereo frame
    cropped to one eye: `ffmpeg -i <frame> -vf crop=iw/2:ih:0:0 <out>`) and cite it in
    `proposal.md` with its quote and time.
 

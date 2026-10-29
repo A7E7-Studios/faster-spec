@@ -48,8 +48,9 @@ Recommended: <letter>, <one line why>
 - Cover, as the tree reaches them:
   - each observable outcome (each becomes a scenario) and its edges: empty, first use, repeated,
     offline, two people at once;
-  - which outcomes only a person can check, and how: `desk`, `headset`, `two-headsets`,
-    `printed-card`, `live-tenant`;
+  - which outcomes only a person can check, and how: the project's human checks, each with how a
+    person checks it and what it needs (`tools/gate/config.json` `humanChecks`; AGENTS.md may say
+    more), and never a check the project does not name;
   - whether anything seen or heard changes (design then draws it);
   - the other repository's side, the contracts between the two, stored data and its migration;
   - what is out of scope.
