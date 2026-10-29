@@ -3,6 +3,7 @@ title: The owner reviews features, and tests prove scenarios
 capabilities:
   - formats/specs
   - formats/changes
+  - formats/systems
   - gate/review-state
   - overview/review-state
   - agents/design-system
@@ -60,8 +61,16 @@ cleaned up.
 - **CI.** A review-only pull request (a `review:` flip, a deleted change folder) runs only the gate;
   the README tells a project to add `specs/**` and `changes/**` to its heavy workflows'
   `paths-ignore`.
+- **Systems beside domains.** Each repository declares its systems in `specs/systems.json`: the
+  parts that run on their own and that you would name to a colleague (an app, a conversion tool, the
+  API, a release pipeline), each with the paths it owns. Domains stay the parent of features; a
+  feature's systems follow from its `code` paths, so a feature may ship in several (sign-in in the
+  app, the API and the web app) and its spec gains no key. The coverage gap is a system no feature
+  ships in, or code inside a system that no spec names.
 - **The overview JSON is version 3**: each capability's review state read from `review:`, tested
-  coverage per scenario, Looks as references, and no human checks.
+  coverage per scenario, Looks as references, each feature's systems, and no human checks. The
+  folders found by marker files (README, `package.json`, `*.asmdef`) stay for agents as
+  `components`; the Solution map no longer shows them.
 
 ## Settled questions
 
@@ -93,6 +102,10 @@ cleaned up.
 - **Q10 The kit's pages**: templates in the kit; a project's theme file or same-named page
   overrides them; never synced over.
 - **Q11 CI**: review-only pull requests run only the gate.
+- **Q12 How features are grouped**: domains plus systems, the common practice of a service catalog:
+  features under domains for the product view, and a short declared list of systems that says what
+  each feature ships in, so a tool shows its features. Rejected: folder modules as the second
+  grouping, which the owner found adds nothing for a person.
 
 ## Calls for the owner
 
@@ -108,6 +121,18 @@ cleaned up.
   kit name), owned by the project and never synced. Alternative: a folder under `tools/`.
 - **An untested scenario is valid** and counts as untested in the overview and the triage
   checklist; the gate fails nothing for it.
+- **`specs/systems.json` is `[{ "id", "title", "purpose", "paths" }]`**, like `domains.json`:
+  kebab-case ids, a purpose of one or two sentences, `paths` written as a spec's `code` is (a
+  folder ends in `/`), each present at the commit. A system that spans repositories has the same id
+  in each, and each declares only its own paths. Alternative: systems inside `domains.json`; it
+  would mix the product view with what ships.
+- **A path belongs to one system at most**: the nearest declaring it, and the gate fails two
+  systems declaring the same path. Code outside every system is information, not a failure, and the
+  overview lists it; a gate failure instead would make every repository declare all its code on
+  the first sync.
+- **The folder modules are renamed `components`** in version 3 and keep their marker rules
+  (`overview.moduleMarkers` becomes `overview.componentMarkers`). Alternative: keep the name
+  `modules`; "module" then means two things in one JSON.
 - **The overview JSON skips to version 3**, since version 2 already names each module's manifest.
 - **The proposal's free text is a `## Review` section**: what the owner looks at and where.
 - **This repository's own four specs move to the new format** in this change: Summary, `review:
