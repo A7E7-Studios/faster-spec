@@ -170,8 +170,9 @@ The owner reviews a feature as a whole, and `review` in its front matter holds t
 - **A board** is `looks/<name>.html` in the capability folder: the design the owner picked, as one
   self-contained HTML file (its CSS inline, nothing loaded from the network or another file), each
   design a `<section id="…">`. A board line names a board of this folder and an `id` it holds. The
-  directions page and the Solution map pull each section in by its id, so the design is drawn
-  once. The directions the owner did not pick are never committed.
+  Solution map pulls each section in by its id, so the design is drawn once. The directions the
+  owner did not pick stay on the change's directions page, `changes/<id>/looks.html`, until the
+  change folder is deleted ([changes/README.md](../changes/README.md#files)).
 - **A page** names where the built feature can be seen: a path in the app, or a URL.
 - The pull request that changes how the feature looks updates its board or its lines; a feature
   with no visual side has no `## Looks`.
