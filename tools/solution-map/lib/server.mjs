@@ -17,7 +17,7 @@ const BOARD = /^\/board\/([a-z0-9]+(?:-[a-z0-9]+)*)\/(specs\/[a-z0-9/-]+\/looks\
  */
 export function withSection(html, id) {
   if (!id) return html;
-  if (!/^[A-Za-z][\w-]*$/.test(id) || !new RegExp(`<section\\b[^>]*\\bid=["']${id}["']`).test(html)) return null;
+  if (!/^[A-Za-z][\w-]*$/.test(id) || !new RegExp(`<section\\b[^>]*\\sid=["']${id}["']`).test(html)) return null;
   const style = `<style>section:not(#${id}):not(#${id} section):not(:has(#${id})){display:none!important}</style>`;
   return /<\/head>/i.test(html) ? html.replace(/<\/head>/i, `${style}</head>`) : style + html;
 }

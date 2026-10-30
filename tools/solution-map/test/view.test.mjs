@@ -52,11 +52,25 @@ test('explore by system without systems says so, and keeps the features', () => 
   ov.systems = [];
   for (const c of ov.capabilities) c.systems = [];
   const html = renderPage(adapt(ov), ui({ tab: 'explore', group: 'system' }));
-  assert.match(html, /No feature ships in a system yet/);
-  assert.match(html, /The project declares no systems/);
+  assert.match(html, /<h2 class="s-h1">No feature ships in a system yet<\/h2><p>The project declares no systems in <span class="mono">specs\/systems\.json<\/span>, so there is nothing to group by system\.<\/p>/);
   assert.doesNotMatch(html, /No features yet/);
+  // Systems declared, but none of the features' code in any of them.
+  const off = sample();
+  for (const c of off.capabilities) c.systems = [];
+  for (const s of off.systems) s.capabilities = [];
+  assert.match(renderPage(adapt(off), ui({ tab: 'explore', group: 'system' })), /<p>The systems’ paths cover none of the features’ code, so there is nothing to group by system\.<\/p>/);
   const none = renderPage(adapt({ ...sample(), capabilities: [] }), ui({ tab: 'explore', group: 'system' }));
   assert.match(none, /No features yet/);
+});
+
+test('a system no feature ships in, and a project with no spec, say so in words', () => {
+  const html = renderPage(adapt(sample()), ui({ tab: 'explore', group: 'system' }));
+  assert.match(html, /<span class="h">Telemetry<span class="repo">api<\/span><\/span><span class="p">Crash and usage reports\.<\/span><\/div><div class="a-none sm">No feature yet: no spec covers this system\.<\/div>/);
+  assert.match(html, /Code no spec names:<\/span><span>src\/spellcheck\/<\/span>/);
+  const empty = renderPage(adapt({ ...sample(), capabilities: [], changes: [] }), ui());
+  assert.match(empty, /<h2 class="s-h1">No features yet<\/h2>/);
+  assert.match(empty, /Ask an agent to run the <b>spec<\/b> skill on one system or area/);
+  assert.match(empty, /data-group="system">See the systems<\/button>/);
 });
 
 test('a page line that does not answer becomes a placeholder', () => {

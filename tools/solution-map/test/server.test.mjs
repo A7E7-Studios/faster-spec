@@ -199,6 +199,7 @@ test('a board section is served from the board by its id', () => withTmp(async (
     assert.equal((await fetch(`${url}?section=nope`)).status, 404);
     assert.equal((await fetch(`${s.base}/board/app/specs/editing/x/looks/missing.html`)).status, 404);
     assert.equal(withSection('<section id="a">', 'a"><script>'), null);
+    assert.equal(withSection('<section data-id="a">x</section>', 'a'), null, 'only an id attribute names a section');
   } finally { await s.close(); }
 }));
 

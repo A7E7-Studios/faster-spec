@@ -94,6 +94,7 @@ by what it does and by what ships.
 - **WHEN** the owner explores by system
 - **THEN** the system says it has no feature yet, or lists the code no spec names
 - **PROOF** test: tools/solution-map/test/adapt.test.mjs::a system no feature ships in is listed as a gap
+- **PROOF** test: tools/solution-map/test/view.test.mjs::a system no feature ships in, and a project with no spec, say so in words
 
 #### Scenario: An approved feature shows what it does and where its code is
 - **WHEN** the owner opens an approved feature
@@ -172,3 +173,4 @@ none.
 - **WHEN** the map opens
 - **THEN** it says there are no features yet and how to write the first, and lists the systems
 - **PROOF** test: tools/solution-map/test/adapt.test.mjs::an empty project has no features and lists its systems
+- **PROOF** test: tools/solution-map/test/view.test.mjs::a system no feature ships in, and a project with no spec, say so in words
