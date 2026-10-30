@@ -22,9 +22,9 @@ built-in browser or file pane. Every agent app the owner works in has a built-in
   critique, and the recommended pick. It becomes the scenario "The directions page is
   self-contained" in `formats/changes`.
 - **It reaches the owner in the harness's built-in browser**: the design skill writes it in the
-  change's worktree, opens it there and gives its path, then asks for the pick as a question to
-  the owner, through the harness's question tool when it has one. It becomes the scenario "The owner picks from the page in the built-in browser"
-  in `agents/design-system`.
+  change's worktree, opens it there and gives its path, then asks for the pick as a question to the
+  owner, through the harness's question tool when it has one. It becomes the scenario "The owner
+  picks from the page in the built-in browser" in `agents/design-system`.
 - **It is committed with `look.md`** once the owner has picked, and deleted with the change
   folder by triage. The picked design still lands as the board beside the spec. The directions
   not picked stay on the page until the folder is deleted; `templates/look.md` says so.
