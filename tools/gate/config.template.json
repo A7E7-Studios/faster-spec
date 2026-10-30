@@ -68,5 +68,8 @@
   "overview": {
     "excludeComponents": ["dev/**", "docs/**", "**/proof/**", "fixtures/**", "**/test/fixtures/**"],
     "componentMarkers": ["README.md", "package.json", "pyproject.toml", "build.gradle", "build.gradle.kts", "*.asmdef"]
+  },
+  "solutionMap": {
+    "repos": [{ "id": "app", "path": "." }]
   }
 }

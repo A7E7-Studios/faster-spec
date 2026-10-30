@@ -135,6 +135,7 @@ The JSON report lists what fails the run in `blocking`.
 | `design` | optional: the project's design system, `{ tokens, brief, catalogues?, render? }`: `tokens` the repository path of a CSS file of custom properties, `brief` that of the style brief (Markdown), `catalogues` a list of `{ name, open }` (a kebab-case name and a URL template holding `{entry}`), `render` a command. The `design` check reads `tokens` and `brief`; the starter names the kit's house style |
 | `overview.excludeComponents` | globs of folders the overview lists no component from (planning and fixture folders); the gate does not read it |
 | `overview.componentMarkers` | file-name globs (no `/`) that make a folder a component in the overview ([its Components](../overview/README.md#components)); without the key, its defaults. The gate does not read it |
+| `solutionMap` | optional: `{ repos, pages?, review? }` for [the Solution map](../solution-map/README.md#config): `repos` the solution's repositories as `{ id, path }`, paths relative to this one; the starter names this repository alone. The gate does not read it |
 
 The values are each repository's own, in its `config.json`. `loadConfig` refuses a mistyped key,
 and names the new name of `overview.moduleMarkers` (`componentMarkers`) and
