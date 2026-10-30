@@ -21,6 +21,14 @@ export function withSection(html, id) {
   return /<\/head>/i.test(html) ? html.replace(/<\/head>/i, `${style}</head>`) : style + html;
 }
 
+/**
+ * Whether a request's `Host` names this server: `127.0.0.1:<port>` or `localhost:<port>`. Another
+ * name pointed at 127.0.0.1 (DNS rebinding) would otherwise make another site's page same-origin.
+ */
+export function hostAllowed(host, port) {
+  return host === `127.0.0.1:${port}` || host === `localhost:${port}`;
+}
+
 function send(res, status, type, body, headers = {}) {
   res.writeHead(status, { 'content-type': type, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', ...headers });
   res.end(body);
@@ -44,6 +52,7 @@ export function createMapServer({ build, themeFile = null, review = async () => 
 
   const server = http.createServer(async (req, res) => {
     try {
+      if (!hostAllowed(req.headers.host, server.address()?.port)) return send(res, 403, 'text/plain', 'this server answers only to 127.0.0.1 and localhost');
       const url = new URL(req.url, 'http://127.0.0.1');
       const p = decodeURIComponent(url.pathname);
       if (req.method === 'GET' && p === '/api/map') return send(res, 200, 'application/json; charset=utf-8', JSON.stringify((await latest()).model));

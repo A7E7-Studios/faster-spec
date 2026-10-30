@@ -105,13 +105,15 @@ export function banners(vm) {
   return vm.banners.map((b) => {
     let text, act = '', tone = '';
     if (b.kind === 'stale') {
-      text = `Couldn’t fetch <b>${esc(b.name)}</b>. It shows its main as last fetched, ${when(b.fetchedAt)}${b.commit ? ` (<span class="mono">${short(b.commit)}</span>)` : ''}; the other repositories are current.`;
+      text = `Couldn’t fetch <b>${esc(b.name)}</b>. It shows its main as last fetched, ${when(b.fetchedAt)}${b.commit ? ` (<span class="mono">${short(b.commit)}</span>)` : ''}.`;
       act = '<button class="s-btn" data-act="refresh">Try again</button>';
     } else if (b.kind === 'missing') {
       text = `Repository <b>${esc(b.repo)}</b> isn’t on this computer${b.dir ? `: nothing at <span class="mono">${esc(b.dir)}</span>` : ''}. The map shows the others. Clone it there, or start the map with <span class="mono">--repo ${esc(b.repo)}=&lt;folder&gt;</span>.`;
     } else if (b.kind === 'pages') {
       text = `The live pages don’t open: nothing answers at ${b.origins.map((o) => `<span class="mono">${esc(o)}</span>`).join(', ')}. The designs still show. Start the project’s dev server, then press Refresh.`;
       act = '<button class="s-btn" data-act="refresh">Refresh</button>';
+    } else if (b.kind === 'pages-address') {
+      text = `The address for the project’s pages, <span class="mono">${esc(b.value)}</span>, isn’t a web address (<span class="mono">http://…</span> or <span class="mono">https://…</span>), so no live page shows. The designs still show. Correct <span class="mono">solutionMap.pages</span> or <span class="mono">--pages</span>.`;
     } else if (b.kind === 'format') {
       tone = 'req';
       text = `<b>${b.features.length} ${b.features.length === 1 ? 'spec breaks' : 'specs break'}</b> the format: ${b.features.map((f) => esc(f.title)).join(', ')}. Each still shows, with its problems listed on its page.`;
@@ -233,9 +235,12 @@ function emptyProject(vm) {
 
 function zeroBody(vm) {
   const t = vm.totals;
-  const untested = Object.values(vm.features).filter((f) => f.tested[0] < f.tested[1]);
+  const untested = Object.values(vm.features).flatMap((f) => f.requirements.flatMap((r) => r.scenarios.filter((s) => !s.tested).map((s) => ({ f, s }))));
+  const SHOWN = 8;
+  const items = untested.slice(0, SHOWN).map(({ f, s }) => `<li><button class="s-link plain" data-open="${esc(f.id)}">${esc(s.name)}</button> <span class="s-faint">${esc(f.title)}</span></li>`).join('');
+  const more = untested.length > SHOWN ? `<p class="s-faint">and ${untested.length - SHOWN} more, each marked untested in its feature’s Behaviour.</p>` : '';
   return `<div class="zero"><span class="zic">${ICON.approved}</span><h2 class="s-h1">Nothing waits for you</h2><p>All ${t.features} features are approved.</p>`
-    + (untested.length ? `<div class="box"><div class="bh">Next worth a look: scenarios without a test</div><div>${t.scenarios - t.tested} of ${t.scenarios} scenarios have no test yet, in ${untested.length} ${untested.length === 1 ? 'feature' : 'features'}: ${untested.map((f) => esc(f.title)).join(', ')}. They don’t need your verdict, but a regression there would go unnoticed.</div><button class="s-btn" data-tab="explore">See them in Explore</button></div>` : '<p>Every scenario has a test.</p>')
+    + (untested.length ? `<div class="box"><div class="bh">Next worth a look: scenarios without a test</div><div>${t.scenarios - t.tested} of ${t.scenarios} scenarios have no test yet. They don’t need your verdict, but a regression there would go unnoticed.</div><ul class="untested">${items}</ul>${more}</div>` : '<p>Every scenario has a test.</p>')
     + '</div>';
 }
 

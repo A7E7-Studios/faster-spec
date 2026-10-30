@@ -70,7 +70,18 @@ export function adapt(ov, ctx = {}) {
     })))
     .sort((a, b) => byDateDesc(a.date, b.date));
 
-  const pageUrl = (target) => /^https?:\/\//.test(target) ? target : (ctx.pages ? ctx.pages.replace(/\/$/, '') + '/' + target.replace(/^\//, '') : null);
+  // The pages' base address: null when none is named, undefined when what is named is no web address.
+  const pagesBase = (() => {
+    if (!ctx.pages) return null;
+    try {
+      const u = new URL(ctx.pages);
+      return /^https?:$/.test(u.protocol) ? u.href.replace(/\/$/, '') : undefined;
+    } catch { return undefined; }
+  })();
+  const pageUrl = (target) => {
+    const u = /^https?:\/\//.test(target) ? target : pagesBase ? `${pagesBase}/${target.replace(/^\//, '')}` : null;
+    try { return u ? new URL(u).href : null; } catch { return null; }
+  };
 
   const features = {};
   for (const c of ov.capabilities || []) {
@@ -130,6 +141,7 @@ export function adapt(ov, ctx = {}) {
   }
   const broken = ids.filter((k) => features[k].problems.length);
   if (broken.length) banners.push({ kind: 'format', features: broken.map((k) => ({ id: k, title: features[k].title })) });
+  if (pagesBase === undefined) banners.push({ kind: 'pages-address', value: ctx.pages });
   const down = [...new Set(Object.values(features).flatMap((f) => f.looks).filter((l) => l.kind === 'page' && l.url && !l.answers).map((l) => new URL(l.url).origin))];
   if (down.length) banners.push({ kind: 'pages', origins: down });
 

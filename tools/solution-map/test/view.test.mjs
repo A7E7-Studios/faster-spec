@@ -29,7 +29,9 @@ test('nothing waiting says so and points at untested scenarios', () => {
   assert.deepEqual(vm.waiting, []);
   const html = renderPage(vm, ui());
   assert.match(html, /Nothing waits for you/);
-  assert.match(html, /2 of 11 scenarios have no test yet, in 2 features: Offline edits, Markdown import/);
+  assert.match(html, /2 of 11 scenarios have no test yet\./);
+  assert.match(html, /data-open="editing\/offline-edits">The banner shows after five seconds<\/button> <span class="s-faint">Offline edits<\/span>/);
+  assert.match(html, /data-open="importing\/markdown-import">A picture travels with its note<\/button> <span class="s-faint">Markdown import<\/span>/);
 });
 
 test('an approved feature folds its behaviour away', () => {
@@ -56,6 +58,12 @@ test('a page line that does not answer becomes a placeholder', () => {
   assert.match(up, /<iframe class="frame" sandbox src="\/board\/app\/specs\/editing\/offline-edits\/looks\/offline-banner\.html\?section=banner"/);
   const nobase = renderPage(adapt(ov), ui({ sel: 'editing/offline-edits' }));
   assert.match(nobase, /the project names no address for its pages/);
+  // A pages address that is no web address: a banner, never a failed build.
+  for (const pages of ['localhost:5173/x', 'not an address']) {
+    const vm = adapt(ov, { pages });
+    assert.deepEqual(vm.banners.filter((b) => b.kind === 'pages-address'), [{ kind: 'pages-address', value: pages }]);
+    assert.match(renderPage(vm, ui({ sel: 'editing/offline-edits' })), /isn’t a web address/);
+  }
 });
 
 test('search finds features by title, summary, requirement, scenario and system', () => {

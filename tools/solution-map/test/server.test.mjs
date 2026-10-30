@@ -5,7 +5,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { buildMap } from '../lib/build.mjs';
-import { createMapServer, withSection } from '../lib/server.mjs';
+import { createMapServer, withSection, PAGE_DIR } from '../lib/server.mjs';
+import http from 'node:http';
 import { reviewCommand, startReview } from '../lib/review.mjs';
 import { EventEmitter } from 'node:events';
 
@@ -78,7 +79,7 @@ function landElsewhere(tmp, origin) {
   return g(other, 'rev-parse', 'HEAD');
 }
 
-/** A stand-in for the overview while version 3 is not written: the commit each repository is at. */
+/** A stand-in for the overview that reports only the commit each repository is at, so a fetch's effect is seen alone. */
 const standIn = (version = 3) => (repos) => ({
   version, generatedAt: new Date().toISOString(),
   repos: repos.map((r) => ({ id: r.id, name: r.id, ref: r.ref, commit: g(r.dir, 'rev-parse', r.ref) })),
@@ -91,6 +92,11 @@ async function serve(build, more = {}) {
   const base = `http://127.0.0.1:${port}`;
   return { ...s, port, base, close: () => new Promise((r) => s.server.close(r)) };
 }
+
+/** A GET with a `Host` header of our choosing, which `fetch` does not allow. */
+const getWithHost = (port, p, host) => new Promise((resolve, reject) => {
+  http.get({ host: '127.0.0.1', port, path: p, headers: { host } }, (res) => { res.resume(); resolve(res.statusCode); }).on('error', reject);
+});
 
 const withTmp = async (fn) => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'solution-map-'));
@@ -109,7 +115,11 @@ test('serves the page and the map on 127.0.0.1 only', () => withTmp(async (tmp) 
     assert.match(view.headers.get('content-type'), /text\/javascript/);
     const map = await (await fetch(`${s.base}/api/map`)).json();
     assert.equal(map.repos[0].state, 'current');
-    assert.equal((await fetch(`${s.base}/page/../lib/server.mjs`)).status, 404);
+    assert.equal((await fetch(`${s.base}/page/%2e%2e%2flib%2fserver.mjs`)).status, 404);
+    // A name rebound to 127.0.0.1 is not this server's.
+    assert.equal(await getWithHost(s.port, '/api/map', `evil.example:${s.port}`), 403);
+    assert.equal(await getWithHost(s.port, '/api/map', `localhost:${s.port}`), 200);
+    assert.equal(await getWithHost(s.port, '/api/map', `127.0.0.1:${s.port + 1}`), 403);
   } finally { await s.close(); }
 }));
 
@@ -124,6 +134,8 @@ test('Refresh fetches again and rebuilds the map', () => withTmp(async (tmp) => 
     assert.equal((await fetch(`${s.base}/api/refresh`, { method: 'POST' })).status, 403);
     const after = await (await fetch(`${s.base}/api/refresh`, { method: 'POST', headers: { 'x-solution-map': '1' } })).json();
     assert.equal(after.repos[0].commit, landed);
+    // Opening the page asks for the same refresh, so it shows main as it is now.
+    assert.match(fs.readFileSync(path.join(PAGE_DIR, 'app.mjs'), 'utf8'), /\nload\('\/api\/refresh', 'POST'\);/);
   } finally { await s.close(); }
 }));
 
@@ -221,3 +233,17 @@ test('an overview of another version gives a banner, not a page error', () => wi
     assert.equal(model.totals.features, 0);
   } finally { await s.close(); }
 }));
+
+test('a saved overview is served without reading a repository', async () => {
+  const sample = JSON.parse(fs.readFileSync(new URL('./fixtures/overview-v3.json', import.meta.url), 'utf8'));
+  let fetched = 0;
+  const fetchRepo = async () => { fetched++; return { state: 'current', fetchedAt: null }; };
+  const { model, dirs, commits } = await buildMap({ repos: [], overview: () => sample, fromFile: true, fetchRepo });
+  assert.equal(fetched, 0);
+  assert.deepEqual([dirs, commits], [{}, {}]);
+  assert.equal(model.totals.features, 8);
+  const boards = Object.values(model.features).flatMap((f) => f.looks).filter((l) => l.kind === 'board');
+  assert.ok(boards.length > 0 && boards.every((l) => l.unserved === true), 'its boards are marked as not served');
+  const old = await buildMap({ repos: [], overview: () => ({ ...sample, version: 2 }), fromFile: true });
+  assert.deepEqual(old.model.banners, [{ kind: 'version', found: 2, reads: 3 }]);
+});

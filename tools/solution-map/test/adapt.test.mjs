@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { adapt, webBase, pathHref, parseProblem } from '../lib/adapt.mjs';
-import { validate, SCHEMA } from './schema.mjs';
+import { validate, SCHEMA } from '../../overview/test/schema.mjs';
 
 const sample = () => JSON.parse(fs.readFileSync(new URL('./fixtures/overview-v3.json', import.meta.url), 'utf8'));
 const webs = { app: 'https://github.com/example/notes-app', api: null };

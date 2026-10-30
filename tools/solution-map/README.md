@@ -75,6 +75,8 @@ On start, on opening the page and on Refresh:
 cd tools/solution-map && npm test     # node --test; throwaway repositories in the OS temp folder
 ```
 
-The adapter and view tests run on a sample index in version 3's shape
-(`test/fixtures/overview-v3.json`); the server tests build bare origins and clones, push to them
-and run the build with a stand-in for the overview.
+The adapter and view tests run on a sample index held to the overview's schema
+(`test/fixtures/overview-v3.json`, checked with the overview's own `test/schema.mjs`). The server
+tests build bare origins and clones and push to them; the board test runs the kit's overview on a
+spec there, the others a stand-in that reports only each repository's commit, so a fetch's effect
+is seen alone.

@@ -8,7 +8,7 @@ scenario a person checks. A `test:` task is ticked when its test passes.
 - [x] 1.1 The command line, the repositories from `--repo` or the config; test: tools/solution-map/test/cli.test.mjs
 - [x] 1.2 Fetch, `current` / `stale` / `missing`, and the banners; test: tools/solution-map/test/server.test.mjs
 - [x] 1.3 The HTTP server on 127.0.0.1, the page, the map, Refresh and the boards by section; test: tools/solution-map/test/server.test.mjs
-- [x] 1.4 `--from <overview.json>` for a look before the repositories carry version 3; test: tools/solution-map/test/cli.test.mjs
+- [x] 1.4 `--from <overview.json>` for a look before the repositories carry version 3; test: tools/solution-map/test/cli.test.mjs, tools/solution-map/test/server.test.mjs::a saved overview is served without reading a repository
 
 ## 2. The adapter (after 1)
 

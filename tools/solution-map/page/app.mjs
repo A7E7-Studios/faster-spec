@@ -1,5 +1,5 @@
 // The page in the browser: loads the map, keeps the state in the address, and wires the events.
-import { renderPage, parseLocation, pathFor, settle } from './view.mjs';
+import { renderPage, parseLocation, pathFor, settle, esc } from './view.mjs';
 
 /** A request only the map's own page may make (see lib/server.mjs). */
 const post = (url) => fetch(url, { method: 'POST', headers: { 'x-solution-map': '1' } });
@@ -44,11 +44,18 @@ async function load(url, method = 'GET') {
   st.refreshing = true;
   if (vm) render();
   try {
-    const r = await (method === 'POST' ? post(url) : fetch(url));
+    let r;
+    try {
+      r = await (method === 'POST' ? post(url) : fetch(url));
+    } catch (e) {
+      root.innerHTML = `<div class="banner req"><span class="bt">The map’s server doesn’t answer (${esc(e.message || e)}). Start it again with <span class="mono">node tools/solution-map/solution-map.mjs</span>.</span></div>`;
+      return;
+    }
+    if (!r.ok) {
+      root.innerHTML = `<div class="banner req"><span class="bt">The map couldn’t be built: <span class="mono">${esc(await r.text())}</span></span><button class="s-btn" data-act="refresh">Try again</button></div>`;
+      return;
+    }
     vm = await r.json();
-  } catch (e) {
-    root.innerHTML = `<div class="banner req"><span class="bt">The map’s server doesn’t answer: ${String(e.message || e)}. Start it again with <span class="mono">node tools/solution-map/solution-map.mjs</span>.</span></div>`;
-    return;
   } finally {
     st.refreshing = false;
   }
@@ -110,4 +117,5 @@ document.addEventListener('keydown', (e) => {
 
 window.addEventListener('popstate', () => { ui = parseLocation(location.pathname, location.search); render(); });
 
-load('/api/map');
+// Opening the page fetches every repository again, as Refresh does.
+load('/api/refresh', 'POST');
