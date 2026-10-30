@@ -14,15 +14,6 @@ export async function probeUrl(url) {
   }
 }
 
-function repoBanners(repos, states) {
-  return repos.flatMap((r) => {
-    const s = states[r.id];
-    if (s.state === 'missing') return [{ kind: 'missing', repo: r.id, dir: r.dir }];
-    if (s.state === 'stale') return [{ kind: 'stale', repo: r.id, name: r.id, commit: null, fetchedAt: s.fetchedAt }];
-    return [];
-  });
-}
-
 /**
  * @param {object} o
  * @param {{ id: string, dir: string }[]} o.repos
@@ -46,15 +37,16 @@ export async function buildMap({ repos, pages = null, overview = buildOverview, 
   const states = Object.fromEntries(repos.map((r, i) => [r.id, { ...fetched[i], dir: r.dir }]));
   const present = repos.filter((r) => states[r.id].state !== 'missing');
   const dirs = Object.fromEntries(present.map((r) => [r.id, r.dir]));
-  const plain = (banners) => ({ model: emptyModel(banners, repos.map((r) => ({ id: r.id, name: r.id, commit: null, state: states[r.id].state, fetchedAt: states[r.id].fetchedAt ?? null, web: null }))), dirs, commits: {} });
-  if (!present.length) return plain(repoBanners(repos, states));
+  // A map with no overview: each repository's state and banner, and the banners given.
+  const plain = (banners) => ({ model: emptyModel(banners, repos.map((r) => ({ id: r.id, name: r.id, commit: null, state: states[r.id].state, fetchedAt: states[r.id].fetchedAt ?? null, web: null, dir: r.dir }))), dirs, commits: {} });
+  if (!present.length) return plain([]);
   let ov;
   try {
     ov = await overview(present.map((r) => ({ id: r.id, dir: r.dir, ref: 'origin/main' })));
   } catch (e) {
-    return plain([...repoBanners(repos, states), { kind: 'overview-error', message: String(e.message || e) }]);
+    return plain([{ kind: 'overview-error', message: String(e.message || e) }]);
   }
-  if (ov?.version !== OVERVIEW_VERSION) return plain([...repoBanners(repos, states), { kind: 'version', found: ov?.version ?? null, reads: OVERVIEW_VERSION }]);
+  if (ov?.version !== OVERVIEW_VERSION) return plain([{ kind: 'version', found: ov?.version ?? null, reads: OVERVIEW_VERSION }]);
   const webs = Object.fromEntries(await Promise.all(present.map(async (r) => [r.id, await webOf(r.dir)])));
   const commits = Object.fromEntries((ov.repos || []).map((r) => [r.id, r.commit]));
   const ctx = { repoStates: states, webs, pages };

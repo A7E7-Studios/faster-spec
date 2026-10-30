@@ -269,7 +269,8 @@ function exploreTab(vm, ui) {
       return `<div class="a-dom"><span>${esc(d.title)}</span>${ic(worst)}</div>` + d.features.map((k) => capBtn(vm, k, ui)).join('');
     }).join('') || '<div class="a-none">No features yet.</div>';
   }
-  const detail = ui.sel && vm.features[ui.sel] ? featurePage(vm, ui.sel, ui) : emptyProject(vm);
+  const noSystem = `<div class="zero"><h2 class="s-h1">No feature ships in a system yet</h2><p>${vm.systems.length ? 'The systems’ paths cover none of the features’ code' : 'The project declares no systems in <span class="mono">specs/systems.json</span>'}, so there is nothing to group by system.</p><button class="s-btn primary" data-group="domain">Group by domain</button></div>`;
+  const detail = ui.sel && vm.features[ui.sel] ? featurePage(vm, ui.sel, ui) : vm.totals.features ? noSystem : emptyProject(vm);
   return `<div class="a-ld"><aside class="a-list">${toggle}${list}</aside><section class="a-detail">${detail}</section></div>`;
 }
 

@@ -134,11 +134,7 @@ export function adapt(ov, ctx = {}) {
     byDomain.push({ id: features[k].domain, title: features[k].domain, features: ids.filter((x) => features[x].domain === features[k].domain) });
   }
 
-  const banners = [];
-  for (const r of repos) {
-    if (r.state === 'stale') banners.push({ kind: 'stale', repo: r.id, name: r.name, commit: r.commit, fetchedAt: r.fetchedAt });
-    if (r.state === 'missing') banners.push({ kind: 'missing', repo: r.id, dir: repoStates[r.id]?.dir ?? null });
-  }
+  const banners = repoBanners(repos);
   const broken = ids.filter((k) => features[k].problems.length);
   if (broken.length) banners.push({ kind: 'format', features: broken.map((k) => ({ id: k, title: features[k].title })) });
   if (pagesBase === undefined) banners.push({ kind: 'pages-address', value: ctx.pages });
@@ -158,8 +154,14 @@ export function adapt(ov, ctx = {}) {
   };
 }
 
-/** The view model of a map that could not be read: no features, only its banners. */
+/** A banner per repository that is `stale` or `missing`: the one place these banners are made. */
+export function repoBanners(repos) {
+  return repos.flatMap((r) => r.state === 'stale' ? [{ kind: 'stale', repo: r.id, name: r.name, commit: r.commit, fetchedAt: r.fetchedAt }]
+    : r.state === 'missing' ? [{ kind: 'missing', repo: r.id, dir: r.dir ?? null }] : []);
+}
+
+/** The view model of a map that could not be read: no features, its repositories' banners and the others given. */
 export function emptyModel(banners, repos = []) {
-  return { generatedAt: null, repos, domains: [], systems: [], features: {}, waiting: [], byDomain: [], banners,
+  return { generatedAt: null, repos, domains: [], systems: [], features: {}, waiting: [], byDomain: [], banners: [...repoBanners(repos), ...banners],
     totals: { features: 0, approved: 0, changesRequested: 0, tested: 0, scenarios: 0 } };
 }

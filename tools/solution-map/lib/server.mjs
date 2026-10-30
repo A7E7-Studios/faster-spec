@@ -12,12 +12,13 @@ const BOARD = /^\/board\/([a-z0-9]+(?:-[a-z0-9]+)*)\/(specs\/[a-z0-9/-]+\/looks\
 
 /**
  * A board showing only its `<section id="<id>">`, or the whole board when no id is given; null when
- * the board holds no such section.
+ * the board holds no such section. Hidden is every section that is not the chosen one, not inside
+ * it and not holding it, so a section's own nested sections still show.
  */
 export function withSection(html, id) {
   if (!id) return html;
   if (!/^[A-Za-z][\w-]*$/.test(id) || !new RegExp(`<section\\b[^>]*\\bid=["']${id}["']`).test(html)) return null;
-  const style = `<style>section:not(#${id}){display:none!important}</style>`;
+  const style = `<style>section:not(#${id}):not(#${id} section):not(:has(#${id})){display:none!important}</style>`;
   return /<\/head>/i.test(html) ? html.replace(/<\/head>/i, `${style}</head>`) : style + html;
 }
 

@@ -47,6 +47,18 @@ test('an approved feature folds its behaviour away', () => {
   assert.match(html, /Approved 12 Oct in #30/);
 });
 
+test('explore by system without systems says so, and keeps the features', () => {
+  const ov = sample();
+  ov.systems = [];
+  for (const c of ov.capabilities) c.systems = [];
+  const html = renderPage(adapt(ov), ui({ tab: 'explore', group: 'system' }));
+  assert.match(html, /No feature ships in a system yet/);
+  assert.match(html, /The project declares no systems/);
+  assert.doesNotMatch(html, /No features yet/);
+  const none = renderPage(adapt({ ...sample(), capabilities: [] }), ui({ tab: 'explore', group: 'system' }));
+  assert.match(none, /No features yet/);
+});
+
 test('a page line that does not answer becomes a placeholder', () => {
   const ov = sample();
   const down = adapt(ov, { pages: 'http://localhost:5173', pageAnswers: { 'http://localhost:5173/notes/demo': false } });

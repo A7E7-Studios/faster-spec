@@ -12,7 +12,7 @@ import { EventEmitter } from 'node:events';
 
 const ID = ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', '-c', 'init.defaultBranch=main'];
 const g = (dir, ...args) => execFileSync('git', ['-C', dir, ...ID, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-const BOARD = '<!doctype html><html><head><style>body{margin:0}</style></head><body><section id="banner">offline banner</section><section id="other">other</section></body></html>';
+const BOARD = '<!doctype html><html><head><style>body{margin:0}</style></head><body><section id="banner">offline banner<section class="detail">its detail pane</section></section><section id="other">other</section></body></html>';
 
 const SPEC = `---
 title: Offline edits
@@ -193,8 +193,9 @@ test('a board section is served from the board by its id', () => withTmp(async (
     assert.equal(r.status, 200);
     assert.match(r.headers.get('content-security-policy'), /^sandbox;/);
     const html = await r.text();
-    assert.match(html, /<style>section:not\(#banner\)\{display:none!important\}<\/style><\/head>/);
-    assert.match(html, /offline banner/);
+    // Every other section hides; the chosen one's own nested sections do not.
+    assert.ok(html.includes('<style>section:not(#banner):not(#banner section):not(:has(#banner)){display:none!important}</style></head>'));
+    assert.match(html, /offline banner<section class="detail">its detail pane<\/section>/);
     assert.equal((await fetch(`${url}?section=nope`)).status, 404);
     assert.equal((await fetch(`${s.base}/board/app/specs/editing/x/looks/missing.html`)).status, 404);
     assert.equal(withSection('<section id="a">', 'a"><script>'), null);

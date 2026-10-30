@@ -17,7 +17,7 @@ neutral (a notes app and its backend).
 | The index | `buildOverview` imported in the process, after a `git fetch origin` per repository | Spawning `overview.mjs --out`: a temp file and a second parse; reading a committed JSON: stale | `tools/overview/README.md` |
 | One seam to the index | `lib/adapt.mjs` turns the overview's JSON into the view model the page draws; nothing else reads the overview's fields | The page reading the overview's JSON directly: every version change reaches the page | — |
 | The page | plain ES modules served as files: `page/view.mjs` builds HTML strings from the view model (pure, imported by the tests), `page/app.mjs` wires events and the address | A framework or a bundler: dependencies and a build step in every project | MDN, JavaScript modules, https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Modules |
-| Addresses | the path names the view (`/waiting/<feature>`, `/explore/<domain>/<feature>`, `/explore/by-system/<system>/<feature>`, `/search?q=`), `history.pushState`, and the server answers every such path with the page | Hash routes: work too, but read worse in a pasted link | MDN, History API, https://developer.mozilla.org/en-US/docs/Web/API/History_API |
+| Addresses | the path names the view (`/waiting/<feature>`, `/explore/<feature>`, `/explore/by-system/<system>/<feature>`, `/search/<feature>?q=<text>`, a feature id being `<domain>/<capability>`), `history.pushState`, and the server answers every such path with the page | Hash routes: work too, but read worse in a pasted link | MDN, History API, https://developer.mozilla.org/en-US/docs/Web/API/History_API |
 | Boards | `GET /board/<repo>/<capability path>/looks/<name>.html` returns the board from git at the commit read; with `?section=<id>` the server adds a style that hides every other section, and the page shows it in an `iframe` with `sandbox` and no scripts, the response also carrying a `sandbox` content security policy | Inlining the section into the page: the board's CSS would leak into the page | MDN, `iframe` `sandbox`, https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe |
 | Start review | `POST /api/review` makes the server start CueReview detached (`lib/review.mjs`); a POST needs the header `x-solution-map: 1`, which a page of another origin cannot send without a CORS preflight this server never answers | A `cuereview:` link from the page: CueReview registers none; `cue record`: refuses to run beside the app and needs a source | Fetch standard, CORS preflight, https://fetch.spec.whatwg.org/#cors-preflight-fetch; CueReview's README, Agent CLI |
 | Live pages | the server asks each page line's address with a `HEAD` request (2 s) once per build; the page embeds an answering one in an `iframe`, else a placeholder | Asking from the browser: blocked by the page's own origin rules | — |
@@ -68,12 +68,6 @@ shown as not served.
 The server tests build throwaway repositories in the OS temp folder, as the overview's tests do.
 The board test runs the kit's own overview on a spec and `specs/systems.json` there; the others
 use a stand-in that reports each repository's commit, so a fetch's effect is seen alone.
-
-## Human checks
-
-| Scenario | Check | What the person looks at |
-|---|---|---|
-| The whole page | desk | The proposal's Review section: the page against the board, in both themes |
 
 ## Risks
 

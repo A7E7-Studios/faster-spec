@@ -1,7 +1,8 @@
 # Tasks: The Solution map, a local page over the overview
 
-Each task is one line and names how it is proven: `test:` a test path or a command, or `check:` the
-scenario a person checks. A `test:` task is ticked when its test passes.
+Each task is one line and names the test that proves it: `test:` a test path with its selector, or
+a command. A task is ticked when its test passes. What no automation reaches has no task of its
+own; the pull request names it under `## Not verified`.
 
 ## 1. Server and sources
 
@@ -20,8 +21,7 @@ scenario a person checks. A `test:` task is ticked when its test passes.
 
 - [x] 3.1 Direction A: Waiting for you, Explore by domain and by system, search, addresses, banners, both themes; test: tools/solution-map/test/view.test.mjs
 - [x] 3.2 The board `specs/overview/solution-map/looks/solution-map.html`, self-contained and under 30720 bytes, sections `waiting`, `explore-system`, `banners`, drawn from the page's own views and styles over the sample; test: node tools/gate/gate.mjs --local
-- [x] 3.3 The page at phone width and with a keyboard only; check: the proposal's Review
-- [x] 3.4 Start review opens CueReview in place of Copy for triage (Q15); test: tools/solution-map/test/server.test.mjs
+- [x] 3.3 Start review opens CueReview in place of Copy for triage (Q15); test: tools/solution-map/test/server.test.mjs
 
 ## 4. Docs
 
