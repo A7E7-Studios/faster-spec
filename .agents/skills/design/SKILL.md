@@ -1,6 +1,6 @@
 ---
 name: design
-description: Design a specified change before it is built - first its look (two or three visual directions as HTML boards built on the project's design tokens, researched against current UX practice, critiqued against the style brief and an accessibility list, and shown to the owner on one page; the pick committed as a board beside the spec and recorded in words in changes/<id>/look.md), then its technical design (design.md, each decision researched) and tasks (tasks.md, each with its test), approved by the owner in chat. Use after spec, or when asked for visual directions, mockups, a look or a technical design for a change.
+description: Design a specified change before it is built - first its look (two or three visual directions as HTML boards built on the project's design tokens, researched against current UX practice, critiqued against the style brief and an accessibility list, and shown to the owner on changes/<id>/looks.html in the harness's built-in browser; the pick committed as a board beside the spec and recorded in words in changes/<id>/look.md), then its technical design (design.md, each decision researched) and tasks (tasks.md, each with its test), approved by the owner in chat. Use after spec, or when asked for visual directions, mockups, a look or a technical design for a change.
 ---
 
 # Design a change
@@ -25,17 +25,19 @@ request. What each file holds is in its template (`templates/`).
 Skip to step 2 when nothing seen or heard changes.
 
 1. **Now.** Render each screen and state the change touches as it is today (`render`, or AGENTS.md's
-   render route), for the page of step 5 only.
+   render route), and draw it as HTML for the page of step 5: the feature's board sections where
+   it has a board, else redrawn on the tokens.
 2. **Research.** Current practice for this kind of interaction on the target platform: the
    platform's own guidelines and how two or three comparable products solve it. Three to five
    findings, each with its source.
-3. **Directions.** Two or three that differ in kind, not in polish, each an HTML board built only
-   on the tokens (by role: `var(--…)`, never a raw value) and the catalogues' components. A
-   component the catalogues lack is drawn as new, and named. Each board is self-contained: its CSS
-   inline, the custom properties it uses copied from the tokens file into its own `:root`, nothing
-   loaded from the network. Each screen and
-   state is one `<section id="<screen>-<state>">`, drawn in the default state and in the state that
-   tells the directions apart. Boards live outside the repository.
+3. **Directions.** Two or three that differ in kind, not in polish, each drawn in HTML only on the
+   tokens (by role: `var(--…)`, never a raw value) and the catalogues' components. A component the
+   catalogues lack is drawn as new, and named. They are drawn on the change's page of step 5,
+   `changes/<id>/looks.html` in the change's worktree, which is self-contained as a board is: its
+   CSS inline, the custom properties it uses copied from the tokens file into its own `:root`,
+   nothing loaded from the network or another file. Each screen and state of a direction is one
+   `<section id="<direction>-<screen>-<state>">`, drawn in the default state and in the state that
+   tells the directions apart.
 4. **Critique**, before the owner sees anything. Each direction against the brief: every principle,
    and how the reference products would do it. Then the accessibility list:
    - contrast: text 4.5:1, large text and control boundaries 3:1, in both themes;
@@ -47,19 +49,21 @@ Skip to step 2 when nothing seen or heard changes.
    - labels: every control and every meaningful image has one.
 
    Fix what fails, then critique again. What stays a trade-off goes on the page.
-5. **One page.** Show the owner one page: a local HTML file outside the repository, or the
-   harness's page or artifact tool when it has one. On it: the current state, the directions side
-   by side, each one's trade-offs against the research and the critique, and your recommended pick.
-   For sound, describe it.
+5. **One page.** The page is `changes/<id>/looks.html` in the change's worktree. On it: the current
+   state, the directions side by side, each one's trade-offs against the research and the
+   critique, and your recommended pick. For sound, describe it. Open it for the owner in the
+   harness's built-in browser, give its path, and ask for the pick through the question tool, your
+   recommended pick first.
 6. **Wait for the pick.** Nothing else happens until the owner picks, mixes, or asks for another
-   round. A mix is a new direction: draw it, critique it and show it again.
+   round. A mix is a new direction: draw it on the page, critique it and show it again.
 7. **The pick.** A board per feature, `specs/<domain>/<capability>/looks/<name>.html` (a second
-   only when one outgrows its 30720 bytes), holding every state the scenarios name as a section. The spec's
-   `## Looks` names each section the owner should see, `- looks/<name>.html#<id> — <caption>`, and
-   where the built feature can be seen, `- page: <path or URL> — <caption>`. `look.md` from
-   `templates/look.md` records the pick, the directions rejected, the critique and the
-   accessibility results in words. The directions not picked are never committed, and no image
-   file ever is.
+   only when one outgrows its 30720 bytes), self-contained as the page is, holding every state the
+   scenarios name as a `<section id="<screen>-<state>">`. The spec's `## Looks` names each section
+   the owner should see, `- looks/<name>.html#<id> — <caption>`, and where the built feature can be
+   seen, `- page: <path or URL> — <caption>`. `look.md` from `templates/look.md` records the pick,
+   the directions rejected, the critique and the accessibility results in words. `looks.html` is
+   committed with `look.md`, and goes when triage deletes the change folder: the directions not
+   picked stay only there. No image file is ever committed.
 
 ## 2. Technical design
 
@@ -83,6 +87,6 @@ Skip to step 2 when nothing seen or heard changes.
 ## 3. Commit
 
 Only after the owner's approval (a look with no technical design: after the pick), so a committed
-board, `look.md` or `design.md` is an approved one: commit on the change's branch in AGENTS.md's
-commit style (for example `docs(changes): design <id>`) and push.
+board, `looks.html`, `look.md` or `design.md` is an approved one: commit on the change's branch in
+AGENTS.md's commit style (for example `docs(changes): design <id>`) and push.
 Open no pull request. Hand over to **ship**.
