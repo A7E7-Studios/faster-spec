@@ -13,8 +13,8 @@ The board: `specs/<domain>/<capability>/looks/<name>.html`, one section per scre
 
 ## Directions rejected
 
-Each was drawn in the default state and in the state that tells the directions apart; none is
-committed.
+Each was drawn in the default state and in the state that tells the directions apart; each stays
+on `looks.html` until the change folder is deleted.
 
 - **<Direction name>**: <what it was, in a line, and why not>.
 - **<Direction name>**: <what it was, in a line, and why not>.

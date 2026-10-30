@@ -470,7 +470,7 @@ function proposalsAt(repo, rev) {
 }
 
 /** The files a change folder may hold. */
-export const CHANGE_FILES = ['proposal.md', 'look.md', 'design.md', 'tasks.md'];
+export const CHANGE_FILES = ['proposal.md', 'looks.html', 'look.md', 'design.md', 'tasks.md'];
 
 /**
  * Everything wrong with one change folder at `rev`, as [{ file, line?, message }]. A capability it
@@ -485,6 +485,10 @@ export function changeProblems(repo, rev, folder, mergeBase = rev) {
   for (const f of repo.tree(rev).files.keys()) {
     if (!f.startsWith(`${folder}/`) || CHANGE_FILES.includes(f.slice(folder.length + 1))) continue;
     out.push({ file: f, message: MEDIA.test(f) ? MEDIA_MESSAGE : `stray file: a change folder holds only ${CHANGE_FILES.join(', ')}` });
+  }
+  // The directions page: self-contained, as a board is.
+  for (const n of networkLoads(repo.text(rev, `${folder}/looks.html`) ?? '')) {
+    out.push({ file: `${folder}/looks.html`, line: n.line, message: `loads ${n.url} from outside the page: the directions page is self-contained, its CSS inline and nothing loaded from the network or another file` });
   }
   const text = repo.text(rev, proposal);
   if (text === null) {

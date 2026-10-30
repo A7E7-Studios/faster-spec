@@ -14,21 +14,22 @@ each feature's spec ([specs/README.md](../specs/README.md#review)). Living docs 
 | Path | Required | What |
 |---|---|---|
 | `changes/<change-id>/proposal.md` | yes | the requirements, where the owner reviews it, the settled questions, the calls for the owner, what is out of scope ([template](../.agents/skills/spec/templates/proposal.md)) |
+| `changes/<change-id>/looks.html` | no | the directions page: the current state, the directions side by side, each one's trade-offs against the research and the critique, and the recommended pick; one self-contained HTML file, as a board is (its CSS inline, nothing loaded from the network or another file) |
 | `changes/<change-id>/look.md` | no | the visual design picked, in words ([template](../.agents/skills/design/templates/look.md)) |
 | `changes/<change-id>/design.md` | no | the technical design ([template](../.agents/skills/design/templates/design.md)); committed only once the owner approved it |
 | `changes/<change-id>/tasks.md` | no | the tasks, each with the test that proves it ([template](../.agents/skills/design/templates/tasks.md)) |
 
 - **Nothing else.** `changes/` holds this `README.md` and change folders, and a change folder holds
-  only the files above: no images, recordings, clips or frames. The design directions are HTML
-  boards shown to the owner and never committed; the board picked lands beside the spec
-  ([Looks](../specs/README.md#looks)).
+  only the files above: no images, recordings, clips or frames. The board picked lands beside the
+  spec ([Looks](../specs/README.md#looks)).
 - **Ids.** A change id is kebab-case, `^[a-z0-9]+(-[a-z0-9]+)*$`, named for the behaviour
   (`offline-banner-delay`), and free both on main and as a branch.
 - **Across repositories.** A change that spans repositories has the same change id in each, and a
   folder in each that names that repository's own capabilities. A repository without `specs/` has
   no folder: its side is an ordinary pull request there, which `design.md` names and the owner
   merges, never an agent.
-- **Size.** At most 30720 bytes per `.md`.
+- **Size.** At most 30720 bytes per `.md`; `looks.html` has no budget of its own, since it goes with
+  the folder.
 - **Restricted material** (what AGENTS.md marks restricted) never enters a change folder.
 
 ## proposal.md
@@ -68,10 +69,10 @@ triage can batch the reviews that need the same setup.
 
 1. **Spec.** The spec skill writes `proposal.md` and the spec edits on the change's branch, in its
    own worktree.
-2. **Design**, when something seen or heard changes or the work needs a plan. The design skill adds
-   `look.md` and the picked board once the owner has picked a direction, then `design.md` and
-   `tasks.md` once the owner has approved them in chat. Neither step gets a pull request of its
-   own.
+2. **Design**, when something seen or heard changes or the work needs a plan. The design skill
+   shows the owner the directions on `looks.html` and adds it, `look.md` and the picked board once
+   the owner has picked a direction, then `design.md` and `tasks.md` once the owner has approved
+   them in chat. Neither step gets a pull request of its own.
 3. **Ship.** The ship skill builds the change on the same branch, sets every feature the change
    names to `review: unreviewed`, and merges the code, the spec edits and the change folder in one
    pull request once the gate, the suites and an independent review are clean. A pull request

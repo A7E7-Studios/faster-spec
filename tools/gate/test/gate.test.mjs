@@ -311,7 +311,7 @@ test('review: a triage PR sets review alone, shown as a notice; PROOF, code and 
 
 // --- changes ---------------------------------------------------------------------------------
 
-test('changes: a folder without proposal.md, a bad id, bad front matter, a missing capability, a stray file', (t) => {
+test('changes: a folder without proposal.md, a bad id, bad front matter, a missing capability, a stray file, a directions page that loads from outside', (t) => {
   const r = setup(t);
   r.branch('x').write({
     'changes/no-proposal/look.md': '# Look\n',
@@ -320,11 +320,14 @@ test('changes: a folder without proposal.md, a bad id, bad front matter, a missi
     'changes/gone-cap/proposal.md': proposalText({ capabilities: ['collaboration/shared-cursors', 'layout/pages'] }),
     'changes/full/proposal.md': proposalText(),
     'changes/full/look.md': '# Look\n',
+    'changes/full/looks.html': '<!doctype html><style>:root { --ink: #222; }</style><section id="now"><svg viewBox="0 0 8 8"><rect width="8" height="8" fill="var(--ink)"/></svg></section>\n',
     'changes/full/design.md': '# Design\n',
     'changes/full/tasks.md': '- [ ] 1.1 x; test: y\n',
     'changes/full/notes.txt': 'x\n',
     'changes/full/evidence/notes.md': 'x\n',
     'changes/loose.md': 'x\n',
+    'changes/net/proposal.md': proposalText(),
+    'changes/net/looks.html': '<!doctype html>\n<link rel="stylesheet" href="https://cdn.example/x.css">\n',
   });
   r.commit('docs: changes');
   const rep = gate(r);
@@ -335,9 +338,10 @@ test('changes: a folder without proposal.md, a bad id, bad front matter, a missi
   assert.match(msgs, /unknown front matter key "review"/);
   assert.match(msgs, /capability layout\/pages has no specs\/layout\/pages\/spec\.md/);
   assert.match(msgs, /changes\/loose\.md: stray file: a change is a folder/);
-  assert.match(msgs, /changes\/full\/notes\.txt: stray file: a change folder holds only proposal\.md, look\.md, design\.md, tasks\.md/);
+  assert.match(msgs, /changes\/full\/notes\.txt: stray file: a change folder holds only proposal\.md, looks\.html, look\.md, design\.md, tasks\.md/);
   assert.match(msgs, /changes\/full\/evidence\/notes\.md: stray file: a change folder holds only/);
-  assert.equal(fails(rep, 'changes').filter((f) => f.file?.startsWith('changes/full/')).length, 2, msgs);
+  assert.equal(fails(rep, 'changes').filter((f) => f.file?.startsWith('changes/full/')).length, 2, `a self-contained looks.html is no stray file:\n${msgs}`);
+  assert.match(msgs, /changes\/net\/looks\.html:2 loads https:\/\/cdn\.example\/x\.css from outside the page: the directions page is self-contained/);
 });
 
 test('changes: deleting a capability a pending change names fails; the change\'s own older problems are information', (t) => {
