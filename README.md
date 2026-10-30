@@ -22,6 +22,7 @@ no dependencies; a project takes them as a vendored copy pinned by a lock.
 | **Four skills**, `.agents/skills/` | `spec` settles the requirements in rounds of questions; `design` draws two or three directions as HTML boards and the technical design; `ship` builds on the code that is there, tests, gates, gets a fresh agent's review and merges; `triage` turns the owner's review (notes, or a [CueReview](https://github.com/A7E7-Studios/cue-review) recording) into verdicts and new changes. Claude Code and Codex read the same files |
 | **The gate**, `tools/gate/` | a deterministic check of form on every pull request: spec and change formats, the review reset, no images, living docs free of history, byte budgets, links, the nearest README, the PR description, the design contract, the kit copy, and the protected paths only the owner merges. [Its README](tools/gate/README.md) |
 | **The overview**, `tools/overview/` | one JSON index (and a plain-text summary) of every feature, its systems, scenarios and tests, review state, the change folders and the components, across repositories. [Its README](tools/overview/README.md) |
+| **The Solution map**, `tools/solution-map/` | a local web page over the overview, on 127.0.0.1: what waits for the owner's review, every feature by domain or by system with its Looks and tests, and Start review, which opens CueReview to record the review. [Its README](tools/solution-map/README.md) |
 | **The house style**, `tools/design/` | a starter design system: tokens and a style brief the design skill works from. [Its README](tools/design/README.md) |
 
 What stays each project's own: its `AGENTS.md` (the rules, the build route, the suites, the commit
@@ -47,8 +48,9 @@ Then, in the project:
 
 1. **Config.** In `tools/gate/config.json`, name the project's vendored folders under `ignore`, any
    owner-only paths under `protectedPaths`, its `overview.componentMarkers` when its components
-   are not README, `package.json`, `pyproject.toml`, Gradle or Unity folders, and its `design`
-   contract (the starter points at the house style).
+   are not README, `package.json`, `pyproject.toml`, Gradle or Unity folders, its `design`
+   contract (the starter points at the house style), and under `solutionMap.repos` every
+   repository of the solution, so `node tools/solution-map/solution-map.mjs` opens them all.
 2. **Domains and systems.** Write `specs/domains.json`, `[{ "id", "title", "purpose" }]`: the few
    areas the product's features fall into; and `specs/systems.json`, `[{ "id", "title",
    "purpose", "paths" }]`: the parts that run on their own.
@@ -89,7 +91,7 @@ is merged by the owner.
 | `tools/kit/` | the sync command; `lock.json` in a project | yes, but `lock.json` |
 | `tools/setup-agents/` | links the skills for Claude Code | yes |
 | `tools/design/` | the house style: tokens and a style brief | yes |
-| `tools/solution-map/` | reserved: the local web viewer over the overview's JSON | yes, once it exists |
+| `tools/solution-map/` | the Solution map, the local page over the overview | yes |
 | `kit.json` | what the kit owns, what stays each project's, the starters | no |
 | `AGENTS.md`, `specs/domains.json`, `specs/systems.json`, `specs/<domain>/`, `changes/<id>/`, `tools/gate/config.json` | this repository's own workflow, run on itself | no |
 

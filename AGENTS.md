@@ -18,7 +18,6 @@ read this file natively.
   `LICENSE`, `specs/domains.json`, `specs/systems.json`, the specs and the changes, and `tools/gate/config.json`.
 - The tests run on `tools/gate/config.template.json`, never on a project's config, so they hold in
   every project that carries the kit.
-- `tools/solution-map/` is reserved for the local web viewer over the overview's JSON.
 
 ## Quality gate
 
@@ -29,6 +28,7 @@ cd tools/gate && npm test
 cd tools/overview && npm test
 cd tools/kit && npm test
 cd tools/setup-agents && npm test
+cd tools/solution-map && npm test
 node tools/gate/gate.mjs --local
 ```
 
@@ -49,7 +49,7 @@ The workflow is the one the kit ships: [specs/README.md](specs/README.md),
 |---|---|
 | Where the owner reviews | at a desk: a tool's output at a computer, a gate run on GitHub |
 | A build | a commit of this repository: `build <short sha>`, its commit that sha |
-| Looks | none: the kit draws nothing, so its specs have no `## Looks` and it has no `design` block |
+| Looks | only the Solution map draws a page: its spec's board, `specs/overview/solution-map/looks/`, drawn from the page's own views; the other specs have no `## Looks`, and the kit has no `design` block |
 | The other repository | none; a project that carries the kit is no side of a kit change |
 
 - **Every behaviour change carries a change folder** and edits the living spec in the same pull
