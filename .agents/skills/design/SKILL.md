@@ -1,6 +1,6 @@
 ---
 name: design
-description: Design a specified change before it is built - first its look (two or three visual directions as HTML boards built on the project's design tokens, researched against current UX practice, critiqued against the style brief and an accessibility list, and shown to the owner on changes/<id>/looks.html in the harness's built-in browser; the pick committed as a board beside the spec and recorded in words in changes/<id>/look.md), then its technical design (design.md, each decision researched) and tasks (tasks.md, each with its test), approved by the owner in chat. Use after spec, or when asked for visual directions, mockups, a look or a technical design for a change.
+description: Design a specified change before it is built - first its look (two or three visual directions drawn in HTML on the project's design tokens, researched against current UX practice, critiqued against the style brief and an accessibility list, and shown to the owner on changes/<id>/looks.html in the harness's built-in browser; the pick committed as a board beside the spec and recorded in words in changes/<id>/look.md), then its technical design (design.md, each decision researched) and tasks (tasks.md, each with its test), approved by the owner in chat. Use after spec, or when asked for visual directions, mockups, a look or a technical design for a change.
 ---
 
 # Design a change
@@ -52,8 +52,8 @@ Skip to step 2 when nothing seen or heard changes.
 5. **One page.** The page is `changes/<id>/looks.html` in the change's worktree. On it: the current
    state, the directions side by side, each one's trade-offs against the research and the
    critique, and your recommended pick. For sound, describe it. Open it for the owner in the
-   harness's built-in browser, give its path, and ask for the pick through the question tool, your
-   recommended pick first.
+   harness's built-in browser, give its path, and ask for the pick as the technical design's
+   Questions step asks, your recommended pick first.
 6. **Wait for the pick.** Nothing else happens until the owner picks, mixes, or asks for another
    round. A mix is a new direction: draw it on the page, critique it and show it again.
 7. **The pick.** A board per feature, `specs/<domain>/<capability>/looks/<name>.html` (a second
@@ -87,6 +87,6 @@ Skip to step 2 when nothing seen or heard changes.
 ## 3. Commit
 
 Only after the owner's approval (a look with no technical design: after the pick), so a committed
-board, `looks.html`, `look.md` or `design.md` is an approved one: commit on the change's branch in
-AGENTS.md's commit style (for example `docs(changes): design <id>`) and push.
+board, `look.md` or `design.md` is an approved one: commit on the change's branch in AGENTS.md's
+commit style (for example `docs(changes): design <id>`) and push.
 Open no pull request. Hand over to **ship**.

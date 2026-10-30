@@ -320,7 +320,7 @@ test('changes: a folder without proposal.md, a bad id, bad front matter, a missi
     'changes/gone-cap/proposal.md': proposalText({ capabilities: ['collaboration/shared-cursors', 'layout/pages'] }),
     'changes/full/proposal.md': proposalText(),
     'changes/full/look.md': '# Look\n',
-    'changes/full/looks.html': '<!doctype html><style>:root { --ink: #222; }</style><section id="now"><img src="data:image/png;base64,AAAA" alt=""></section>\n',
+    'changes/full/looks.html': '<!doctype html><style>:root { --ink: #222; }</style><section id="now"><svg viewBox="0 0 8 8"><rect width="8" height="8" fill="var(--ink)"/></svg></section>\n',
     'changes/full/design.md': '# Design\n',
     'changes/full/tasks.md': '- [ ] 1.1 x; test: y\n',
     'changes/full/notes.txt': 'x\n',

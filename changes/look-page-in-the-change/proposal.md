@@ -33,7 +33,7 @@ built-in browser or file pane. Every agent app the owner works in has a built-in
 
 ## Review
 
-At a desk: read the design skill's steps 1 and 7, `changes/README.md` and the Looks section of
+At a desk: read the design skill's steps 1, 3, 5 and 7, `changes/README.md` and the Looks section of
 `specs/README.md`; then run the design skill on a change in a project that carries the kit and
 open its `looks.html` in the agent app's built-in browser.
 
@@ -65,5 +65,7 @@ open its `looks.html` in the agent app's built-in browser.
 ## Out of scope
 
 - A check that the page renders (Q2).
+- The triage skill's to-review checklist, which goes out in chat or as a local page outside the
+  repository: a different page, which a change of its own may route the same way.
 - Updating the projects that carry the kit: each takes this on its next sync, with nothing to
   change in its config.

@@ -32,7 +32,7 @@ every other review artefact lives elsewhere or nowhere.
 #### Scenario: The directions page is self-contained
 - **WHEN** a change folder's `looks.html` loads a stylesheet from `https://…`
 - **THEN** the gate fails and names the line
-- **AND** a page with its CSS inline and only `data:` URLs passes
+- **AND** a page with its CSS and its drawing inline passes
 - **PROOF** test: tools/gate/test/gate.test.mjs::changes: a folder without proposal.md, a bad id, bad front matter, a missing capability, a stray file, a directions page that loads from outside
 
 #### Scenario: An old review key fails

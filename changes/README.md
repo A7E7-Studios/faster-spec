@@ -20,10 +20,8 @@ each feature's spec ([specs/README.md](../specs/README.md#review)). Living docs 
 | `changes/<change-id>/tasks.md` | no | the tasks, each with the test that proves it ([template](../.agents/skills/design/templates/tasks.md)) |
 
 - **Nothing else.** `changes/` holds this `README.md` and change folders, and a change folder holds
-  only the files above: no images, recordings, clips or frames. The design directions reach the
-  owner on `looks.html`, opened in the harness's built-in browser; the page is committed with
-  `look.md` once the owner has picked and goes with the folder, and the board picked lands beside
-  the spec ([Looks](../specs/README.md#looks)).
+  only the files above: no images, recordings, clips or frames. The board picked lands beside the
+  spec ([Looks](../specs/README.md#looks)).
 - **Ids.** A change id is kebab-case, `^[a-z0-9]+(-[a-z0-9]+)*$`, named for the behaviour
   (`offline-banner-delay`), and free both on main and as a branch.
 - **Across repositories.** A change that spans repositories has the same change id in each, and a
@@ -72,9 +70,10 @@ triage can batch the reviews that need the same setup.
 1. **Spec.** The spec skill writes `proposal.md` and the spec edits on the change's branch, in its
    own worktree.
 2. **Design**, when something seen or heard changes or the work needs a plan. The design skill
-   shows the owner the directions on `looks.html` and adds it, `look.md` and the picked board once
-   the owner has picked a direction, then `design.md` and `tasks.md` once the owner has approved
-   them in chat. Neither step gets a pull request of its own.
+   shows the owner the directions on `looks.html`, opened in the harness's built-in browser, and
+   adds it, `look.md` and the picked board once the owner has picked a direction, then `design.md`
+   and `tasks.md` once the owner has approved them in chat. Neither step gets a pull request of its
+   own.
 3. **Ship.** The ship skill builds the change on the same branch, sets every feature the change
    names to `review: unreviewed`, and merges the code, the spec edits and the change folder in one
    pull request once the gate, the suites and an independent review are clean. A pull request

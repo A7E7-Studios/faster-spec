@@ -45,15 +45,15 @@ to choosing between sound directions, not to finding contrast errors.
 ### Requirement: The owner picks from one page in the change folder
 When the design skill shows the owner its directions, it SHALL draw them on the change's page,
 `changes/<id>/looks.html`, open it in the harness's built-in browser with its path given and ask
-for the pick through the question tool, because a page inside the change's worktree opens beside
-the conversation in any agent app, where the owner can compare the directions.
+for the pick as it asks the owner a question, because a page inside the change's worktree opens
+beside the conversation in any agent app, where the owner can compare the directions.
 
 #### Scenario: The owner picks from the page in the built-in browser
 - **WHEN** the design skill has critiqued its directions
 - **THEN** `changes/<id>/looks.html` holds the current state, the directions side by side, each
   one's trade-offs against the research and the critique, and the recommended pick
 - **AND** the page is open in the harness's built-in browser, its path given, and the pick is
-  asked through the question tool
+  asked as a question to the owner, through the harness's question tool when it has one
 
 #### Scenario: The page lands with the pick and leaves with the folder
 - **WHEN** the owner has picked a direction
