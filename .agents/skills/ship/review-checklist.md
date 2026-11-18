@@ -7,8 +7,8 @@ comments. Return your findings as text, in the form under Output.
 
 The lead gives you: the worktree path at the pull request's head, the pull request number (both
 numbers for a change across repositories), the change id (or `none`). From round 2 also: the
-previous round's findings, how each was resolved (fixed in a commit, or answered with a reason),
-and the head you last reviewed.
+previous round's findings and follow-ups, how each was resolved (fixed, or answered with a
+reason), and the head you last reviewed.
 
 ## Read
 
@@ -74,9 +74,10 @@ and the head you last reviewed.
 **Process**
 
 12. **Tests were run.** `## Tests` lists the suites AGENTS.md names for what changed, each with its
-    result and commit; no commit after that changes code. A failing suite is a blocker, unless the
-    same test also fails on `origin/main` and `## Tests` records main's result (pre-existing). A
-    triage result needs the gate alone.
+    result, and the head they ran on; no commit after that changes code. A failing suite is a
+    blocker, unless the same test also fails on `origin/main` and `## Tests` records main's result
+    (pre-existing). A triage result needs the gate alone. From round 2 a record older than head is
+    no finding; ship §6.4 checks it at merge.
 13. **The change folder** has valid front matter, a `## Review` saying what the owner looks at and
     where, and every task ticked as the tasks template says.
 14. **The pull request body** has `## What and why`, `## Change`, `## Reuse`, `## Tests`,
@@ -96,12 +97,16 @@ proves.
 | `minor` | correct but incomplete or unclear; code that could share more with what exists |
 | `nit` | a small wording or naming fix |
 
+Only a `blocker` or a `major` fails a round. A `minor` or a `nit` is a follow-up: the lead fixes or
+answers it without another round, unless its fix changes code (ship §5.4).
+
 ## Round 2 and later
 
-- Each previous finding, with its id: `resolved` (the fix holds, or the answer is right) or `open`,
-  with why.
-- Review all of `git diff <head last reviewed>..HEAD`, and the whole change again wherever the
-  fixes reach.
+- Each previous finding and follow-up, with its id: `resolved` (the fix holds, or the answer is
+  right) or `open`, with why.
+- Review `git diff <head last reviewed>..HEAD`: each fix holds, and nothing it touches broke
+  (code, its tests, and the spec, README and comment lines that describe it). On unchanged code
+  raise only a `blocker` or `major`.
 - A new finding takes the next free id.
 
 ## Output
@@ -112,11 +117,15 @@ Round: <n>
 Head: <sha>
 
 Findings
-F1 [blocker|major|minor|nit] <file>:<line> - <what is wrong and what fixes it, at most two sentences, citing the scenario or rule>
+F1 [blocker|major] <file>:<line> - <what is wrong and what fixes it, at most two sentences, citing the scenario or rule>
+
+Follow-ups
+F2 [minor|nit] <file>:<line> - <the same form>
 
 Previous findings
 F1 resolved - <why>
 F2 open - <why>
 ```
 
-`pass` only when no finding of any severity is open. Write `Findings: none` when there are none.
+`pass` when no `blocker` or `major` is open; list `minor` and `nit` under `Follow-ups`, which never
+fail a verdict. Write `Findings: none` or `Follow-ups: none` for an empty list.
