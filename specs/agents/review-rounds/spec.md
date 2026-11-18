@@ -11,9 +11,9 @@ code:
 
 Before an agent merges a change, fresh reviewers read it in rounds. Only a blocker or a major
 finding sends the change into another round; a minor finding or a nit is fixed or answered on the
-way to the merge. After the first round a reviewer checks the fixes, not the whole change again,
-and the builder checks its own work before the first round, so a change normally takes two rounds,
-and a third only when the second finds a blocker or a major.
+way to the merge, and its fix gets one more round only when it changes code. After the first round
+a reviewer checks the fixes, not the whole change again, and the builder checks its own work before
+the first round, so the review ends once no blocker or major is left.
 
 ## Requirements
 

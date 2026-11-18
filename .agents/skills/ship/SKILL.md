@@ -96,7 +96,7 @@ A change with a side in the other repository: open both pull requests, each link
    answer its follow-ups without another round, with one exception. When those fixes changed code
    (more than docs, comments or wording), one more round reviews them. Passing, it ends the review
    the same way, its own follow-ups fixed or answered without a further round; failing, the rounds
-   go on.
+   go on, up to step 5's stop.
 5. A `blocker` or `major` still open after round 3: stop, list each open finding for the owner, do
    not merge.
 

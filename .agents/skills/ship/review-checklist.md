@@ -98,7 +98,7 @@ proves.
 | `nit` | a small wording or naming fix |
 
 Only a `blocker` or a `major` fails a round. A `minor` or a `nit` is a follow-up: the lead fixes or
-answers it without another round.
+answers it without another round, unless its fix changes code (ship §5.4).
 
 ## Round 2 and later
 
