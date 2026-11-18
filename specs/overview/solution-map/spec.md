@@ -22,7 +22,18 @@ request, and whenever you want to see what the product does.
 - looks/solution-map.html#waiting — Waiting for you, a feature in review open
 - looks/solution-map.html#explore-system — Explore by system, an approved feature open
 - looks/solution-map.html#banners — A repository that cannot be fetched and one that is missing
+- looks/backlog.html#waiting-requests — Waiting for you, new requests beside the features
+- looks/backlog.html#backlog-board — The backlog's board, one draft card
+- looks/backlog.html#backlog-empty — No requests yet
+- looks/backlog.html#request-open — A request open in its dialog
+- looks/backlog.html#request-narrow — The dialog on a narrow screen
+- looks/backlog.html#request-new — A new request from Suggest a change
+- looks/backlog.html#feature-requests — A feature with its open requests
+- looks/backlog-drafts.html#drafts-unsent — The unsent drafts and Submit
+- looks/backlog-drafts.html#submit-clash — A draft held after Submit, both values shown
+- looks/backlog-drafts.html#submit-unreachable — Submit could not reach the backlog
 - page: http://127.0.0.1:7317/ — The map itself, once the command runs
+- page: http://127.0.0.1:7317/backlog — The backlog's board, once the command runs
 
 ## Requirements
 

@@ -9,18 +9,28 @@ code:
 ## Summary
 
 A way for people who are not developers to open the Solution map with a double-click. One setup
-command, run once, checks that Git and Node are there, makes a copy of the repository without any
-working files, and puts a shortcut on the computer. The shortcut always runs the newest map from
+command, run once, checks that Git and Node are there, makes copies of the project's repositories
+without any working files, and puts a shortcut on the computer. The shortcut always runs the newest map from
 main, so nobody pulls or updates anything, and when a newer map lands while it runs, a banner
 offers a restart. You meet it when you raise or discuss requests without working in the code.
+
+## Looks
+
+- looks/launcher.html#restart-update — Restart to update, a newer map on main
 
 ## Requirements
 
 ### Requirement: One setup command prepares the computer
 When a person runs the setup command their project gives, the launcher SHALL check for Git and
-Node 22 or later, ask for a git name and email when none is set, make a clone of the repository with
-no working files and add a shortcut for this system, because a person who is not a developer gets
-the map without a developer's setup.
+Node 22 or later, ask for a git name and email when none is set, clone each of the project's
+repositories that its config gives an address for, with no working files, and add a shortcut for
+this system, because a person who is not a developer gets the map without a developer's setup.
+
+#### Scenario: A developer prints the setup command
+- **WHEN** a developer runs `node tools/solution-map/launcher/setup.mjs --print-command`
+- **THEN** one command per system prints, ready to paste, that checks Git and Node, clones the
+  backlog's repository without working files and runs setup from it
+- **PROOF** test: tools/solution-map/test/launcher.test.mjs::print-command prints one setup command per system
 
 #### Scenario: Something missing stops setup and says what to install
 - **GIVEN** Git, or Node 22 or later, is missing
@@ -35,10 +45,11 @@ the map without a developer's setup.
 - **THEN** it asks for them and sets them for git
 - **PROOF** test: tools/solution-map/test/launcher.test.mjs::setup asks for a git name and email when none is set
 
-#### Scenario: Setup makes a clone with no working files
+#### Scenario: Setup clones each repository with no working files
 - **WHEN** setup finishes
-- **THEN** the clone holds the repository's history and no working files
-- **PROOF** test: tools/solution-map/test/launcher.test.mjs::setup makes a clone with no working files
+- **THEN** each repository the config gives an address for is cloned, side by side as the config
+  lays them out, holding its history and no working files
+- **PROOF** test: tools/solution-map/test/launcher.test.mjs::setup clones each repository with no working files
 
 #### Scenario: The shortcut fits the system
 | System | Shortcut |

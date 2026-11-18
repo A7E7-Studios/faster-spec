@@ -46,8 +46,8 @@ the map for people who are not developers.
   shows what is unsent; Drafts survive a restart; Submit sends every draft as one commit; A
   clashing draft stays unsent with both values; Submit without the network keeps the drafts; Only
   the map's own page can write).
-- One setup command and a shortcut on Windows, macOS and Linux run the newest map from main, with
-  Restart to update (the Map launcher's scenarios).
+- A printed setup command and a shortcut on Windows, macOS and Linux run the newest map from main,
+  with Restart to update (the Map launcher's scenarios).
 
 ## Review
 
@@ -86,6 +86,17 @@ map change to main and press Restart to update. Judge the views against the boar
 - **Q11 Summary**: the owner confirmed the requirements, and asked how notes are stored (Q12).
 - **Q12 Notes**: one file per request, notes appended to it; every write replays onto the latest
   commit, so appends never clash. Rejected: one file per note.
+- **Q13 Look**: the board; a request opens the way established task tools open an item from a
+  board, not in a side sheet (the owner's words: "I would actually go with the board approach for
+  this one. Not sure about a side panel for the details of a task. I would rather follow best
+  practices from Jira or other task tools"). Rejected: a third tab with a list and detail pane; a
+  board with a side sheet; a conversation thread.
+- **Q14 Look D**: the board with a centred two-column request dialog, as drawn, with everything
+  not strictly needed removed from view ("Simple, clean, minimal"). Rejected: changes to D.
+- **Q15 Repositories**: each `solutionMap.repos` entry may carry its clone address; setup clones
+  every one that does. Rejected: setup clones only the backlog's repository.
+- **Q16 Setup command**: `setup.mjs --print-command` prints one command per system for a project's
+  README or a message. Rejected: steps in the README.
 
 ## Calls for the owner
 
