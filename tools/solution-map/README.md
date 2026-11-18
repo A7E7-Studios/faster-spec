@@ -2,8 +2,8 @@
 
 A local web page over the [overview](../overview/README.md)'s index: what waits for the owner's
 review, every feature by domain or by the system it ships in, and how well each is tested. It
-serves on 127.0.0.1 only, deploys nothing and writes nothing. What it does for a person:
-[its spec](../../specs/overview/solution-map/spec.md).
+serves on 127.0.0.1 only, deploys nothing and writes nothing. What it does for a person: the
+kit's spec `overview/solution-map`.
 
 No npm dependencies; Node 22 or later. It reads the overview's JSON **version 3** only.
 
