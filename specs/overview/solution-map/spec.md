@@ -8,11 +8,14 @@ code:
 
 ## Summary
 
-A local web page over the overview's index: what waits for the owner's review, every feature by
-domain or by the system it ships in, and how well each is tested. One command on the owner's
-computer fetches the repositories, builds the index and opens the page; nothing is deployed and
-the page writes nothing. From a feature, Start review opens CueReview to record the review. You
-meet it before a review and whenever you want to see what the product does.
+A local web page over the overview's index and the backlog: what waits for the owner (features to
+review and new requests), every feature by domain or by the system it ships in, how well each is
+tested, and the requests people raise. One command on the owner's computer fetches the
+repositories, builds the index and opens the page; nothing is deployed. From a feature, Start
+review opens CueReview to record the review, and Suggest a change starts a request about it. What
+people write on the page waits as drafts until they press Submit, which sends it to the backlog's
+branch, the only thing the map writes. You meet it before a review, when you raise or discuss a
+request, and whenever you want to see what the product does.
 
 ## Looks
 
@@ -41,7 +44,8 @@ address only, because the map shows unreleased work and needs no sign-in or depl
 
 ### Requirement: The map shows main as it is now
 When the page opens or the owner presses Refresh, the Solution map SHALL fetch every repository
-again and rebuild the map, because a review judged on an old main misses what just landed.
+and the backlog's branch again and rebuild the map, because a review judged on an old main misses
+what just landed, and a discussion read from an old backlog misses what was just said.
 
 #### Scenario: Refresh shows what landed since the page opened
 - **GIVEN** a change lands on a repository's main after the page opened
@@ -49,9 +53,22 @@ again and rebuild the map, because a review judged on an old main misses what ju
 - **THEN** the map shows the change
 - **PROOF** test: tools/solution-map/test/server.test.mjs::Refresh fetches again and rebuilds the map
 
+#### Scenario: Refresh shows what others sent to the backlog
+- **GIVEN** someone else submits an item or a note after the page opened
+- **WHEN** a person presses Refresh
+- **THEN** the map shows it
+- **PROOF** test: tools/solution-map/test/server.test.mjs::Refresh shows what others sent to the backlog
+
 ### Requirement: What waits for the owner comes first
 The Solution map SHALL open on "Waiting for you": every feature whose review is not `approved`,
-newest change first, because the owner's next step is to review them.
+newest change first, and every request in New, because the owner's next step is to review the one
+and discuss the other.
+
+#### Scenario: New requests wait beside the features
+- **GIVEN** the backlog holds items in New
+- **WHEN** the map opens
+- **THEN** Waiting for you lists them beside the features, newest first, each with who asked
+- **PROOF** test: tools/solution-map/test/backlog.test.mjs::new requests wait beside the features, newest first
 
 #### Scenario: The queue holds every feature not approved, newest change first
 - **WHEN** the map opens
@@ -74,7 +91,7 @@ newest change first, because the owner's next step is to review them.
 - **PROOF** test: tools/solution-map/test/view.test.mjs::start review says what to say at the start of the take
 
 #### Scenario: Nothing waits
-- **GIVEN** every feature is `approved`
+- **GIVEN** every feature is `approved` and no request is in New
 - **WHEN** the map opens
 - **THEN** it says nothing waits, and names the scenarios that have no test
 - **PROOF** test: tools/solution-map/test/view.test.mjs::nothing waiting says so and points at untested scenarios
@@ -101,6 +118,93 @@ by what it does and by what ships.
 - **THEN** its Summary, its Looks, the systems it ships in and its code show, with its
   requirements and scenarios folded away, and each scenario with its test
 - **PROOF** test: tools/solution-map/test/view.test.mjs::an approved feature folds its behaviour away
+
+### Requirement: The backlog has a view of its own
+The Solution map SHALL show the backlog's items grouped by the state each shows, Done and Parked
+only behind a filter, and open an item with its request, its notes, the features it names and the
+changes it led to, because people follow a request from its first note to the feature it became.
+
+#### Scenario: Items show by state
+- **WHEN** a person opens Backlog
+- **THEN** the items in New, Discussing, Ready, In progress and To review show, grouped by state,
+  and those in Done or Parked only once their filter is on
+- **PROOF** test: tools/solution-map/test/backlog.test.mjs::items show by state, done and parked behind a filter
+
+#### Scenario: An item shows what became of it
+- **WHEN** a person opens an item
+- **THEN** its request, its notes in order, the features it names and each change it led to, with
+  that change's state, show
+- **PROOF** test: tools/solution-map/test/view.test.mjs::an item shows its notes, its features and its changes
+
+#### Scenario: A person adds a request
+- **WHEN** a person fills in a title, what happens, what should happen and where, picks the
+  features it is about, and saves
+- **THEN** the request shows as a draft in New
+- **PROOF** test: tools/solution-map/test/backlog.test.mjs::a request added on the page is a draft in new
+
+#### Scenario: The backlog's branch does not exist yet
+- **GIVEN** nobody has written to the backlog
+- **WHEN** a person opens Backlog
+- **THEN** it says there are no requests yet and how to add the first
+- **PROOF** test: tools/solution-map/test/view.test.mjs::an empty backlog says how to add the first request
+
+### Requirement: A feature shows the requests about it
+The Solution map SHALL list on each feature the requests that name it and are not Done, and offer
+Suggest a change, which starts a draft request naming that feature, because people comment on a
+feature where they read it.
+
+#### Scenario: A feature lists its open requests
+- **GIVEN** requests name a feature, some of them Done
+- **WHEN** a person opens the feature
+- **THEN** the requests not Done show, each with its state and a link to it
+- **PROOF** test: tools/solution-map/test/backlog.test.mjs::a feature lists the requests about it that are not done
+
+#### Scenario: Suggest a change starts a request about the feature
+- **WHEN** a person presses Suggest a change on a feature
+- **THEN** a new request opens with that feature already named
+- **PROOF** test: tools/solution-map/test/view.test.mjs::suggest a change starts a request naming the feature
+
+### Requirement: What people write waits until they submit it
+When a person adds a request, writes a note, edits a request or moves one, the Solution map SHALL
+keep it as a draft on this computer, show how many drafts are unsent on every view, and send every
+draft as one commit to the backlog's branch when the person presses Submit, because a person reads
+what they wrote before others see it, and nothing is lost when the page closes.
+
+#### Scenario: Every view shows what is unsent
+- **GIVEN** a person has unsent drafts
+- **WHEN** they open any view
+- **THEN** the number of unsent drafts and Submit show
+- **PROOF** test: tools/solution-map/test/view.test.mjs::every view shows the unsent drafts and submit
+
+#### Scenario: Drafts survive a restart
+- **GIVEN** a person has unsent drafts
+- **WHEN** the page closes and the map starts again
+- **THEN** the drafts are there, still unsent
+- **PROOF** test: tools/solution-map/test/server.test.mjs::drafts survive a restart of the map
+
+#### Scenario: Submit sends every draft as one commit
+- **WHEN** a person presses Submit
+- **THEN** one commit on the backlog's branch holds every draft, named by the person and what it
+  did, and nothing is left unsent
+- **PROOF** test: tools/solution-map/test/server.test.mjs::submit sends every draft as one commit
+
+#### Scenario: A clashing draft stays unsent with both values
+- **GIVEN** someone changed a field of a request after a person's draft changed it too
+- **WHEN** the person presses Submit
+- **THEN** the other drafts are sent, and that draft stays unsent showing both values, for the
+  person to apply again or drop
+- **PROOF** test: tools/solution-map/test/server.test.mjs::a clashing draft stays unsent with both values
+
+#### Scenario: Submit without the network keeps the drafts
+- **GIVEN** the backlog's repository cannot be reached
+- **WHEN** a person presses Submit
+- **THEN** every draft stays unsent, and a banner says the backlog could not be reached
+- **PROOF** test: tools/solution-map/test/server.test.mjs::submit without the network keeps every draft
+
+#### Scenario: Only the map's own page can write
+- **WHEN** a request to write a draft or to submit comes from any other page
+- **THEN** it is refused, and nothing is kept or sent
+- **PROOF** test: tools/solution-map/test/server.test.mjs::a write from another page is refused
 
 ### Requirement: Looks are drawn from the repository
 The Solution map SHALL draw a board line from the board's section with that id, and show a page
