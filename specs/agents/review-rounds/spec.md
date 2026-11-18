@@ -13,7 +13,8 @@ Before an agent merges a change, fresh reviewers read it in rounds. Only a block
 finding sends the change into another round; a minor finding or a nit is fixed or answered on the
 way to the merge, and its fix gets one more round only when it changes code. After the first round
 a reviewer checks the fixes, not the whole change again, and the builder checks its own work before
-the first round, so the review ends once no blocker or major is left.
+the first round. The review ends once no blocker or major is left and no follow-up fix that changes
+code is still unreviewed.
 
 ## Requirements
 
