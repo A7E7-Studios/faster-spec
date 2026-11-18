@@ -82,20 +82,21 @@ A change with a side in the other repository: open both pull requests, each link
    separate headless run (`claude -p`, `codex exec`). Its brief: read
    `.agents/skills/ship/review-checklist.md` and follow it; the worktree path, the pull request
    number (both, for a change across repositories), the change id; from round 2, the previous
-   findings and follow-ups, how each was resolved, and the head last reviewed. A gate failure other than
-   `protected` is a blocker; `protected` only means the owner merges, and is no finding. It changes
-   nothing.
+   findings and follow-ups, how each was resolved, and the head last reviewed. A gate failure
+   other than `protected` is a blocker; `protected` only means the owner merges, and is no
+   finding. It changes nothing.
 2. Every finding, a follow-up included: **fix** it, or **answer** it with a reason that cites the
    code, a scenario or a rule. An answer is for a finding that is wrong; work you would rather skip
    is no reason.
 3. Commit, gate, rerun the suites the fixes touch, push, and record the round in `## Review`:
    `R1 F2 [minor] <finding> → fixed`, or `→ answered: <reason>`. Name no commit there:
    `## Tests` names the head, once.
-4. Review again with a fresh reviewer, round by round, while the last round found a `blocker` or
-   `major`. A round that finds none ends the review: fix or answer its follow-ups without another
-   round, with one exception. When those fixes changed code (more than docs, comments or wording),
-   one more round reviews them. Finding no `blocker` or `major`, it ends the review the same way,
-   its own follow-ups fixed or answered without a further round; finding one, the rounds go on.
+4. Review again with a fresh reviewer, round by round, while the last round returns
+   `Verdict: fail` (a `blocker` or `major` open). A round that passes ends the review: fix or
+   answer its follow-ups without another round, with one exception. When those fixes changed code
+   (more than docs, comments or wording), one more round reviews them. Passing, it ends the review
+   the same way, its own follow-ups fixed or answered without a further round; failing, the rounds
+   go on.
 5. A `blocker` or `major` still open after round 3: stop, list each open finding for the owner, do
    not merge.
 
