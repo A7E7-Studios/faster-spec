@@ -61,6 +61,7 @@ supports, no product names, and nothing the backlog does may touch main or a che
 | A write changes only the item's own file | `tools/backlog/test/store.test.mjs::a write changes only the item's own file`, new |
 | Two notes sent at once both arrive | `tools/backlog/test/store.test.mjs::two notes sent at once both arrive`, new |
 | A field changed meanwhile is held, not overwritten | `tools/backlog/test/store.test.mjs::a field changed meanwhile is held with both values`, new |
+| A write that landed is not sent twice | `tools/backlog/test/store.test.mjs::a push that lands though it reports failure is sent once, not replayed`, new |
 | A person moves an item | `tools/backlog/test/store.test.mjs::a person moves an item to any state they set`, new |
 | An item's changes decide what it shows | `tools/backlog/test/state.test.mjs::an item's changes decide its shown state`, new |
 | Each write command sends one commit | `tools/backlog/test/cli.test.mjs::each write command sends one commit`, new |
@@ -82,6 +83,7 @@ supports, no product names, and nothing the backlog does may touch main or a che
 | A clashing draft stays unsent with both values | `tools/solution-map/test/server.test.mjs::a clashing draft stays unsent with both values`, new |
 | Submit without the network keeps the drafts | `tools/solution-map/test/server.test.mjs::submit without the network keeps every draft`, new |
 | Only the map's own page can write | `tools/solution-map/test/server.test.mjs::a write from another page is refused`, new |
+| A draft waits while Submit sends | `tools/solution-map/test/server.test.mjs::a draft is not changed while Submit sends, and says why`, new |
 | Every view has its own address (the backlog's) | `tools/solution-map/test/view.test.mjs::every view has its own address`, existing, extended |
 | Something missing stops setup and says what to install | `tools/solution-map/test/launcher.test.mjs::setup names what is missing and stops`, new; the printed commands' checks run under `sh` where the test has one |
 | Setup asks for a name and email when git has none | `tools/solution-map/test/launcher.test.mjs::setup asks for a git name and email when none is set`, new |
@@ -92,9 +94,11 @@ supports, no product names, and nothing the backlog does may touch main or a che
 | The map runs from main's code | `tools/solution-map/test/launcher.test.mjs::the launched map runs from main's code`, new |
 | Without the network the last map runs | `tools/solution-map/test/launcher.test.mjs::without the network the last map runs`, new |
 | A launcher fixed on main reaches the shortcut | `tools/solution-map/test/launcher.test.mjs::the launcher takes main's copy of itself, never into a checkout`, new |
+| Old maps are removed | `tools/solution-map/test/launcher.test.mjs::the launcher keeps the map it runs and the one run before, and removes the others`, new |
 | A newer map on main shows a banner | `tools/solution-map/test/launcher.test.mjs::a newer map on main offers a restart`, new |
 | Restart runs the newer map and keeps the drafts | `tools/solution-map/test/launcher.test.mjs::restart runs the newer map and keeps the drafts`, new |
 | A map run from a checkout never offers a restart | `tools/solution-map/test/launcher.test.mjs::a map run from a checkout offers no restart`, new |
+| Restart waits for a Submit under way | `tools/solution-map/test/server.test.mjs::Restart hands over only once a Submit out has cleared what it sent`, new |
 | The shortcut opens the browser on the map | none: untested, because no automation double-clicks a desktop icon and watches a browser open |
 | A request becomes a change | none: untested, because it is an agent following the spec skill's text; the `link` and `note` commands it runs are tested |
 | New requests wait beside the features (triage) | none: untested, because it is an agent following the triage skill's text; `list --state new` is tested |
