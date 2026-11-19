@@ -7,13 +7,13 @@ nearest the code it changes.
 
 ## 1. The backlog library and command line, `tools/backlog/`
 
-- [ ] 1.1 `lib/item.mjs`: parse and write the item file with the gate's `parseFrontMatter`; note headings; ids from titles; test: tools/backlog/test/item.test.mjs
-- [ ] 1.2 `lib/ops.mjs`: `add`, `note`, `edit`, `move`, `link` applied to an item's text, with held clashes; test: tools/backlog/test/ops.test.mjs
-- [ ] 1.3 `lib/state.mjs`: `shownState(item, facts)` and the git facts per change id; test: tools/backlog/test/state.test.mjs::an item's changes decide its shown state
-- [ ] 1.4 `lib/store.mjs`: read the branch through git objects; write by plumbing with replay and five retries; first write without a parent; config `backlog { repo, branch }`; test: tools/backlog/test/store.test.mjs
-- [ ] 1.5 `lib/drafts.mjs`: drafts in the git common directory; test: tools/backlog/test/drafts.test.mjs
-- [ ] 1.6 `backlog.mjs`: `list`, `show`, `add`, `note`, `move`, `link`, `--json`; test: tools/backlog/test/cli.test.mjs
-- [ ] 1.7 `package.json` (`node --test`) and `README.md`: the item format, the commands, the config, the branch rule to set; test: node tools/gate/gate.mjs --local
+- [x] 1.1 `lib/item.mjs`: parse and write the item file with the gate's `parseFrontMatter`; note headings; ids from titles; test: tools/backlog/test/item.test.mjs
+- [x] 1.2 `lib/ops.mjs`: `add`, `note`, `edit`, `move`, `link` applied to an item's text, with held clashes; test: tools/backlog/test/ops.test.mjs
+- [x] 1.3 `lib/state.mjs`: `shownState(item, facts)` and the git facts per change id; test: tools/backlog/test/state.test.mjs::an item's changes decide its shown state
+- [x] 1.4 `lib/store.mjs`: read the branch through git objects; write by plumbing with replay and five retries; first write without a parent; config `backlog { repo, branch }`; test: tools/backlog/test/store.test.mjs
+- [x] 1.5 `lib/drafts.mjs`: drafts in the git common directory; test: tools/backlog/test/drafts.test.mjs
+- [x] 1.6 `backlog.mjs`: `list`, `show`, `add`, `note`, `move`, `link`, `--json`; test: tools/backlog/test/cli.test.mjs
+- [x] 1.7 `package.json` (`node --test`) and `README.md`: the item format, the commands, the config, the branch rule to set; test: node tools/gate/gate.mjs --local
 
 ## 2. The map's server (after 1)
 

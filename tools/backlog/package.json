@@ -1,0 +1,12 @@
+{
+  "name": "backlog",
+  "private": true,
+  "description": "The backlog: requests on a branch of their own, one file each, read through git objects and written by plumbing. Its library and command line. No dependencies.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test \"test/*.test.mjs\""
+  }
+}
