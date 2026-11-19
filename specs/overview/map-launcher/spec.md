@@ -67,13 +67,13 @@ this system, because a person who is not a developer gets the map without a deve
 
 ### Requirement: The shortcut always runs the newest map
 When the shortcut is opened, the launcher SHALL fetch, run the map from the code on `origin/main` in
-a folder kept for that commit, and open the browser on it, because nobody has to pull or update
+a folder kept for that code, and open the browser on it, because nobody has to pull or update
 anything.
 
 #### Scenario: The map runs from main's code
 - **GIVEN** main holds a newer map than the one last run
 - **WHEN** the shortcut opens
-- **THEN** the newer map runs, from a folder named for main's commit
+- **THEN** the newer map runs, from a folder named for the map's code on main
 - **PROOF** test: tools/solution-map/test/launcher.test.mjs::the launched map runs from main's code
 
 #### Scenario: Without the network the last map runs
