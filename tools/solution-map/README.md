@@ -197,10 +197,18 @@ when the backlog lives in another of those repositories ([Config](#config)).
 | `lib/backlog-view.mjs` | the backlog and the drafts to the backlog's view model |
 | `lib/review.mjs` | Start review: where CueReview is, and opening it detached |
 | `lib/server.mjs` | the HTTP server: the page at its views' addresses (`/`, `/waiting/…`, `/explore/…`, `/search/…`, `/backlog/…`) and the routes above |
-| `page/` | the page: `index.html`, `style.css`, `view.mjs` (pure HTML from the view model), `app.mjs` (events and the address) |
+| `page/` | the page: `index.html`, `style.css`, `html.mjs` (escaping, inline Markdown, icons, the banner line), `view.mjs` (pure HTML from the view models), `backlog.mjs` (the backlog's views: the board, the Move menu, the request dialog, the create form, the unsent line, its banners) and `app.mjs` (events, the address, the dialog; the only module that touches the DOM) |
 
 - **Addresses**: `/waiting/<feature>`, `/explore/<feature>`, `/explore/by-system/<system>/<feature>`,
-  `/search/<feature>?q=<text>`; a feature id is `<domain>/<capability>`.
+  `/search/<feature>?q=<text>`; a feature id is `<domain>/<capability>`. `/backlog` is the board,
+  `/backlog/<id>` a request in its dialog (an unsent one by its draft's key), and
+  `/backlog/new?about=<feature>` the create form with that feature named (`about` may repeat; New
+  request gives `/backlog/new`). A dialog's address keeps the view under it in the history entry, so
+  back, forward and reload show both again.
+- **Drafts and Submit** go through `POST /api/drafts` and `/api/submit`; a failed Submit's banner
+  stays until a Submit goes through. The `map-update` banner's Restart to update sends
+  `POST /api/restart`; after `{ ok: true }` the page polls `/api/map` every second, reloads when the
+  new map answers, and after 30 s says the map has not come back while it keeps polling.
 - **Boards** come from git at the commit read, showing only the section with the id, in a sandboxed
   frame that runs no script.
 - **Links** go to GitHub at the commit read, for a repository whose `origin` is on GitHub; any
@@ -218,7 +226,8 @@ cd tools/solution-map && npm test     # node --test; throwaway repositories in t
 
 The adapter and view tests run on a sample index held to the overview's schema
 (`test/fixtures/overview-v3.json`, checked with the overview's own `test/schema.mjs`); the backlog's
-view model tests on items and drafts made in the test. The server tests build bare origins and
+view model tests on items and drafts made in the test, and the backlog's view tests on a sample
+backlog built with `backlogView` (`test/fixtures/backlog.mjs`). The server tests build bare origins and
 clones and push to them, with git reading no global or system config (the backlog's
 `test/helpers.mjs`); the board test runs the kit's overview on a spec there, the others a stand-in
 that reports only each repository's commit, so a fetch's effect is seen alone. A clone made without
