@@ -100,8 +100,9 @@ The note's text.
 | `## Notes` | the notes in the order they arrived, each under its `###` heading |
 
 - **Ids** are the title in kebab-case, accents folded to ASCII, at most 60 characters, cut at a word;
-  `-2`, `-3` when taken. A title with no letter or digit gives `request`. An id is given when the
-  write is replayed, so a draft has none until it is sent.
+  `-2`, `-3` when taken, and `new`, the map's address of a request being written, always is. A
+  title with no letter or digit gives `request`. An id is given when the write is replayed, so a
+  draft has none until it is sent.
 - **A person's text cannot break the file**: a line that would read as a section (`## `), or in a
   note as a note heading (`### `), is written with a backslash before its `#` and read back
   without it; a code fence left open is closed.

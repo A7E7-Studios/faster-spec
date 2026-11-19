@@ -82,6 +82,13 @@ anything.
 - **THEN** the map last run starts, with the banner that says the fetch failed
 - **PROOF** test: tools/solution-map/test/launcher.test.mjs::without the network the last map runs
 
+#### Scenario: A launcher fixed on main reaches the shortcut
+- **GIVEN** main holds a newer launcher than the one this computer runs
+- **WHEN** the shortcut opens
+- **THEN** this computer runs main's launcher from then on, and a launcher in a checkout is never
+  rewritten
+- **PROOF** test: tools/solution-map/test/launcher.test.mjs::the launcher takes main's copy of itself, never into a checkout
+
 #### Scenario: The shortcut opens the browser on the map
 - **WHEN** a person double-clicks the shortcut on their desktop
 - **THEN** the browser opens on the map
