@@ -23,11 +23,11 @@ nearest the code it changes.
 
 ## 3. The map's page (after 2)
 
-- [ ] 3.1 The Backlog tab and board: columns by shown state, Move menu on every card, Show done and parked; test: tools/solution-map/test/view.test.mjs
-- [ ] 3.2 The request dialog (`<dialog>`, `showModal`), its narrow full-screen layout, the create form from New request and Suggest a change; test: tools/solution-map/test/view.test.mjs::suggest a change starts a request naming the feature
-- [ ] 3.3 A feature's open requests; New requests in Waiting for you; test: tools/solution-map/test/view.test.mjs::an item shows its notes, its features and its changes
-- [ ] 3.4 The unsent line with Submit on every view, the held draft in the dialog, the empty and unreachable states; test: tools/solution-map/test/view.test.mjs::every view shows the unsent drafts and submit
-- [ ] 3.5 Addresses `/backlog`, `/backlog/<id>`, `/backlog/new?about=<feature>`; test: tools/solution-map/test/view.test.mjs::every view has its own address
+- [x] 3.1 The Backlog tab and board: columns by shown state, Move menu on every card, Show done and parked; test: tools/solution-map/test/view.test.mjs
+- [x] 3.2 The request dialog (`<dialog>`, `showModal`), its narrow full-screen layout, the create form from New request and Suggest a change; test: tools/solution-map/test/view.test.mjs::suggest a change starts a request naming the feature
+- [x] 3.3 A feature's open requests; New requests in Waiting for you; test: tools/solution-map/test/view.test.mjs::an item shows its notes, its features and its changes
+- [x] 3.4 The unsent line with Submit on every view, the held draft in the dialog, the empty and unreachable states; test: tools/solution-map/test/view.test.mjs::every view shows the unsent drafts and submit
+- [x] 3.5 Addresses `/backlog`, `/backlog/<id>`, `/backlog/new?about=<feature>`; test: tools/solution-map/test/view.test.mjs::every view has its own address
 - [ ] 3.6 Compare the page with `specs/overview/solution-map/looks/backlog.html`; test: node tools/gate/gate.mjs --local
 
 ## 4. The launcher (after 2)
