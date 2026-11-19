@@ -4,6 +4,7 @@ review: unreviewed
 code:
   - tools/backlog/
   - .agents/skills/spec/SKILL.md
+  - .agents/skills/spec/templates/proposal.md
   - .agents/skills/triage/SKILL.md
 ---
 # Backlog

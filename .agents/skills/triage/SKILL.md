@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Turn the owner's review of merged features into results. With no input, list what waits for the owner's review (every feature that is unreviewed, grouped by where the owner looks at it, and every feature with changes requested and the change that answers it) as one checklist. With CueReview sessions (their Copy for agent text or ids), review notes or feedback, map each remark to a feature, record the owner's verdict per feature (approved or changes-requested) in its spec's review key, delete the change folders whose features are all approved, and start a change for each bug or gap. Use for what is waiting for my review, a CueReview recording, or the owner's review results, notes or feedback on merged features. Not for reviewing code or a pull request.
+description: Turn the owner's review of merged features into results. With no input, list what waits for the owner's review (every feature that is unreviewed, grouped by where the owner looks at it, every feature with changes requested and the change that answers it, and every new request in the backlog) as one checklist. With CueReview sessions (their Copy for agent text or ids), review notes or feedback, map each remark to a feature, record the owner's verdict per feature (approved or changes-requested) in its spec's review key, delete the change folders whose features are all approved, and start a change for each bug or gap. Use for what is waiting for my review, a CueReview recording, or the owner's review results, notes or feedback on merged features. Not for reviewing code or a pull request.
 ---
 
 # Triage the owner's review
@@ -27,6 +27,9 @@ never the model.
      group of its own.
    - **Changes requested:** every feature whose `review` is `changes-requested`, with the change
      that answers it (a change folder, branch or pull request naming it), or "none yet".
+   - **New requests:** `node tools/backlog/backlog.mjs list --state new --json`: each request in
+     New, newest first, with its title, who asked and when (`by`, `created`), and its id, which
+     `spec` takes as `backlog:<id>`.
 4. Give it in chat, or as a local HTML page outside the repository. Never commit it.
 5. Suggest the recording: one CueReview session per source ("Record more" keeps the source, so a
    desk review and a device review are separate sessions), one take per feature, each opening

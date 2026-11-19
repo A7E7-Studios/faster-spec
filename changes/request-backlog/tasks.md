@@ -39,10 +39,10 @@ nearest the code it changes.
 
 ## 5. The skills and the kit (after 1)
 
-- [ ] 5.1 `spec` accepts `backlog:<id>`: show, quote in Why, `link` and a note; test: node tools/gate/gate.mjs --local
-- [ ] 5.2 `triage` with no input lists `backlog.mjs list --state new`; test: node tools/gate/gate.mjs --local
-- [ ] 5.3 `kit.json` adds `tools/backlog/`; `specs/systems.json` adds Backlog and Solution map; `config.template.json` documents `backlog` and `solutionMap.repos[].url`; test: cd tools/kit && npm test
-- [ ] 5.4 The kit's `README.md` lists the backlog and the launcher; test: node tools/gate/gate.mjs --local
+- [x] 5.1 `spec` accepts `backlog:<id>`: show, quote in Why, `link` and a note; test: node tools/gate/gate.mjs --local
+- [x] 5.2 `triage` with no input lists `backlog.mjs list --state new`; test: node tools/gate/gate.mjs --local
+- [x] 5.3 `kit.json` adds `tools/backlog/`; `specs/systems.json` adds Backlog and Solution map; `config.template.json` documents `backlog` and `solutionMap.repos[].url`; test: cd tools/kit && npm test
+- [x] 5.4 The kit's `README.md` lists the backlog and the launcher; test: node tools/gate/gate.mjs --local
 
 ## 6. The quality gate (after 1–5)
 

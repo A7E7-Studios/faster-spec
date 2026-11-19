@@ -71,5 +71,6 @@
   },
   "solutionMap": {
     "repos": [{ "id": "app", "path": "." }]
-  }
+  },
+  "backlog": { "branch": "backlog" }
 }
