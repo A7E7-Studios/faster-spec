@@ -46,5 +46,5 @@ nearest the code it changes.
 
 ## 6. The quality gate (after 1–5)
 
-- [ ] 6.1 Every suite in AGENTS.md's Quality gate, with `tools/backlog`; test: cd tools/backlog && npm test
-- [ ] 6.2 The formality gate; test: node tools/gate/gate.mjs --local
+- [x] 6.1 Every suite in AGENTS.md's Quality gate, with `tools/backlog`; test: cd tools/backlog && npm test
+- [x] 6.2 The formality gate; test: node tools/gate/gate.mjs --local
