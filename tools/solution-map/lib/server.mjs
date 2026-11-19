@@ -199,8 +199,10 @@ export function createMapServer({ build, theme = async () => null, review = asyn
       } else if (body.save && typeof body.save === 'object' && !Array.isArray(body.save)) draft = (await saveDraft(where.dir, withFrom(body.save, b))).draft;
       else throw new Error('send { "save": <draft> }, { "drop": "<key>" } or { "apply": "<key>" }');
     } catch (e) {
-      // Another map on this computer holds the drafts: the same refusal as this map's own Submit.
-      throw new Refused(e.code === DRAFTS_BUSY ? 409 : 400, e.message);
+      // The drafts are held: by this map's own Submit, begun while the change waited, its refusal;
+      // else another map on this computer holds them, the same refusal shape.
+      if (e.code === DRAFTS_BUSY) throw new Refused(409, sending ? SENDING : e.message);
+      throw new Refused(400, e.message);
     }
     return { ok: true, draft, backlog: await backlogModel() };
   };

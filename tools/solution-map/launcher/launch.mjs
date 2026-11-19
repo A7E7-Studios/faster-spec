@@ -247,7 +247,9 @@ export function pruneMaps(maps, keep) {
     const m = RUNNING.exec(name);
     if (!m) continue;
     if (alive(Number(m[2]))) running.add(m[1]);
-    else fs.rmSync(path.join(maps, name), { force: true });
+    else {
+      try { fs.rmSync(path.join(maps, name), { force: true }); } catch { /* held: the next prune removes it */ }
+    }
   }
   for (const name of names) {
     const dir = path.join(maps, name);
