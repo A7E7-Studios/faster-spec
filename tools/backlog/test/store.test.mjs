@@ -4,7 +4,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { withTmp, project, writeFiles, git, show, commits, hasRef } from './helpers.mjs';
-import { git as netGit } from '../../solution-map/lib/sources.mjs';
+import { gitAsync as netGit } from '../../gate/lib/git.mjs';
 import { locateBacklog, backlogConfig, fetchBacklog, readBacklog, writeBacklog, MAX_TRIES } from '../lib/store.mjs';
 import { parseItem, SET_STATES } from '../lib/item.mjs';
 
@@ -300,6 +300,36 @@ test('a push the remote refuses, with nobody pushing first, is reported once', (
   const w = await writeBacklog(at(dir), [{ op: 'note', id: 'export-a-note-as-pdf', text: 'x' }], { now: NOW, net });
   assert.deepEqual([w.ok, w.unreachable, w.error, pushes], [false, true, 'remote: permission denied', 1]);
   assert.equal(commits(origin, 'backlog').length, 1);
+}));
+
+test('a push that lands though it reports failure is sent once, not replayed', () => withTmp(async (tmp) => {
+  const { origin, clones: [pat, sam] } = project(tmp, 'notes-app', { people: ['Pat Example', 'Sam Example'] });
+  const id = (await writeBacklog(at(pat), [REQUEST], { now: NOW })).results[0].id;
+  /** A runner whose pushes reach the remote and then report the connection lost; `after` runs once the remote has it. */
+  const lostAfterPush = (after = async () => {}) => async (d, args, opts) => {
+    if (args[0] !== 'push') return netGit(d, args, opts);
+    const r = await netGit(d, args, opts);
+    assert.equal(r.ok, true, r.err);
+    await after();
+    return { ok: false, out: Buffer.alloc(0), err: 'fatal: the remote end hung up unexpectedly' };
+  };
+  const before = commits(origin, 'backlog').length;
+  const w = await writeBacklog(at(pat), [{ op: 'note', id, text: 'Sent once.' }, { op: 'add', title: 'Dark mode' }], { now: NOW, net: lostAfterPush() });
+  assert.equal(w.ok, true, w.error);
+  assert.deepEqual(w.results.map((r) => [r.status, r.id]), [['applied', id], ['applied', 'dark-mode']]);
+  const history = commits(origin, 'backlog');
+  assert.equal(history.length, before + 1);
+  assert.equal(history[0].sha, w.commit);
+  assert.deepEqual(item(pat, id).notes.map((n) => n.text), ['Sent once.']);
+  assert.deepEqual(git(origin, ['ls-tree', '-r', '--name-only', 'backlog']).split('\n'), ['backlog/dark-mode.md', `backlog/${id}.md`]);
+
+  // Someone else's write lands on top of it before the fetch that follows: still sent, once.
+  let samsCommit;
+  const net = lostAfterPush(async () => { samsCommit = (await writeBacklog(at(sam), [{ op: 'note', id, text: "Sam's, on top." }], { now: NOW })).commit; });
+  const w2 = await writeBacklog(at(pat), [{ op: 'note', id, text: 'Also sent once.' }], { now: NOW, net });
+  assert.equal(w2.ok, true, w2.error);
+  assert.deepEqual(commits(origin, 'backlog').slice(0, 2).map((c) => c.sha), [samsCommit, w2.commit]);
+  assert.deepEqual(item(pat, id).notes.map((n) => n.text), ['Sent once.', 'Also sent once.', "Sam's, on top."]);
 }));
 
 test('a branch someone pushes to before every try ends after five, nothing sent', () => withTmp(async (tmp) => {

@@ -194,7 +194,10 @@ function toast(msg) {
 
 /* ---------- the backlog's writes: drafts, then Submit ---------- */
 
-/** Saves, drops or applies a draft; the page draws the backlog the server answers with. */
+/**
+ * Saves, drops or applies a draft; the page draws the backlog the server answers with. While Submit
+ * sends, the server refuses (409) and says so: what was typed stays in its form, to save once it is done.
+ */
 async function changeDrafts(body, { focus = null } = {}) {
   let r;
   try { r = await answer(await post('/api/drafts', body)); } catch { r = { ok: false, error: NO_SERVER }; }
@@ -294,6 +297,8 @@ function pick(about, focus) {
 /* ---------- Restart to update ---------- */
 
 async function restart() {
+  // Not while Submit sends, as its button says; the server too hands over only once Submit is done.
+  if (st.submitting) return;
   st.restart = { phase: 'asking' };
   render();
   let r;

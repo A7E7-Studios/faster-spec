@@ -5,10 +5,11 @@ each on a branch of their own, read through git objects and written by git plumb
 Solution map's server calls the library; agents and scripts use the command line. What it does for
 a person: the kit's spec `requests/backlog`.
 
-No npm dependencies; Node 22 or later; Git. It reads front matter with the gate's parser
-([`tools/gate/lib/spec.mjs`](../gate/lib/spec.mjs)) and runs git through
-[`tools/gate/lib/git.mjs`](../gate/lib/git.mjs) and the map's
-[`lib/sources.mjs`](../solution-map/lib/sources.mjs).
+No npm dependencies; Node 22 or later; Git 2.29 or later (it fetches with
+`--no-write-fetch-head`). It imports the gate's library alone: front matter from
+[`tools/gate/lib/spec.mjs`](../gate/lib/spec.mjs), git from
+[`tools/gate/lib/git.mjs`](../gate/lib/git.mjs), and the config and the solution's repositories from
+[`tools/gate/lib/repos.mjs`](../gate/lib/repos.mjs).
 
 ```
 node tools/backlog/backlog.mjs list [--state <state>] [--json]
@@ -136,8 +137,10 @@ nothing is written. The subject counts what was applied, `<name>: 1 new request,
 `edit <id>: <field>`, `move <id>: <from> -> <to>`, `link <id>: <change>`).
 
 Each fetch and push may take 60 s. A push refused because someone pushed first fetches and
-replays, five tries in all. Any
-other failure, a remote that cannot be reached or a push refused while the branch did not move,
+replays, five tries in all. A push that reports failure though it landed (it timed out, or the
+connection went once the remote had it) is sent: the branch fetched then holds its commit, as its
+tip or beneath it, and nothing is replayed, so no note arrives twice and no request is added again.
+Any other failure, a remote that cannot be reached or a push refused while the branch did not move,
 sends nothing and reports `unreachable`. No write touches main, a checkout's HEAD, index, branches
 or files; it moves only this clone's `refs/remotes/origin/<branch>`. Fetch the backlog after the
 repositories' own fetch, never beside it: two fetches in one repository race for its refs.
@@ -172,7 +175,7 @@ sent, every draft stays. Submits of one clone run one after the other.
 | `lib/store.mjs` | `locateBacklog({ config, repos, root })` → `{ dir, branch, repo }`; `backlogConfig(config)` → `{ repo, branch }`; `fetchBacklog(where)` → `{ state: 'current' \| 'absent' \| 'unreachable', tip, error? }`; `readBacklog(where, { tip? })` → `{ tip, items, problems }`; `writeBacklog(where, ops, { now? })` → `{ ok: true, commit, results }` or `{ ok: false, unreachable, error }`; `gitIdentity(dir)`; `backlogTip(where)` |
 | `lib/state.mjs` | `withShownStates(items, repos)` → items with `shown` and `changes: [{ id, state }]`; `shownState(item, facts)`; `changeState(fact)`; `changeFacts(repos, ids)`; `SHOWN_STATES`; `STATE_LABELS` |
 | `lib/drafts.mjs` | `readDrafts(dir)`; `saveDraft(dir, draft)` → `{ draft, drafts }` (a `key` changes that draft); `dropDraft(dir, key)` → drafts left (an `add` takes the drafts naming it); `submitDrafts(where, { now? })` → `{ ok, commit, sent, held, refused, drafts, unreachable?, error? }`; `draftsPath(dir)` |
-| `lib/ops.mjs` | `applyOps(tip, ops, { name, now })` → `{ files, results }`; `opProblem(op)`; `summary(results)`; `commitMessage(name, results)` |
+| `lib/ops.mjs` | `applyOps(tip, ops, { name, now })` → `{ files, results }`; `opProblem(op)`; `fieldOf(op)`, the field a move (`state`) or an edit sets; `summary(results)`; `commitMessage(name, results)` |
 | `lib/item.mjs` | `parseItem(text, { id })`; `writeItem(item)`; `newId(title, taken)`; `itemProblem(item)`; `SET_STATES`; `SECTIONS` |
 
 `where` is `{ dir, branch }`, as `locateBacklog` gives it. An item is `{ id, path, title, by,
@@ -180,7 +183,7 @@ created, state, about, change, happens, should, where, notes: [{ by, at, text }]
 write's `results` hold one entry per operation, in order: `{ op, status, id?, before?, theirs?,
 reason? }`, `status` one of `applied`, `unchanged`, `held`, `refused`. `fetchBacklog`,
 `writeBacklog` and `submitDrafts` take `net`, the runner for git's network commands, with the
-signature of `git` in the map's `lib/sources.mjs`.
+signature of `gitAsync` in `tools/gate/lib/git.mjs`.
 
 For the map: `GET /api/backlog` is `readBacklog` + `withShownStates` + `readDrafts`; `POST
 /api/drafts` is `saveDraft` or `dropDraft`; `POST /api/submit` is `submitDrafts`; Refresh calls

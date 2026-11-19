@@ -6,8 +6,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { buildMap } from '../lib/build.mjs';
-import { createMapServer, withSection, PAGE_DIR, MAX_BODY } from '../lib/server.mjs';
-import { fetchRepo, readAt } from '../lib/sources.mjs';
+import { createMapServer, withSection, PAGE_DIR, MAX_BODY, SENDING } from '../lib/server.mjs';
+import { gitAsync } from '../../gate/lib/git.mjs';
+import { fetchRepo } from '../../gate/lib/repos.mjs';
+import { readAt } from '../lib/sources.mjs';
 import http from 'node:http';
 import { reviewCommand, startReview } from '../lib/review.mjs';
 import { EventEmitter } from 'node:events';
@@ -265,11 +267,27 @@ test('a saved overview is served without reading a repository', async () => {
 const at = (dir) => ({ dir, branch: 'backlog', repo: 'app' });
 const WRITE = { 'x-solution-map': '1', 'content-type': 'application/json' };
 
-/** A map of one clone whose backlog is that clone's branch `backlog`, wired as the command line wires it. */
-function serveBacklog(dir, more = {}) {
+/**
+ * A map of one clone whose backlog is that clone's branch `backlog`, wired as the command line wires
+ * it; `more` goes to each build, `net` runs Submit's git and `restart` is Restart to update.
+ */
+function serveBacklog(dir, more = {}, { net, restart } = {}) {
   const where = at(dir);
   const repos = [{ id: 'app', dir }];
-  return serve(() => buildMap({ repos, overview: standIn(), backlog: where, ...more }), { backlog: { where, repos } });
+  return serve(() => buildMap({ repos, overview: standIn(), backlog: where, ...more }), { backlog: { where, repos, net }, restart });
+}
+
+/** A runner for Submit's git whose push waits for `release()`; `pushing` resolves once the push is out. */
+function heldPush() {
+  let release;
+  let started;
+  const gate = new Promise((r) => { release = r; });
+  const pushing = new Promise((r) => { started = r; });
+  const net = async (d, args, o) => {
+    if (args[0] === 'push') { started(); await gate; }
+    return gitAsync(d, args, o);
+  };
+  return { net, pushing, release };
 }
 
 /** A write as the map's page sends it; resolves the JSON answer. */
@@ -430,6 +448,80 @@ test('a clashing draft stays unsent with both values', () => withTmp(async (tmp)
     const bad = await fetch(`${s.base}/api/drafts`, { method: 'POST', headers: WRITE, body: JSON.stringify({ apply: move.key }) });
     assert.deepEqual([bad.status, (await bad.json()).error], [400, `no held draft "${move.key}"`]);
   } finally { await s.close(); }
+}));
+
+test('a held move made again is made over the value shown, and is sent', () => withTmp(async (tmp) => {
+  const { clones: [pat, sam] } = project(tmp, 'notes-app', { people: ['Pat Example', 'Sam Example'] });
+  const id = (await writeBacklog(at(sam), [{ op: 'add', title: 'Undo after closing a note' }])).results[0].id;
+  const s = await serveBacklog(pat);
+  try {
+    await backlogOf(s);
+    const move = (await write(s, '/api/drafts', { save: { op: 'move', id, to: 'ready' } })).draft;
+    await writeBacklog(at(sam), [{ op: 'move', id, to: 'parked' }]);
+    const held = await write(s, '/api/submit');
+    assert.deepEqual(held.held.map((h) => [h.key, h.theirs]), [[move.key, 'parked']]);
+    // The page shows Parked; Move again, to Discussing, changes the held draft by its key.
+    assert.equal(held.backlog.requests[id].state, 'parked');
+    const again = (await write(s, '/api/drafts', { save: { op: 'move', id, to: 'discussing', key: move.key } })).draft;
+    assert.deepEqual([again.key, again.from, again.to, again.held], [move.key, 'parked', 'discussing', undefined]);
+    const r = await write(s, '/api/submit');
+    assert.deepEqual([r.ok, r.sent.map((d) => d.key), r.held], [true, [move.key], []]);
+    assert.equal(r.backlog.requests[id].state, 'discussing');
+  } finally { await s.close(); }
+}));
+
+test('a draft is not changed while Submit sends, and says why', () => withTmp(async (tmp) => {
+  const { origin, clones: [pat] } = project(tmp, 'notes-app', { people: ['Pat Example'] });
+  const push = heldPush();
+  const s = await serveBacklog(pat, {}, { net: push.net });
+  try {
+    const add = (await write(s, '/api/drafts', { save: { op: 'add', title: 'Dark mode' } })).draft;
+    const sending = write(s, '/api/submit');
+    await push.pushing;
+    // The unsent request changed in its form, a new one, a drop and an apply-again: each refused.
+    for (const body of [{ save: { ...add, title: 'Dark mode everywhere' } }, { save: { op: 'add', title: 'Export as PDF' } }, { drop: add.key }, { apply: add.key }]) {
+      const r = await fetch(`${s.base}/api/drafts`, { method: 'POST', headers: WRITE, body: JSON.stringify(body) });
+      assert.deepEqual([r.status, await r.json()], [409, { ok: false, error: SENDING }], JSON.stringify(body));
+    }
+    push.release();
+    const sent = await sending;
+    assert.deepEqual([sent.ok, sent.sent.map((d) => [d.key, d.id])], [true, [[add.key, 'dark-mode']]]);
+    assert.deepEqual(readDrafts(pat), []);
+    // Once it is done, drafts change again; the request was sent once, as it was when Submit read it.
+    assert.equal((await write(s, '/api/drafts', { save: { op: 'note', id: 'dark-mode', text: 'Everywhere, please.' } })).ok, true);
+    assert.deepEqual(execFileSync('git', ['-C', origin, 'ls-tree', '-r', '--name-only', 'backlog'], { encoding: 'utf8' }).trim().split('\n'), ['backlog/dark-mode.md']);
+  } finally {
+    push.release(); // a failed check never leaves the push waiting
+    s.server.closeAllConnections();
+    await s.close();
+  }
+}));
+
+test('Restart hands over only once a Submit out has cleared what it sent', () => withTmp(async (tmp) => {
+  const { origin, clones: [pat] } = project(tmp, 'notes-app', { people: ['Pat Example'] });
+  const push = heldPush();
+  const handed = [];
+  const s = await serveBacklog(pat, {}, { net: push.net, restart: async () => ({ ok: true, handOver: () => { handed.push(readDrafts(pat)); } }) });
+  try {
+    await write(s, '/api/drafts', { save: { op: 'add', title: 'Dark mode' } });
+    const sending = write(s, '/api/submit');
+    await push.pushing;
+    assert.deepEqual(await write(s, '/api/restart'), { ok: true });
+    await new Promise((r) => setTimeout(r, 200));
+    assert.deepEqual(handed, [], 'not while the push is out');
+    // A Submit asked for now would never run: it is refused, not left waiting.
+    const late = await fetch(`${s.base}/api/submit`, { method: 'POST', headers: WRITE, body: '{}', signal: AbortSignal.timeout(10000) });
+    assert.deepEqual([late.status, (await late.json()).error], [409, 'the map is restarting']);
+    push.release();
+    assert.equal((await sending).ok, true);
+    for (const until = Date.now() + 5000; !handed.length && Date.now() < until;) await new Promise((r) => setTimeout(r, 20));
+    assert.deepEqual(handed, [[]], 'handed over once, with the sent drafts cleared');
+    assert.equal(commits(origin, 'backlog').length, 1);
+  } finally {
+    push.release();
+    s.server.closeAllConnections();
+    await s.close();
+  }
 }));
 
 test('submit without the network keeps every draft', () => withTmp(async (tmp) => {

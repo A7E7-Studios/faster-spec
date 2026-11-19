@@ -418,6 +418,8 @@ test('a newer map offers restart to update, and says how the restart goes', () =
   assert.doesNotMatch(restarting, /data-act="restart"/);
   assert.match(renderPage(vm, ui(), { restart: { phase: 'late' } }), /<div class="banner req" role="status"><span class="bt">The map didn’t come back within 30 seconds\. The page keeps trying/);
   assert.match(renderPage(vm, ui(), { restart: { phase: 'error', error: 'the map was not launched' } }), /The map couldn’t restart: <span class="mono">the map was not launched<\/span><\/span><button class="s-btn" data-act="restart">Restart to update<\/button>/);
+  // While Submit sends, Restart waits.
+  assert.match(renderPage(vm, ui(), { submitting: true }), /<button class="s-btn" data-act="restart" disabled title="Submit is sending your drafts">Restart to update<\/button>/);
   // A map with no newer one on main offers nothing.
   assert.doesNotMatch(renderPage(adapt(sample()), ui()), /Restart to update/);
 });

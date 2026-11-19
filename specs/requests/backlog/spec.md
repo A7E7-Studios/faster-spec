@@ -82,6 +82,12 @@ the same time and no one's note may be lost.
   rest of the write is applied
 - **PROOF** test: tools/backlog/test/store.test.mjs::a field changed meanwhile is held with both values
 
+#### Scenario: A write that landed is not sent twice
+- **GIVEN** a write reached the branch, but the push reported a failure
+- **WHEN** the write tries again
+- **THEN** it counts as sent: no note is appended twice and no request is added twice
+- **PROOF** test: tools/backlog/test/store.test.mjs::a push that lands though it reports failure is sent once, not replayed
+
 ### Requirement: People set where an item stands, and its changes say what became of it
 People SHALL move an item between New, Discussing, Ready and Parked, any of them by anyone who can
 push to the branch, and once an item names a change the backlog SHALL show its state from that

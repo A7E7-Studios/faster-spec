@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { runGit } from '../gate/lib/git.mjs';
-import { readConfig, resolveRepos, fetchRepo } from '../solution-map/lib/sources.mjs';
+import { readConfig, resolveRepos, fetchRepo } from '../gate/lib/repos.mjs';
 import { SET_STATES, SECTIONS } from './lib/item.mjs';
 import { SHOWN_STATES, STATE_LABELS, withShownStates } from './lib/state.mjs';
 import { locateBacklog, fetchBacklog, readBacklog, writeBacklog } from './lib/store.mjs';

@@ -21,10 +21,11 @@ offers a restart. You meet it when you raise or discuss requests without working
 ## Requirements
 
 ### Requirement: One setup command prepares the computer
-When a person runs the setup command their project gives, the launcher SHALL check for Git and
-Node 22 or later, ask for a git name and email when none is set, clone each of the project's
-repositories that its config gives an address for, with no working files, and add a shortcut for
-this system, because a person who is not a developer gets the map without a developer's setup.
+When a person runs the setup command their project gives, the launcher SHALL check for Git 2.29 or
+later and Node 22 or later, ask for a git name and email when none is set, clone each of the
+project's repositories that its config gives an address for, with no working files, and add a
+shortcut for this system, because a person who is not a developer gets the map without a
+developer's setup, and an older Git cannot fetch what the map and the backlog fetch.
 
 #### Scenario: A developer prints the setup command
 - **WHEN** a developer runs `node tools/solution-map/launcher/setup.mjs --print-command`
@@ -33,7 +34,7 @@ this system, because a person who is not a developer gets the map without a deve
 - **PROOF** test: tools/solution-map/test/launcher.test.mjs::print-command prints one setup command per system
 
 #### Scenario: Something missing stops setup and says what to install
-- **GIVEN** Git, or Node 22 or later, is missing
+- **GIVEN** Git 2.29 or later, or Node 22 or later, is missing
 - **WHEN** setup runs
 - **THEN** it names what is missing and its official download page, and stops without changing
   anything
@@ -89,6 +90,12 @@ anything.
   rewritten
 - **PROOF** test: tools/solution-map/test/launcher.test.mjs::the launcher takes main's copy of itself, never into a checkout
 
+#### Scenario: Old maps are removed
+- **GIVEN** the shortcut ran several maps before
+- **WHEN** it opens
+- **THEN** only the map it runs and the one run before it stay on the computer
+- **PROOF** test: tools/solution-map/test/launcher.test.mjs::the launcher keeps the map it runs and the one run before, and removes the others
+
 #### Scenario: The shortcut opens the browser on the map
 - **WHEN** a person double-clicks the shortcut on their desktop
 - **THEN** the browser opens on the map
@@ -113,3 +120,9 @@ because people keep the map open for long and should not work in an old one.
 - **WHEN** the map runs from a checkout with `node tools/solution-map/solution-map.mjs`
 - **THEN** no restart banner shows, whatever main holds
 - **PROOF** test: tools/solution-map/test/launcher.test.mjs::a map run from a checkout offers no restart
+
+#### Scenario: Restart waits for a Submit under way
+- **GIVEN** Submit is sending
+- **WHEN** the person presses Restart to update
+- **THEN** the map restarts once Submit has cleared what it sent, so no draft is sent twice
+- **PROOF** test: tools/solution-map/test/server.test.mjs::Restart hands over only once a Submit out has cleared what it sent

@@ -3,13 +3,15 @@
 // the result into the view model, and for a launched map, say when main holds a newer map.
 import path from 'node:path';
 import { buildOverview } from '../../overview/overview.mjs';
-import { Repo } from '../../gate/lib/git.mjs';
+import { Repo, gitAsync, lastLine } from '../../gate/lib/git.mjs';
+import { fetchRepo as fetchOne, samePath } from '../../gate/lib/repos.mjs';
 import { SPEC_FILE } from '../../gate/lib/spec.mjs';
 import { parseItem, itemPath } from '../../backlog/lib/item.mjs';
+import { fieldOf } from '../../backlog/lib/ops.mjs';
 import { fetchBacklog as fetchBranch } from '../../backlog/lib/store.mjs';
 import { mainMapTree, missingObjects, fetchObjects } from '../launcher/launch.mjs';
 import { adapt, emptyModel, webBase, OVERVIEW_VERSION } from './adapt.mjs';
-import { fetchRepo as fetchOne, remoteUrl, git, samePath } from './sources.mjs';
+import { remoteUrl } from './sources.mjs';
 
 /** Whether anything answers at an address within 2 s. */
 export async function probeUrl(url) {
@@ -94,7 +96,7 @@ async function mapUpdate(launched, mapTreeOf) {
 
 /** A clone's git directory shared by its worktrees, or null. */
 async function commonDir(dir) {
-  const r = await git(dir, ['rev-parse', '--git-common-dir']);
+  const r = await gitAsync(dir, ['rev-parse', '--git-common-dir']);
   return r.ok ? path.resolve(dir, String(r.out).trim()) : null;
 }
 
@@ -121,7 +123,7 @@ export const PREFETCH_TIMEOUT = 10 * 60 * 1000;
 
 /** Whether a clone was made without blobs from origin: origin is its promisor remote (`extensions.partialClone` in older clones). */
 async function fetchesBlobsFromOrigin(dir) {
-  const r = await git(dir, ['config', '--get-regexp', '^(remote\\.origin\\.promisor|extensions\\.partialclone)$']);
+  const r = await gitAsync(dir, ['config', '--get-regexp', '^(remote\\.origin\\.promisor|extensions\\.partialclone)$']);
   if (!r.ok) return false;
   return String(r.out).split('\n').some((l) => {
     const [key, value = ''] = l.trim().split(/\s+/);
@@ -147,11 +149,11 @@ export async function prefetchClone(dir, { main = true, trees = [] } = {}) {
   const tips = [...trees];
   let history = null;
   if (main) {
-    const c = await git(dir, ['rev-parse', '--verify', '--quiet', 'origin/main^{commit}']);
+    const c = await gitAsync(dir, ['rev-parse', '--verify', '--quiet', 'origin/main^{commit}']);
     if (c.ok) {
       const commit = String(c.out).trim();
       tips.push(`${commit}^{tree}`);
-      const ls = await git(dir, ['ls-tree', '-r', '-z', '--name-only', '--full-tree', commit, '--', 'specs']);
+      const ls = await gitAsync(dir, ['ls-tree', '-r', '-z', '--name-only', '--full-tree', commit, '--', 'specs']);
       const specs = ls.ok ? String(ls.out).split('\0').filter((p) => SPEC_FILE.test(p)) : [];
       if (specs.length) history = `${commit}\n--\n${specs.join('\n')}\n`;
     }
@@ -160,7 +162,7 @@ export async function prefetchClone(dir, { main = true, trees = [] } = {}) {
     const missing = new Set(tips.length ? await missingObjects(dir, [], tips.join('\n') + '\n') : []);
     if (history) for (const oid of await missingObjects(dir, ['--first-parent'], history)) missing.add(oid);
     const f = await fetchObjects(dir, [...missing], { timeout: PREFETCH_TIMEOUT });
-    return f.ok ? { fetched: missing.size } : { fetched: 0, error: f.err.trim().split('\n').pop() || 'the fetch failed' };
+    return f.ok ? { fetched: missing.size } : { fetched: 0, error: lastLine(f.err, 'the fetch failed') };
   } catch (e) {
     return { fetched: 0, error: e.message };
   }
@@ -180,7 +182,7 @@ export function heldBy(where, tip, drafts) {
   if (!tip || !held.length) return out;
   const repo = new Repo(where.dir);
   for (const d of held) {
-    const field = d.op === 'move' ? 'state' : d.field;
+    const field = fieldOf(d);
     const p = itemPath(d.id);
     const log = repo.git(['log', '--format=%H%x00%an', tip, '--', p], { allowFail: true });
     const versions = log.status === 0 ? String(log.stdout).split('\n').filter(Boolean).map((l) => l.split('\0')) : [];

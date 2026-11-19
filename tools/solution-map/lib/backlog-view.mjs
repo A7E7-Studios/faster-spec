@@ -3,6 +3,7 @@
 // dialog, each feature's open requests and the New requests that wait for the owner. What a person
 // sees is the branch with their own drafts on it. Nothing here touches git or the file system.
 import { SET_STATES } from '../../backlog/lib/item.mjs';
+import { fieldOf } from '../../backlog/lib/ops.mjs';
 import { STATE_LABELS } from '../../backlog/lib/state.mjs';
 
 /** The board's columns, in order; Done and Parked show only once their filter is on. */
@@ -16,7 +17,6 @@ export const STATES = ORDER.map((id) => ({ id, label: STATE_LABELS[id], set: SET
 /** The page's address of a request: `/backlog/<id>`, an unsent one by its draft's key. */
 export const requestAddress = (id) => `/backlog/${encodeURIComponent(id)}`;
 
-const fieldOf = (d) => (d.op === 'move' ? 'state' : d.field);
 const label = (state) => STATE_LABELS[state] ?? null;
 
 function fromItem(item) {

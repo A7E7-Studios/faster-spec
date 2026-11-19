@@ -43,7 +43,7 @@ supports, no product names, and nothing the backlog does may touch main or a che
 | Area | Detail |
 |---|---|
 | Modules and READMEs | `tools/backlog/` (new): `backlog.mjs` (command line), `lib/item.mjs` (format), `lib/ops.mjs` (operations and replay), `lib/store.mjs` (git), `lib/state.mjs` (shown state), `lib/drafts.mjs`, `test/`, `README.md`. `tools/solution-map/`: `lib/server.mjs` routes, `lib/backlog-view.mjs` (new), `page/` (board, dialog, create form, unsent line, banners), `launcher/` (new: `setup.mjs`, `launch.mjs`), `README.md` |
-| Code reused | `parseFrontMatter` and `ID` from `tools/gate/lib/spec.mjs`; `runGit` and `parseCatFileBatch` from `tools/gate/lib/git.mjs`; the map's `git` and `fetchRepo` from `lib/sources.mjs`; the map's banner and dialog styles |
+| Code reused | `parseFrontMatter` and `ID` from `tools/gate/lib/spec.mjs`; `runGit`, `gitAsync` and `parseCatFileBatch` from `tools/gate/lib/git.mjs`; `fetchRepo`, `readConfig`, `resolveRepos` and `samePath` from `tools/gate/lib/repos.mjs`, moved there from the map's `lib/sources.mjs` so the backlog and the map do not import each other; the map's banner and dialog styles |
 | State on the network | The backlog's branch on the repository's remote is the only shared state: anyone who can push changes it; every writer replays onto its tip. Drafts never leave the computer before Submit |
 | Formats and contracts | The item file (new, described in `tools/backlog/README.md`); the config keys `backlog` and `solutionMap.repos[].url` (new, optional: a project's next sync needs nothing unless it uses them); the overview's JSON unchanged (version 3) |
 | Storage | The branch, kept for good; drafts and launched maps under the clone's git directory, removed with the clone |

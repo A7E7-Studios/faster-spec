@@ -1,7 +1,7 @@
 {
   "name": "solution-map",
   "private": true,
-  "description": "The Solution map: a local web page over the overview's index, served on 127.0.0.1. No dependencies.",
+  "description": "The Solution map: a local web page over the overview's index and the backlog, served on 127.0.0.1, where people raise requests and submit them to the backlog's branch; and its launcher, which sets a computer up and opens the newest map from main with a shortcut. No dependencies.",
   "type": "module",
   "engines": {
     "node": ">=22"

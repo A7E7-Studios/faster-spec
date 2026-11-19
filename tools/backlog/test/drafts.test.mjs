@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { withTmp, project, git, commits } from './helpers.mjs';
-import { git as netGit } from '../../solution-map/lib/sources.mjs';
+import { gitAsync as netGit } from '../../gate/lib/git.mjs';
 import { draftsPath, readDrafts, saveDraft, dropDraft, submitDrafts } from '../lib/drafts.mjs';
 import { writeBacklog, readBacklog } from '../lib/store.mjs';
 

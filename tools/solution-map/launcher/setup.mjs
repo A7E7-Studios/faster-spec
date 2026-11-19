@@ -4,8 +4,8 @@
 //   node tools/solution-map/launcher/setup.mjs [--root <repository folder>]
 //   node tools/solution-map/launcher/setup.mjs --print-command
 //
-// 1. Checks for Git and Node 22 or later; when one is missing, names it and its download page and
-//    stops without changing anything. It never installs anything.
+// 1. Checks for Git 2.29 and Node 22 or later (GIT_MIN, NODE_MAJOR); when one is missing or older,
+//    names it and its download page and stops without changing anything. It never installs anything.
 // 2. Asks for git's `user.name` and `user.email` when none is set, and sets them (`--global`).
 // 3. Clones each `solutionMap.repos` entry of `origin/main:tools/gate/config.json` that carries a
 //    `url`, at its `path` relative to --root, with `--filter=blob:none --no-checkout`: history, no
@@ -28,13 +28,24 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { git, resolveRepos, readAt, remoteUrl, hasRef, samePath } from '../lib/sources.mjs';
+import { gitAsync, lastLine } from '../../gate/lib/git.mjs';
+import { resolveRepos, hasRef, samePath } from '../../gate/lib/repos.mjs';
+import { readAt, remoteUrl } from '../lib/sources.mjs';
 
 export const GIT_PAGE = 'https://git-scm.com/downloads';
 export const NODE_PAGE = 'https://nodejs.org/en/download';
 export const NODE_MAJOR = 22;
-/** What the setup command takes from git to run this file: its folder and the module it imports. */
-export const SETUP_PATHS = ['tools/solution-map/launcher', 'tools/solution-map/lib/sources.mjs'];
+/**
+ * The oldest Git the map, its launcher and the backlog run on: 2.29 brought `fetch --stdin` and the
+ * `noop` negotiation (`fetch.negotiationAlgorithm`) the launcher fetches missing blobs with, and
+ * `fetch --no-write-fetch-head`, which the backlog fetches its branch with.
+ */
+export const GIT_MIN = '2.29';
+/**
+ * What the setup command takes from git to run this file: its folder, the map's module it imports
+ * and the gate's library, whose modules import each other.
+ */
+export const SETUP_PATHS = ['tools/solution-map/launcher', 'tools/solution-map/lib/sources.mjs', 'tools/gate/lib'];
 const SETUP_SCRIPT = 'tools/solution-map/launcher/setup.mjs';
 const CONFIG = 'tools/gate/config.json';
 const LAUNCH_SOURCE = fileURLToPath(new URL('./launch.mjs', import.meta.url));
@@ -43,7 +54,17 @@ const USAGE = `usage: node tools/solution-map/launcher/setup.mjs [--root <reposi
   sets this computer up to open the Solution map from a shortcut; --root defaults to the
   repository holding the current folder; --print-command prints the setup command per system`;
 
-const lastLine = (s) => String(s).trim().split('\n').pop() || 'failed';
+/** The version `git --version` answers with, `2.39.2` from `git version 2.39.2.windows.1`; null when it names none. */
+export function gitVersionOf(answer) {
+  return /\d+\.\d+(?:\.\d+)?/.exec(String(answer ?? ''))?.[0] ?? null;
+}
+
+/** Whether a Git version, `<major>.<minor>[.<patch>]`, is older than GIT_MIN. */
+export function gitTooOld(version) {
+  const [a, b] = version.split('.').map(Number);
+  const [x, y] = GIT_MIN.split('.').map(Number);
+  return a < x || (a === x && b < y);
+}
 
 /** A short name from a repository's address: `notes-app` from `.../notes-app.git`; '' when none. */
 export function repoName(address) {
@@ -58,7 +79,7 @@ const shQuote = (s) => `'${String(s).replace(/'/g, "'\\''")}'`;
 export function setupCommands({ url, name }) {
   if (!/^[A-Za-z0-9._-]+$/.test(name)) throw new Error(`"${name}" is not a folder name`);
   const nodeLine = `Install Node.js ${NODE_MAJOR} or later first: ${NODE_PAGE}`;
-  const gitLine = `Install Git first: ${GIT_PAGE}`;
+  const gitLine = `Install Git ${GIT_MIN} or later first: ${GIT_PAGE}`;
   const take = `restore --source=origin/main -- ${SETUP_PATHS.join(' ')}`;
   const clone = (q, dest) => `git clone -q --filter=blob:none --no-checkout ${q(url)} ${dest}`;
   const powershell = [
@@ -133,7 +154,7 @@ function askLine(question) {
 }
 
 async function gitVersionOnPath() {
-  const r = await git(process.cwd(), ['--version']);
+  const r = await gitAsync(process.cwd(), ['--version']);
   return r.ok ? String(r.out).trim() : null;
 }
 
@@ -158,7 +179,7 @@ async function readProject(root) {
 }
 
 async function toplevel(dir) {
-  const r = await git(dir, ['rev-parse', '--show-toplevel']);
+  const r = await gitAsync(dir, ['rev-parse', '--show-toplevel']);
   return r.ok ? path.resolve(String(r.out).trim()) : null;
 }
 
@@ -190,7 +211,10 @@ export async function setup({
   log = console.log, warn = console.error,
 } = {}) {
   const missing = [];
-  if (!(await gitVersion())) missing.push(`Git, from ${GIT_PAGE}`);
+  const answer = await gitVersion();
+  const have = answer ? gitVersionOf(answer) : null;
+  if (!answer) missing.push(`Git ${GIT_MIN} or later, from ${GIT_PAGE}`);
+  else if (have && gitTooOld(have)) missing.push(`Git ${GIT_MIN} or later (this computer has ${have}), from ${GIT_PAGE}`);
   if (Number(String(nodeVersion).split('.')[0]) < NODE_MAJOR) missing.push(`Node.js ${NODE_MAJOR} or later (this computer has ${nodeVersion}), from ${NODE_PAGE}`);
   if (missing.length) {
     for (const m of missing) warn(`setup: install ${m}`);
@@ -205,7 +229,7 @@ export async function setup({
   const { repos, store } = project;
 
   for (const [key, what] of [['user.name', 'name'], ['user.email', 'email address']]) {
-    const set = await git(root, ['config', '--get', key]);
+    const set = await gitAsync(root, ['config', '--get', key]);
     if (set.ok && String(set.out).trim()) continue;
     let answer = '';
     while (answer === '') {
@@ -214,8 +238,8 @@ export async function setup({
       answer = String(a).trim();
     }
     if (!answer) { warn(`setup: git needs your ${what}; run setup again`); return 1; }
-    const w = await git(root, ['config', '--global', key, answer]);
-    if (!w.ok) { warn(`setup: could not set git's ${key}: ${lastLine(w.err)}`); return 1; }
+    const w = await gitAsync(root, ['config', '--global', key, answer]);
+    if (!w.ok) { warn(`setup: could not set git's ${key}: ${lastLine(w.err, 'failed')}`); return 1; }
   }
 
   for (const r of repos) {
@@ -227,16 +251,16 @@ export async function setup({
       return 1;
     }
     log(`setup: cloning ${r.id} into ${r.dir}`);
-    const c = await git(root, ['clone', '--quiet', '--filter=blob:none', '--no-checkout', r.url, r.dir], { timeout: 0 });
-    if (!c.ok) { warn(`setup: could not clone ${r.id} from ${r.url}: ${lastLine(c.err)}`); return 1; }
+    const c = await gitAsync(root, ['clone', '--quiet', '--filter=blob:none', '--no-checkout', r.url, r.dir], { timeout: 0 });
+    if (!c.ok) { warn(`setup: could not clone ${r.id} from ${r.url}: ${lastLine(c.err, 'failed')}`); return 1; }
   }
 
   if (!fs.existsSync(path.join(store.dir, '.git'))) {
     warn(`setup: the backlog's repository ${store.id} is not at ${store.dir}; give its solutionMap.repos entry a url`);
     return 1;
   }
-  const common = await git(store.dir, ['rev-parse', '--git-common-dir']);
-  if (!common.ok) { warn(`setup: ${store.dir}: ${lastLine(common.err)}`); return 1; }
+  const common = await gitAsync(store.dir, ['rev-parse', '--git-common-dir']);
+  if (!common.ok) { warn(`setup: ${store.dir}: ${lastLine(common.err, 'failed')}`); return 1; }
   const launch = path.join(path.resolve(store.dir, String(common.out).trim()), 'faster-spec', 'launcher', 'launch.mjs');
   fs.mkdirSync(path.dirname(launch), { recursive: true });
   fs.copyFileSync(launchSource, launch);

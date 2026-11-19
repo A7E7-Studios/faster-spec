@@ -25,7 +25,8 @@ import { readDocImpact } from '../lib/trailers.mjs';
 import { prSections } from '../lib/pr.mjs';
 import { blobSize, holdsId, networkLoads, MEDIA } from '../lib/checks.mjs';
 import { loadConfig } from '../lib/index.mjs';
-import { parseCatFileBatch } from '../lib/git.mjs';
+import { parseCatFileBatch, gitAsync, lastLine } from '../lib/git.mjs';
+import { samePath, readConfig } from '../lib/repos.mjs';
 import { blobId, parseLock, owns } from '../lib/kit.mjs';
 import { specText, proposalText, P, GATE_DIR } from './helpers.mjs';
 
@@ -636,6 +637,27 @@ test('cat-file batch: each record must be the blob asked for; a missing or misma
   assert.throws(() => parseCatFileBatch(Buffer.from(rec(A, 'tree', 'x')), [A]), /is a tree, not a blob/);
   assert.throws(() => parseCatFileBatch(Buffer.from(`${A} blob 10\nshort\n`), [A]), /cut short/);
   assert.throws(() => parseCatFileBatch(Buffer.from(rec(A, 'blob', 'x')), [A, B]), /no record for b+/);
+});
+
+test('git\'s last line; one folder by two paths; a config that is missing or not JSON reads as null', async () => {
+  assert.equal(lastLine('remote: counting\r\nfatal: the remote end hung up unexpectedly\r\n'), 'fatal: the remote end hung up unexpectedly');
+  assert.deepEqual([lastLine(''), lastLine(undefined), lastLine('\n \n', 'failed')], ['', '', 'failed']);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-repos-'));
+  try {
+    assert.equal(samePath(dir, path.join(dir, 'sub', '..')), true);
+    assert.equal(samePath(dir, `${dir}-other`), false);
+    assert.equal(samePath(dir, dir.toUpperCase()), process.platform === 'win32');
+    assert.equal(readConfig(dir), null);
+    fs.mkdirSync(path.join(dir, 'tools', 'gate'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'tools', 'gate', 'config.json'), '{ "solutionMap": ');
+    assert.equal(readConfig(dir), null);
+    fs.writeFileSync(path.join(dir, 'tools', 'gate', 'config.json'), '{ "solutionMap": { "repos": [] } }');
+    assert.deepEqual(readConfig(dir), { solutionMap: { repos: [] } });
+    // The async runner resolves, never rejects, whatever git says.
+    const r = await gitAsync(dir, ['rev-parse', '--verify', '--quiet', 'no-such-ref']);
+    assert.equal(r.ok, false);
+    assert.equal((await gitAsync(dir, ['--version'])).ok, true);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
 test('budgets measure the git blob, the same on every OS', () => {

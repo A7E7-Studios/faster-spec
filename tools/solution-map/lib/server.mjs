@@ -9,6 +9,7 @@ import { readAt } from './sources.mjs';
 import { heldBy } from './build.mjs';
 import { backlogView } from './backlog-view.mjs';
 import { backlogTip, readBacklog, gitIdentity } from '../../backlog/lib/store.mjs';
+import { fieldOf } from '../../backlog/lib/ops.mjs';
 import { withShownStates } from '../../backlog/lib/state.mjs';
 import { readDrafts, saveDraft, dropDraft, submitDrafts } from '../../backlog/lib/drafts.mjs';
 
@@ -89,7 +90,8 @@ function readJson(req) {
   });
 }
 
-const fieldOf = (d) => (d.op === 'move' ? 'state' : d.field);
+/** Why a draft is not changed while a Submit is out: the drafts it sends stay as it sends them. */
+export const SENDING = 'Submit is sending your drafts; try again once it is done.';
 
 /**
  * @param {object} o
@@ -97,10 +99,12 @@ const fieldOf = (d) => (d.op === 'move' ? 'state' : d.field);
  *   `backlog` is the backlog's fetch (`buildMap`)
  * @param {() => Promise<string|Buffer|null>} [o.theme] the project's `kit-pages/theme.css`, served as `/theme.css`; null when it has none
  * @param {() => Promise<{ ok: boolean, error?: string }>} [o.review] opens CueReview
- * @param {{ where?: { dir: string, branch: string, repo: string|null }, repos?: { dir: string }[], error?: string }|null} [o.backlog]
- *   where the backlog lives (`locateBacklog`) and the solution's repositories, or why there is none
+ * @param {{ where?: { dir: string, branch: string, repo: string|null }, repos?: { dir: string }[], net?: Function, error?: string }|null} [o.backlog]
+ *   where the backlog lives (`locateBacklog`) and the solution's repositories, or why there is none;
+ *   `net`, the runner for Submit's fetches and push (`submitDrafts`), git by default
  * @param {(() => Promise<{ ok: true, handOver: () => void } | { ok: false, error: string }>)|null} [o.restart]
- *   Restart to update, for a map the launcher started: whether it can, and `handOver`, run once the answer is sent
+ *   Restart to update, for a map the launcher started: whether it can, and `handOver`, run once the
+ *   answer is sent and the fetches and Submits before it are done
  * @returns {{ server: http.Server, refresh: () => Promise<object>, listen: (port: number, o?: { wait?: number }) => Promise<number> }}
  */
 export function createMapServer({ build, theme = async () => null, review = async () => ({ ok: false, error: 'Start review is not set up here.' }), backlog = null, restart = null }) {
@@ -152,22 +156,31 @@ export function createMapServer({ build, theme = async () => null, review = asyn
     const status = fetched ?? { state: tip ? 'current' : 'absent' };
     return backlogView({ items, drafts, features, me: gitIdentity(where.dir)?.name ?? null, status, problems, heldBy: heldBy(where, tip, drafts), where, submit, draftsError });
   };
-  // A move or an edit of a sent request keeps the value it was made over: the draft's own when it
-  // is changed, else the branch's as last read. Submit then holds it when someone changed the field
-  // meanwhile, instead of writing over theirs.
+  // A move or an edit of a sent request keeps the value it was made over: for a held draft changed
+  // again, the other person's value it was held over, which the page shows; for another changed
+  // draft, its own; else the branch's as last read. Submit then holds it when someone changed the
+  // field meanwhile, instead of writing over theirs.
   const withFrom = (save, b) => {
     if ((save.op !== 'move' && save.op !== 'edit') || save.from !== undefined || save.id === undefined) return save;
     const prev = save.key === undefined ? null : readDrafts(where.dir).find((d) => d.key === save.key);
-    if (prev && prev.from !== undefined && prev.id === save.id && prev.op === save.op && fieldOf(prev) === fieldOf(save)) return { ...save, from: prev.from };
+    if (prev && prev.id === save.id && prev.op === save.op && fieldOf(prev) === fieldOf(save)) {
+      if (prev.held) return { ...save, from: prev.held.theirs };
+      if (prev.from !== undefined) return { ...save, from: prev.from };
+    }
     const item = readBranch(b).items.find((i) => i.id === save.id);
     return item && !item.problems.length ? { ...save, from: item[fieldOf(save)] } : save;
   };
+  // How many Submits are out. A draft changed while one is out is sent as Submit read it and kept
+  // as changed: an unsent request changed then would be sent twice, as two requests.
+  let sending = 0;
   /** POST /api/drafts: `{ save }` adds a draft, or changes the one its `key` names; `{ drop }` drops one; `{ apply }` applies a held one again over the other person's value. */
   const changeDrafts = async (req) => {
     const body = await readJson(req);
     const off = noBacklog();
     if (off) throw new Refused(409, off);
     const b = await latest();
+    // From here to the write nothing waits, so no Submit starts in between.
+    if (sending) throw new Refused(409, SENDING);
     let draft = null;
     try {
       if (typeof body.drop === 'string') dropDraft(where.dir, body.drop);
@@ -182,12 +195,20 @@ export function createMapServer({ build, theme = async () => null, review = asyn
     }
     return { ok: true, draft, backlog: await backlogModel() };
   };
+  let restarting = false;
   /** POST /api/submit: every draft as one commit, in turn with the fetches. */
   const submit = async (req) => {
     await readJson(req);
     const off = noBacklog();
     if (off) throw new Refused(409, off);
-    const s = await inTurn(() => submitDrafts(where));
+    if (restarting) throw new Refused(409, 'the map is restarting');
+    sending++;
+    let s;
+    try {
+      s = await inTurn(() => submitDrafts(where, { net: backlog.net }));
+    } finally {
+      sending--;
+    }
     if (s.ok) fetched = { state: 'current', tip: backlogTip(where) };
     return {
       ok: s.ok,
@@ -201,8 +222,11 @@ export function createMapServer({ build, theme = async () => null, review = asyn
     };
   };
 
-  let restarting = false;
-  /** POST /api/restart: answers `{ ok: true }`, then hands over to the launcher (`restart().handOver`). */
+  /**
+   * POST /api/restart: answers `{ ok: true }`, then hands over to the launcher (`restart().handOver`)
+   * in turn with the fetches and Submits: one out finishes first, so the map never exits between a
+   * push and the drafts it sent being cleared. Nothing in turn after it runs.
+   */
   const restartMap = async (req, res) => {
     await readJson(req);
     if (!restart) throw new Refused(409, 'only a map its shortcut opened restarts; start this one again from its checkout');
@@ -211,7 +235,10 @@ export function createMapServer({ build, theme = async () => null, review = asyn
     if (!r?.ok) throw new Refused(409, r?.error || 'the map cannot restart');
     restarting = true;
     // Only once the page has the answer; a page gone before it can ask again.
-    res.once('close', () => { if (res.writableFinished) r.handOver(); else restarting = false; });
+    res.once('close', () => {
+      if (!res.writableFinished) { restarting = false; return; }
+      inTurn(() => new Promise(() => r.handOver())).catch(() => { restarting = false; });
+    });
     return send(res, 200, JSON_TYPE, JSON.stringify({ ok: true }));
   };
 

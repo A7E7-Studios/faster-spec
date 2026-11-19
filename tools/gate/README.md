@@ -166,7 +166,8 @@ Globs: `**` spans folders, `*` and `?` stay inside one.
 | `lib/context.mjs` | revisions, changed paths, the Markdown diff, commits, nearest README |
 | `lib/kit.mjs` | the lock: `parseLock`, `blobId`, `kitProblems`; shared with [`tools/kit`](../kit/README.md) |
 | `lib/spec.mjs` | `parseSpec`, `parseChange`, `parseProof`, `parseLook`, front matter, scenario slugs, the spec text and the derived states (`isTested`, `reviewState`); shared with [`tools/overview`](../overview/README.md) |
-| `lib/git.mjs` | reads a repository at a revision through git objects |
+| `lib/git.mjs` | reads a repository at a revision through git objects; `gitAsync`, git run without waiting, and `lastLine`, what a failure says |
+| `lib/repos.mjs` | the repositories a project's tools read together: `readConfig`, `resolveRepos` (`--repo`, else `solutionMap.repos`), `fetchRepo`, `hasRef`, `samePath`; shared with [`tools/solution-map`](../solution-map/README.md) and [`tools/backlog`](../backlog/README.md) |
 | `lib/markdown.mjs` | fences, inline code, heading anchors, links, a document's first heading and paragraph |
 | `lib/diff.mjs`, `lib/glob.mjs`, `lib/trailers.mjs`, `lib/pr.mjs`, `lib/report.mjs` | diff parsing, globs, `Doc-Impact`, the PR description, the Markdown summary |
 

@@ -49,6 +49,9 @@ export function opProblem(op) {
   return null;
 }
 
+/** The field a move or an edit sets: `state` for a move, the edit's `field`. */
+export const fieldOf = (op) => (op.op === 'move' ? 'state' : op.field);
+
 /** A field's value as the file keeps it. */
 function norm(field, v) {
   if (field === 'about') return [...new Set(v)];
@@ -139,7 +142,7 @@ export function applyOps(tip, ops, { name, now = new Date() }) {
       }
       continue;
     }
-    const field = op.op === 'move' ? 'state' : op.field;
+    const field = fieldOf(op);
     const current = item[field];
     const to = norm(field, op.to);
     if (same(field, current, to)) results.push({ op, status: 'unchanged', id });

@@ -5,7 +5,9 @@ import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { resolveRepos, readConfig, readAt, git } from './lib/sources.mjs';
+import { gitAsync } from '../gate/lib/git.mjs';
+import { resolveRepos, readConfig } from '../gate/lib/repos.mjs';
+import { readAt } from './lib/sources.mjs';
 import { buildMap } from './lib/build.mjs';
 import { createMapServer } from './lib/server.mjs';
 import { reviewCommand, startReview } from './lib/review.mjs';
@@ -69,7 +71,7 @@ export async function main(argv) {
   try {
     o = parseArgs(argv);
     if (o.help) { console.log(USAGE); return 0; }
-    const top = await git(process.cwd(), ['rev-parse', '--show-toplevel']);
+    const top = await gitAsync(process.cwd(), ['rev-parse', '--show-toplevel']);
     root = top.ok ? String(top.out).trim() : process.cwd();
     const config = readConfig(root);
     o.config = config;

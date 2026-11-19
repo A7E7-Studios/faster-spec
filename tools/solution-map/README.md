@@ -8,7 +8,8 @@ backlog's branch, only when a person presses Submit on the map's own page. Peopl
 developers open it from a shortcut that runs the newest map from main ([Launcher](#launcher)). What
 it does for a person: the kit's specs `overview/solution-map` and `overview/map-launcher`.
 
-No npm dependencies; Node 22 or later. It reads the overview's JSON **version 3** only.
+No npm dependencies; Node 22 or later; Git 2.29 or later (`GIT_MIN` in `launcher/setup.mjs`). It
+reads the overview's JSON **version 3** only.
 
 ```
 node tools/solution-map/solution-map.mjs [--repo <id>=<folder>]... [--port <n>] [--pages <address>] [--no-open]
@@ -81,8 +82,8 @@ moves. Fetches and Submit's push take turns.
 | `POST /api/refresh` | | builds again (above); the map's view model |
 | `POST /api/review` | | opens CueReview: `{ ok, error? }` |
 | `GET /api/backlog` | | the backlog's view model (below) |
-| `POST /api/drafts` | `{ "save": <operation> }` adds a draft, and with the draft's `key` changes it; `{ "drop": "<key>" }` drops it (an unsent request with the drafts naming it); `{ "apply": "<key>" }` applies a held draft again over the other person's value | `{ ok: true, draft, backlog }`; a draft that is not one: `400 { ok: false, error }` |
-| `POST /api/submit` | `{}` | `{ ok, unreachable, error, commit, sent: [{ key, op, id }], held: [{ key, op, id, field, theirs, yours }], refused: [{ key, op, reason }], backlog }`; `ok` false when nothing was sent, every draft kept |
+| `POST /api/drafts` | `{ "save": <operation> }` adds a draft, and with the draft's `key` changes it; `{ "drop": "<key>" }` drops it (an unsent request with the drafts naming it); `{ "apply": "<key>" }` applies a held draft again over the other person's value | `{ ok: true, draft, backlog }`; a draft that is not one: `400 { ok: false, error }`; while a Submit is out: `409 { ok: false, error }` (`SENDING`), nothing changed |
+| `POST /api/submit` | `{}` | `{ ok, unreachable, error, commit, sent: [{ key, op, id }], held: [{ key, op, id, field, theirs, yours }], refused: [{ key, op, reason }], backlog }`; `ok` false when nothing was sent, every draft kept; once a restart is under way: `409 { ok: false, error }` |
 | `POST /api/restart` | `{}` | a launched map: `{ ok: true }`, then [Restart to update](#launcher); any other, one no launcher waits on, or a restart under way: `409 { ok: false, error }` |
 | `GET /board/<repo>/<path>?section=<id>` | | a board at the commit read |
 
@@ -92,8 +93,13 @@ moves. Fetches and Submit's push take turns.
   A draft, a Submit or a restart is `application/json` of at most 256 KiB. Anything else is refused
   (403, 415, 413, 400), and nothing is kept or sent. A map without a backlog answers 409.
 - **An operation** is the backlog's ([A write](../backlog/README.md#a-write)). A move or an edit
-  of a sent request saved without `from` takes the value the map last read, and a changed draft
-  keeps its own, so Submit holds it when someone changed the field meanwhile.
+  of a sent request saved without `from` takes the value the map last read, a changed draft keeps
+  its own, and a held draft changed again takes the other person's value it was held over, the one
+  the page shows; so Submit holds it only when someone changed the field meanwhile.
+- **A Submit out holds the drafts still.** From the moment the map takes a Submit until it is done,
+  no draft is saved, dropped or applied again (409): Submit sends the drafts as it read them and
+  clears what it sent, so a draft changed meanwhile, an unsent request's form above all, would stay
+  a draft and be sent a second time.
 - **Drafts** live in the backlog's repository's git directory, per clone, out of `git status`, kept
   across restarts ([Drafts](../backlog/README.md#drafts)). Submit sends them all as one commit to
   the backlog's branch, nothing else: no checkout, branch or file of the repository moves.
@@ -139,20 +145,23 @@ when the backlog lives in another of those repositories ([Config](#config)).
 - **The printed command** is one line for PowerShell 5.1 (no `&&`) and one for POSIX `sh`. Each
   checks for `git` and `node` and names the missing one's download page; clones the backlog's
   repository (its `url`, else its `origin`) into `~/<name>-map/<name>` with `--filter=blob:none
-  --no-checkout`, `<name>` the address's last part without `.git`; takes
-  `tools/solution-map/launcher/` and `tools/solution-map/lib/sources.mjs` from its `origin/main`
-  into the clone's `.git/faster-spec/setup/` with `git restore`; and runs setup from there. Pasted
-  again, it fetches and runs setup again. An SSH address is printed with a warning: the other
-  computer needs a key.
+  --no-checkout`, `<name>` the address's last part without `.git`; takes what setup imports,
+  `tools/solution-map/launcher/`, `tools/solution-map/lib/sources.mjs` and `tools/gate/lib/`
+  (`SETUP_PATHS`), from its `origin/main` into the clone's `.git/faster-spec/setup/` with
+  `git restore`; and runs setup from there. Pasted again, it fetches and runs setup again. An SSH
+  address is printed with a warning: the other computer needs a key.
 - **Setup** reads `origin/main:tools/gate/config.json` of `--root` (default: the repository holding
-  the current folder). It checks for Git and Node 22 or later; when one is missing it names it and
-  its download page and stops, having changed nothing, and it never installs anything. It asks for
-  git's `user.name` and `user.email` when either is unset and sets them `--global`; clones each
-  `solutionMap.repos` entry with a `url` at its `path` relative to `--root`, blobless and with no
-  checkout, keeping a folder that already holds a clone and stopping at one that holds other
-  files; copies `launch.mjs` into `<git common dir>/faster-spec/launcher/` of the backlog's
-  repository; and writes the shortcut and prints its path. Run again, it keeps the clones and the
-  drafts. Exit: 0 done, 1 something missing or failed, 2 a usage error.
+  the current folder). It checks for Git 2.29 or later and Node 22 or later; when one is missing or
+  older it names it and its download page and stops, having changed nothing, and it never installs
+  anything. Git 2.29 (`GIT_MIN`) brought what the launcher fetches missing blobs with
+  (`fetch --stdin`, `fetch.negotiationAlgorithm=noop`) and what the backlog fetches its branch with
+  (`fetch --no-write-fetch-head`); the rest each uses is older. It asks for git's `user.name` and
+  `user.email` when either is unset and sets them `--global`; clones each `solutionMap.repos` entry
+  with a `url` at its `path` relative to `--root`, blobless and with no checkout, keeping a folder
+  that already holds a clone and stopping at one that holds other files; copies `launch.mjs` into
+  `<git common dir>/faster-spec/launcher/` of the backlog's repository; and writes the shortcut and
+  prints its path. Run again, it keeps the clones and the drafts. Exit: 0 done, 1 something missing
+  or failed, 2 a usage error.
 - **The shortcut** runs `<node> launch.mjs --root <clone>`, with the node setup ran under, in a
   terminal window; closing the window, or Ctrl+C, stops the launcher and the map, a restarted one
   too. Windows: `<Desktop>\<name> map.cmd`, the
@@ -165,33 +174,38 @@ when the backlog lives in another of those repositories ([Config](#config)).
   blobs the clone lacks in one request and writes those paths there with `checkout-index`. It
   takes main's copy of itself from that folder when the two differ and the copy passes
   `node --check`; the copy runs from the shortcut's next opening, as the launcher running goes on
-  with the code it started with. A copy in a checkout is never replaced. It runs the map from that
-  folder as its child, in the shortcut's window (inherited output, and an IPC channel), with
-  `--launched <tree id> --root <clone>`, a `--repo` per entry of that folder's config and the
-  arguments after `--`, and waits; Ctrl+C or a closed window it passes on to the map. When the
-  fetch fails it runs the map last run (the folder it touched last). It never moves a clone's
-  HEAD, index or working files.
+  with the code it started with. A copy in a checkout is never replaced. It removes every map
+  folder but the one it runs and the one run before it, which may still run in another window
+  (`pruneMaps`): each is renamed aside, then removed, and on Windows one a running map works in
+  cannot be renamed and stays; a folder another launch is writing (`<tree id>.part-<pid>`) stays.
+  It runs the map from that folder as its child, in the shortcut's window (inherited output, and
+  an IPC channel), with `--launched <tree id> --root <clone>`, a `--repo` per entry of that
+  folder's config and the arguments after `--`, and waits; Ctrl+C or a closed window it passes on
+  to the map. When the fetch fails it runs the map last run (the folder it touched last). It never
+  moves a clone's HEAD, index or working files.
 - **Restart to update**: at every build a launched map compares its `--launched` tree id with
   main's and, when they differ, gives the `map-update` banner. `POST /api/restart` answers
-  `{ ok: true }`; once the answer is out, the map stops listening, sends its port to the launcher
-  over the IPC channel and exits with the restart code (`RESTART_CODE`). The launcher, waiting in
-  the same window, runs all of the above again in the same process, the port and `--no-open` added
-  to the map's arguments; any other exit code ends the launcher with that code. The newer map
-  waits up to 10 s for the port, and the page, asking `/api/map` until it answers, reloads. A map
-  started without `--launched`, or one no launcher waits on, answers 409.
+  `{ ok: true }`; once the answer is out and the fetches and Submits taken before it are done (they
+  take turns), the map stops listening, sends its port to the launcher over the IPC channel and
+  exits with the restart code (`RESTART_CODE`), so it never exits between a Submit's push and the
+  clearing of the drafts it sent. The launcher, waiting in the same window, runs all of the above
+  again in the same process, the port and `--no-open` added to the map's arguments; any other exit
+  code ends the launcher with that code. The newer map waits up to 10 s for the port, and the page,
+  asking `/api/map` until it answers, reloads. A map started without `--launched`, or one no
+  launcher waits on, answers 409.
 - **What it keeps** lives under the clone's `<git common dir>/faster-spec/`: `setup/`,
-  `launcher/launch.mjs` and `maps/<tree id>/`, beside the drafts (`backlog-drafts.json`), which a
-  restart, a newer map and setup run again all keep. None of it shows in `git status`, and it goes
-  with the clone.
+  `launcher/launch.mjs` and `maps/<tree id>/` (the map run last and the one before it), beside the
+  drafts (`backlog-drafts.json`), which a restart, a newer map and setup run again all keep. None
+  of it shows in `git status`, and it goes with the clone.
 
 ## Files
 
 | Path | What |
 |---|---|
 | `solution-map.mjs` | the command line; Restart to update's hand-over to the launcher |
-| `launcher/setup.mjs` | setup and the printed command; imports only `lib/sources.mjs`, which the command takes with it |
+| `launcher/setup.mjs` | setup and the printed command; imports, beyond Node, only `lib/sources.mjs` and `tools/gate/lib/`, which the command takes with it (`SETUP_PATHS`) |
 | `launcher/launch.mjs` | what the shortcut runs; Node's own modules only, since setup copies it alone. The map imports its `MAP_PATHS`, `TREE_ID`, `RESTART_CODE`, `mapTree`, `mainMapTree`, `missingObjects` and `fetchObjects` |
-| `lib/sources.mjs` | naming, fetching and reading the repositories |
+| `lib/sources.mjs` | the map's own reads of a repository: its origin's address and a file at a commit. Naming and fetching the repositories, and the config, are the gate's [`lib/repos.mjs`](../gate/lib/repos.mjs), which the backlog shares |
 | `lib/build.mjs` | one build: fetch, the backlog's fetch, the blobs a clone without them lacks, overview, page probes, adapt, the `map-update` banner; who set a held draft's field |
 | `lib/adapt.mjs` | the overview's JSON to the view model: features, the queue, the groups, links, banners |
 | `lib/backlog-view.mjs` | the backlog and the drafts to the backlog's view model |
@@ -206,8 +220,9 @@ when the backlog lives in another of those repositories ([Config](#config)).
   request gives `/backlog/new`). A dialog's address keeps the view under it in the history entry, so
   back, forward and reload show both again.
 - **Drafts and Submit** go through `POST /api/drafts` and `/api/submit`; a failed Submit's banner
-  stays until a Submit goes through. The `map-update` banner's Restart to update sends
-  `POST /api/restart`; after `{ ok: true }` the page polls `/api/map` every second, reloads when the
+  stays until a Submit goes through. A draft changed while Submit sends gets the server's refusal
+  as a toast, and what was typed stays in its form. The `map-update` banner's Restart to update,
+  disabled while Submit sends, sends `POST /api/restart`; after `{ ok: true }` the page polls `/api/map` every second, reloads when the
   new map answers, and after 30 s says the map has not come back while it keeps polling.
 - **Boards** come from git at the commit read, showing only the section with the id, in a sandboxed
   frame that runs no script.

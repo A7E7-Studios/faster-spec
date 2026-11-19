@@ -115,10 +115,13 @@ function topBar(vm, ui, st) {
     + `<button class="s-btn icon" data-act="theme" title="Light or dark">◐</button></header>`;
 }
 
-/** What the map-update banner says: a newer map is on main, then how the restart goes (`st.restart`). */
+/**
+ * What the map-update banner says: a newer map is on main, then how the restart goes (`st.restart`).
+ * Restart waits while Submit sends (`st.submitting`).
+ */
 function restartLine(st) {
   const r = st.restart;
-  const offer = '<button class="s-btn" data-act="restart">Restart to update</button>';
+  const offer = `<button class="s-btn" data-act="restart"${st.submitting ? ' disabled title="Submit is sending your drafts"' : ''}>Restart to update</button>`;
   if (r?.phase === 'asking' || r?.phase === 'restarting') return ['Restarting the map… The page reloads when it is back.', ''];
   if (r?.phase === 'late') return ['The map didn’t come back within 30 seconds. The page keeps trying; if it stays away, start the map again from its shortcut.', ''];
   if (r?.phase === 'error') return [`The map couldn’t restart: <span class="mono">${esc(r.error)}</span>`, offer];

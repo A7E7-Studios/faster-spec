@@ -6,8 +6,8 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { setup, setupCommands, shortcutFiles, repoName, GIT_PAGE, NODE_PAGE, SETUP_PATHS } from '../launcher/setup.mjs';
-import { MAP_PATHS, parseArgs as launchArgv } from '../launcher/launch.mjs';
+import { setup, setupCommands, shortcutFiles, repoName, gitVersionOf, gitTooOld, GIT_PAGE, GIT_MIN, NODE_PAGE, SETUP_PATHS } from '../launcher/setup.mjs';
+import { MAP_PATHS, TREE_ID, pruneMaps, parseArgs as launchArgv } from '../launcher/launch.mjs';
 import { parseArgs as parseMapArgs } from '../solution-map.mjs';
 
 const KIT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -115,14 +115,23 @@ test('setup names what is missing and stops', () => withTmp(async (tmp) => {
   const oldNode = await runSetup({ root, home, nodeVersion: '20.18.0' });
   assert.equal(oldNode.code, 1);
   assert.match(oldNode.warn.join('\n'), new RegExp(`Node\\.js 22 or later \\(this computer has 20\\.18\\.0\\), from ${NODE_PAGE}`));
-  assert.doesNotMatch(oldNode.warn.join('\n'), /Git, from/);
+  assert.doesNotMatch(oldNode.warn.join('\n'), /install Git/);
   unchanged();
 
   const noGit = await runSetup({ root, home, gitVersion: async () => null });
   assert.equal(noGit.code, 1);
-  assert.match(noGit.warn.join('\n'), new RegExp(`install Git, from ${GIT_PAGE}`));
+  assert.match(noGit.warn.join('\n'), new RegExp(`install Git 2\\.29 or later, from ${GIT_PAGE}`));
   assert.doesNotMatch(noGit.warn.join('\n'), /Node\.js/);
   unchanged();
+
+  // A Git older than 2.29 lacks what the launcher and the backlog fetch with.
+  assert.equal(GIT_MIN, '2.29');
+  const oldGit = await runSetup({ root, home, gitVersion: async () => 'git version 2.28.0.windows.1' });
+  assert.equal(oldGit.code, 1);
+  assert.match(oldGit.warn.join('\n'), new RegExp(`install Git 2\\.29 or later \\(this computer has 2\\.28\\.0\\), from ${GIT_PAGE}`));
+  unchanged();
+  assert.deepEqual(['git version 2.39.2.windows.1', 'git version 2.29.0', 'git version 3.1', 'no version here'].map(gitVersionOf), ['2.39.2', '2.29.0', '3.1', null]);
+  assert.deepEqual(['1.9.5', '2.9.0', '2.28.9', '2.29.0', '2.29', '2.100.0', '3.0'].map(gitTooOld), [true, true, true, false, false, false, false]);
 
   const neither = await runSetup({ root, home, gitVersion: async () => null, nodeVersion: '18.0.0' });
   assert.equal(neither.code, 1);
@@ -290,11 +299,9 @@ const envWith = (over) => {
 
 test('print-command prints one setup command per system', () => withTmp(async (tmp) => {
   identity(true);
-  // A project whose main carries the launcher, and a developer's checkout of it.
-  const kitFiles = {};
-  for (const p of ['tools/solution-map/launcher/setup.mjs', 'tools/solution-map/launcher/launch.mjs', 'tools/solution-map/lib/sources.mjs']) {
-    kitFiles[p] = fs.readFileSync(path.join(KIT, p), 'utf8');
-  }
+  // A project whose main carries the kit's map, its launcher and the gate's library, and a
+  // developer's checkout of it. The command takes SETUP_PATHS of it alone.
+  const kitFiles = kitMap();
   const app = origin(tmp, 'notes-app', { ...kitFiles, 'README.md': 'a notes app\n', 'tools/gate/config.json': config([{ id: 'app', path: '.' }]) });
   const checkout = path.join(tmp, 'checkout');
   execFileSync('git', ['clone', '-q', app.url, checkout], { stdio: 'pipe' });
@@ -320,8 +327,21 @@ test('print-command prints one setup command per system', () => withTmp(async (t
     const clone = path.join(home, 'notes-app-map', 'notes-app');
     assert.deepEqual(fs.readdirSync(clone), ['.git']);
     assert.equal(g(clone, 'config', 'remote.origin.partialclonefilter'), 'blob:none');
-    const taken = path.join(clone, '.git', 'faster-spec', 'setup', 'tools', 'solution-map', 'launcher', 'setup.mjs');
+    const setupDir = path.join(clone, '.git', 'faster-spec', 'setup');
+    const taken = path.join(setupDir, 'tools', 'solution-map', 'launcher', 'setup.mjs');
     assert.equal(fs.readFileSync(taken, 'utf8'), kitFiles['tools/solution-map/launcher/setup.mjs']);
+    // SETUP_PATHS and nothing else of main.
+    const within = (p) => SETUP_PATHS.some((s) => p === s || p.startsWith(`${s}/`));
+    const files = [];
+    const walk = (dir, rel) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (e.isDirectory()) walk(path.join(dir, e.name), `${rel}${e.name}/`);
+        else files.push(`${rel}${e.name}`);
+      }
+    };
+    walk(setupDir, '');
+    assert.deepEqual(files.filter((p) => !within(p)), []);
+    assert.deepEqual(files.sort(), Object.keys(kitFiles).filter(within).sort());
     const args = fs.readFileSync(record, 'utf8');
     assert.match(slashes(args).trim(), /notes-app-map\/notes-app\/\.git\/faster-spec\/setup\/tools\/solution-map\/launcher\/setup\.mjs"?\s+--root\s+"?[^\n]*notes-app-map\/notes-app"?$/);
     // What the command took from git is enough for setup to load: every module it imports is there.
@@ -342,7 +362,7 @@ test('print-command prints one setup command per system', () => withTmp(async (t
       return spawnSync(shell, ['-c', sh], { encoding: 'utf8', env: envWith({ PATH, HOME: slashes(home) }) });
     };
     const h1 = path.join(tmp, 'sh home one');
-    assert.match(runSh(empty, h1).stdout, new RegExp(`^Install Git first: ${GIT_PAGE}`));
+    assert.match(runSh(empty, h1).stdout, new RegExp(`^Install Git 2\\.29 or later first: ${GIT_PAGE}`));
     assert.deepEqual(fs.readdirSync(h1), []);
     const h2 = path.join(tmp, 'sh home two');
     assert.match(runSh(gitOnly, h2).stdout, new RegExp(`^Install Node\\.js 22 or later first: ${NODE_PAGE}`));
@@ -369,7 +389,7 @@ test('print-command prints one setup command per system', () => withTmp(async (t
     // One profile folder for the three runs (PowerShell keeps its own caches there, slow to build),
     // so only the command's own folder is looked for.
     const home = path.join(tmp, 'ps home');
-    assert.match(runPs(empty, home).stdout, new RegExp(`^Install Git first: ${GIT_PAGE}`));
+    assert.match(runPs(empty, home).stdout, new RegExp(`^Install Git 2\\.29 or later first: ${GIT_PAGE}`));
     assert.equal(fs.existsSync(path.join(home, 'notes-app-map')), false);
     const gitDir = path.dirname(execFileSync('where', ['git'], { encoding: 'utf8' }).split(/\r?\n/)[0].trim());
     if (!fs.existsSync(path.join(gitDir, 'node.exe'))) {
@@ -461,11 +481,13 @@ test('the launched map runs from main\'s code', () => withTmp(async (tmp) => {
   assert.deepEqual(launchArgs(second.ran.argv, t2, root), ['--repo', `app=${root}`, '--repo', `api=${apiClone}`]);
   assert.equal(g(apiClone, 'rev-parse', 'origin/main'), apiMain);
 
-  // A commit outside the map's code is the same map: no new folder.
+  // A commit outside the map's code is the same map: no new folder (and v1's goes, being neither
+  // the map run nor the one run before it).
+  assert.deepEqual(fs.readdirSync(maps).sort(), [t1, t2].sort());
   land(app, { 'README.md': 'a notes app, reworded\n' }, 'docs only');
   const third = open();
   assert.equal(third.ran.argv[1], t2);
-  assert.deepEqual(fs.readdirSync(maps).sort(), [t1, t2].sort());
+  assert.deepEqual(fs.readdirSync(maps), [t2]);
 
   // The clone's HEAD, index and working files are as setup left them.
   assert.equal(g(root, 'rev-parse', 'HEAD'), head);
@@ -514,6 +536,45 @@ test('without the network the last map runs', () => withTmp(async (tmp) => {
   assert.equal(lastRun.status, 0, lastRun.stderr);
   assert.equal(lastRun.ran.version, 'v1');
   assert.equal(real(lastRun.ran.cwd), real(path.join(maps, t1)));
+}));
+
+test('the launcher keeps the map it runs and the one run before, and removes the others', () => withTmp(async (tmp) => {
+  identity(true);
+  const { app, open, maps } = launched(tmp);
+  const t1 = open().ran.argv[1];
+  land(app, { 'tools/solution-map/solution-map.mjs': standIn('v2') }, 'a newer map');
+  const t2 = open().ran.argv[1];
+  assert.deepEqual(fs.readdirSync(maps).sort(), [t1, t2].sort(), 'the map before stays: it may run in another window');
+
+  // An older map, a folder another launch is still writing, and one a prune left aside.
+  const older = '0'.repeat(40);
+  fs.mkdirSync(path.join(maps, older, 'tools', 'solution-map'), { recursive: true });
+  fs.writeFileSync(path.join(maps, older, 'tools', 'solution-map', 'solution-map.mjs'), standIn('v0'));
+  const longAgo = new Date(Date.now() - 86400000);
+  fs.utimesSync(path.join(maps, older), longAgo, longAgo);
+  const writing = `${'1'.repeat(40)}.part-4242`;
+  fs.mkdirSync(path.join(maps, writing, 'tools'), { recursive: true });
+  const aside = `${'2'.repeat(40)}.prune-77`;
+  fs.mkdirSync(path.join(maps, aside, 'tools'), { recursive: true });
+
+  land(app, { 'tools/solution-map/solution-map.mjs': standIn('v3') }, 'a third map');
+  const third = open();
+  assert.equal(third.status, 0, third.stderr);
+  const t3 = third.ran.argv[1];
+  assert.equal(third.ran.version, 'v3');
+  assert.deepEqual(fs.readdirSync(maps).sort(), [t2, t3, writing].sort());
+
+  // Offline, the map last run runs, and it alone is kept.
+  fs.renameSync(app.bare, `${app.bare}-unreachable`);
+  const offline = open();
+  assert.equal(offline.ran.version, 'v3');
+  assert.deepEqual(fs.readdirSync(maps).filter((n) => TREE_ID.test(n)), [t3]);
+  assert.ok(fs.existsSync(path.join(maps, writing)));
+
+  // Nothing there to prune, and a prune of nothing, change nothing.
+  pruneMaps(path.join(tmp, 'no-maps-here'), []);
+  pruneMaps(maps, [t3]);
+  assert.deepEqual(fs.readdirSync(maps).sort(), [t3, writing].sort());
 }));
 
 test('the launcher takes main\'s copy of itself, never into a checkout', () => withTmp(async (tmp) => {

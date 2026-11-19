@@ -217,6 +217,12 @@ what they wrote before others see it, and nothing is lost when the page closes.
 - **THEN** it is refused, and nothing is kept or sent
 - **PROOF** test: tools/solution-map/test/server.test.mjs::a write from another page is refused
 
+#### Scenario: A draft waits while Submit sends
+- **GIVEN** Submit is sending
+- **WHEN** a person adds, changes or drops a draft
+- **THEN** the map refuses it and says Submit is sending, and the drafts being sent stay as they were
+- **PROOF** test: tools/solution-map/test/server.test.mjs::a draft is not changed while Submit sends, and says why
+
 ### Requirement: Looks are drawn from the repository
 The Solution map SHALL draw a board line from the board's section with that id, and show a page
 line's page live, because the design is drawn once, beside the spec.

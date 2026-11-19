@@ -4,8 +4,9 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Repo, runGit } from '../../gate/lib/git.mjs';
-import { git as gitAsync, resolveRepos } from '../../solution-map/lib/sources.mjs';
+import { Repo, runGit, gitAsync, lastLine } from '../../gate/lib/git.mjs';
+import { resolveRepos, samePath } from '../../gate/lib/repos.mjs';
+import { ID } from '../../gate/lib/spec.mjs';
 import { parseItem, itemPath, ITEM_FILE } from './item.mjs';
 import { applyOps, commitMessage } from './ops.mjs';
 
@@ -15,10 +16,7 @@ export const MAX_TRIES = 5;
 /** How long a fetch or a push may take, in ms. */
 export const NET_TIMEOUT = 60000;
 const REMOTE = 'origin';
-const REPO_ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const NEVER = ['main', 'master', 'HEAD'];
-
-const lastLine = (s) => String(s ?? '').trim().split('\n').pop() || '';
 
 /** A branch name the backlog may use: git's rules, a little stricter, and never main. */
 function branchProblem(b) {
@@ -38,7 +36,7 @@ export function backlogConfig(config) {
   if (b === undefined || b === null) return { repo: null, branch: DEFAULT_BRANCH };
   if (typeof b !== 'object' || Array.isArray(b)) throw new Error('backlog is { "repo": "<id in solutionMap.repos>", "branch": "<name>" }');
   for (const k of Object.keys(b)) if (k !== 'repo' && k !== 'branch') throw new Error(`backlog has no key "${k}" (repo, branch)`);
-  if (b.repo !== undefined && (typeof b.repo !== 'string' || !REPO_ID.test(b.repo))) throw new Error(`backlog.repo "${b.repo}" is an id in solutionMap.repos`);
+  if (b.repo !== undefined && (typeof b.repo !== 'string' || !ID.test(b.repo))) throw new Error(`backlog.repo "${b.repo}" is an id in solutionMap.repos`);
   const branch = b.branch ?? DEFAULT_BRANCH;
   const bad = branchProblem(branch);
   if (bad) throw new Error(bad);
@@ -68,8 +66,7 @@ export function locateBacklog({ config = null, repos = [], root = process.cwd() 
   };
   const dir = ask(['rev-parse', '--show-toplevel']) ?? ask(['rev-parse', '--absolute-git-dir']) ?? repos[0]?.dir;
   if (!dir) throw new Error('the backlog lives in a git repository: run this in one, or name backlog.repo in tools/gate/config.json');
-  const key = (p) => (process.platform === 'win32' ? path.resolve(p).toLowerCase() : path.resolve(p));
-  return { dir, branch, repo: repos.find((r) => key(r.dir) === key(dir))?.id ?? null };
+  return { dir, branch, repo: repos.find((r) => samePath(r.dir, dir))?.id ?? null };
 }
 
 /** The remote-tracking ref this clone reads the backlog from. */
@@ -95,7 +92,7 @@ export async function fetchBacklog(where, { net = gitAsync } = {}) {
   const ls = await net(where.dir, ['ls-remote', REMOTE, `refs/heads/${where.branch}`], { timeout: NET_TIMEOUT });
   const named = ls.ok && String(ls.out).split('\n').some((l) => l.trim().endsWith(`\trefs/heads/${where.branch}`));
   if (ls.ok && !named) return { state: 'absent', tip: backlogTip(where) };
-  return { state: 'unreachable', tip: backlogTip(where), error: lastLine(f.err) || 'the fetch failed' };
+  return { state: 'unreachable', tip: backlogTip(where), error: lastLine(f.err, 'the fetch failed') };
 }
 
 /** Each item's id and file text at `tip`, and the paths there that are not items. */
@@ -152,8 +149,9 @@ function makeCommit(dir, base, files, message, who) {
 /**
  * Writes `ops` to the backlog as one commit: fetches the branch, replays the operations onto its
  * tip (`applyOps`), commits with the repository's git name and email, and pushes. A push that
- * someone else's beat fetches and replays, MAX_TRIES tries in all. The first write makes the
- * branch: a commit with no parent, sharing no history with main.
+ * someone else's beat fetches and replays, MAX_TRIES tries in all; a push reported failed whose
+ * commit the branch then holds was sent, and is not replayed. The first write makes the branch: a
+ * commit with no parent, sharing no history with main.
  *
  * Resolves `{ ok: true, commit, results }`, `commit` null when nothing changed (every operation
  * unchanged, held or refused); or `{ ok: false, unreachable, error, results: [] }` when nothing was
@@ -183,8 +181,18 @@ export async function writeBacklog(where, ops, { now = new Date(), net = gitAsyn
     }
     f = await fetchBacklog(where, { net });
     if (f.state === 'unreachable') continue;
+    // A push reported failed that landed all the same (it timed out, or the connection went once
+    // the remote had it): the branch holds this commit, so it was sent, and a replay would send
+    // every operation again.
+    if (holds(where.dir, f.tip, commit)) return { ok: true, commit, results };
     // Refused although nobody moved the branch: a rule or a permission, not a race.
-    if (f.tip === base) return { ok: false, unreachable: true, error: lastLine(p.err) || 'the push was refused', results: [] };
+    if (f.tip === base) return { ok: false, unreachable: true, error: lastLine(p.err, 'the push was refused'), results: [] };
     if (attempt >= MAX_TRIES) return { ok: false, unreachable: true, error: `others pushed to ${where.branch} before each of ${MAX_TRIES} tries; nothing was sent`, results: [] };
   }
+}
+
+/** Whether the branch at `tip` holds `commit`: it is the tip, or the tip descends from it. */
+function holds(dir, tip, commit) {
+  if (!tip) return false;
+  return tip === commit || runGit(dir, ['merge-base', '--is-ancestor', commit, tip], { allowFail: true }).status === 0;
 }
