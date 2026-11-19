@@ -91,6 +91,7 @@ supports, no product names, and nothing the backlog does may touch main or a che
 | Running setup again keeps the clone and the drafts | `tools/solution-map/test/launcher.test.mjs::setup run again keeps the clone and the drafts`, new |
 | The map runs from main's code | `tools/solution-map/test/launcher.test.mjs::the launched map runs from main's code`, new |
 | Without the network the last map runs | `tools/solution-map/test/launcher.test.mjs::without the network the last map runs`, new |
+| A launcher fixed on main reaches the shortcut | `tools/solution-map/test/launcher.test.mjs::the launcher takes main's copy of itself, never into a checkout`, new |
 | A newer map on main shows a banner | `tools/solution-map/test/launcher.test.mjs::a newer map on main offers a restart`, new |
 | Restart runs the newer map and keeps the drafts | `tools/solution-map/test/launcher.test.mjs::restart runs the newer map and keeps the drafts`, new |
 | A map run from a checkout never offers a restart | `tools/solution-map/test/launcher.test.mjs::a map run from a checkout offers no restart`, new |

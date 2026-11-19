@@ -111,8 +111,10 @@ map change to main and press Restart to update. Judge the views against the boar
   change id when it is free. Opaque numbers instead would read worse in a file list.
 - **Notes** carry the author's git name and the time in UTC. A GitHub account name instead would
   need the network to read it.
-- **Editing and removing**: anyone may edit a request's text, and git history keeps the old text;
-  nothing is deleted, Parked takes its place. A delete would need its own rule for the history.
+- **Editing and removing**: the backlog and the map's drafts take an edit of a request's text from
+  anyone who can push, and git history keeps the old text, but no view offers one: the boards draw
+  no edit control and the command line has no `edit`. Nothing is deleted; Parked takes its place. A
+  delete would need its own rule for the history.
 - **Done and Parked stay** in the tree, shown behind a filter. Removing them would make the branch
   forget who asked.
 - **Search** stays on features; requests are found on the Backlog view.
@@ -120,8 +122,9 @@ map change to main and press Restart to update. Judge the views against the boar
   Q4): to the backlog's branch only, only on Submit, only from the map's own page.
 - **The branch's rules**: the first write creates it; the README advises a branch rule against
   force-pushes and deletion. The kit sets no rule itself.
-- **A newer map** for Restart to update means main changed a folder the map runs from
-  (`tools/solution-map/`, `tools/backlog/`, `tools/overview/`), not any commit.
+- **A newer map** for Restart to update means main changed what the map runs from
+  (`tools/solution-map/`, `tools/backlog/`, `tools/overview/`, `tools/gate/lib/`,
+  `tools/gate/config.json`), not any commit.
 - **`specs/systems.json`**: `tools/backlog/` joins a new system, Backlog; `tools/solution-map/`
   gets the system it lacks, Solution map. Ship adds both.
 
