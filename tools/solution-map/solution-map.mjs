@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // The Solution map's command line: name the repositories, build the map, serve it on 127.0.0.1
 // and open it in the browser.
-import { execFile, spawn } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -10,7 +10,7 @@ import { buildMap } from './lib/build.mjs';
 import { createMapServer } from './lib/server.mjs';
 import { reviewCommand, startReview } from './lib/review.mjs';
 import { locateBacklog } from '../backlog/lib/store.mjs';
-import { TREE_ID } from './launcher/launch.mjs';
+import { TREE_ID, RESTART_CODE } from './launcher/launch.mjs';
 
 export const DEFAULT_PORT = 7317;
 /** How long a launched map waits for its port: the map a restart replaces may still be closing it. */
@@ -20,11 +20,11 @@ const USAGE = `usage: node tools/solution-map/solution-map.mjs [--repo <id>=<fol
        node tools/solution-map/solution-map.mjs --from <overview.json> [--port <n>] [--no-open]
   without --repo, the repositories are tools/gate/config.json's solutionMap.repos;
   --from serves a saved overview instead of fetching and building one;
-  the launcher adds --launched <tree id> --root <folder> --launcher <file>`;
+  the launcher adds --launched <tree id> --root <folder>`;
 
 /**
  * The parsed command line: `{ repoArgs, port, pages, open, help, from }`, and `launched: { tree,
- * root, launcher }` when the launcher started the map; throws on a bad argument.
+ * root }` when the launcher started the map; throws on a bad argument.
  */
 export function parseArgs(argv) {
   const o = { repoArgs: [], port: DEFAULT_PORT, pages: null, open: true, help: false, from: null };
@@ -47,12 +47,11 @@ export function parseArgs(argv) {
       launch.tree = val();
       if (!TREE_ID.test(launch.tree)) throw new Error('--launched takes the tree id of the map\'s code');
     } else if (a === '--root') launch.root = path.resolve(val());
-    else if (a === '--launcher') launch.launcher = path.resolve(val());
     else if (a === '-h' || a === '--help') o.help = true;
     else throw new Error(`unknown argument ${a}`);
   }
   if (Object.keys(launch).length) {
-    if (!launch.tree || !launch.root || !launch.launcher) throw new Error('--launched, --root and --launcher go together; the launcher gives them');
+    if (!launch.tree || !launch.root) throw new Error('--launched and --root go together; the launcher gives them');
     if (o.from) throw new Error('--from and --launched do not go together');
     o.launched = launch;
   }
@@ -95,6 +94,8 @@ export async function main(argv) {
     return 2;
   }
   const launched = o.launched ?? null;
+  // The launcher waits on its map through an IPC channel; should it go, its map goes with it.
+  if (launched && process.connected) process.once('disconnect', () => process.exit(0));
   const reviewCmd = reviewCommand({ config: o.config });
   let port;
   const { server, listen, refresh } = createMapServer({
@@ -105,7 +106,7 @@ export async function main(argv) {
       : async () => { const f = path.join(root, THEME); return fs.existsSync(f) ? fs.readFileSync(f) : null; },
     review: () => startReview(reviewCmd),
     backlog: o.backlog ?? null,
-    restart: launched ? async () => restartWith({ launched, server, port: () => port }) : null,
+    restart: launched ? async () => restartWith({ server, port: () => port }) : null,
   });
   try {
     port = await listen(o.port, { wait: launched ? PORT_WAIT : 0 });
@@ -121,28 +122,20 @@ export async function main(argv) {
 }
 
 /**
- * Restart to update: whether the launcher is there to run, and `handOver`, run once the page has
- * its answer: stop listening, start the launcher detached on this map's port without opening
- * another browser tab, and exit. The launcher runs main's newest map, which waits for the port.
- * A launcher that cannot be started is said, and the exit code is 1.
+ * Restart to update: whether the launcher that started this map waits on it (its IPC channel), and
+ * `handOver`, run once the page has its answer: stop listening, tell the launcher this map's port,
+ * and exit with RESTART_CODE. The launcher then runs main's newest map, in the same window, on
+ * that port.
  */
-function restartWith({ launched, server, port }) {
-  if (!fs.existsSync(launched.launcher)) return { ok: false, error: `the launcher is not at ${launched.launcher}; open the map from its shortcut again` };
+function restartWith({ server, port }) {
+  if (!process.connected) return { ok: false, error: 'the launcher that started this map no longer waits on it; open the map from its shortcut again' };
   return {
     ok: true,
     handOver: () => {
       server.close();
       server.closeAllConnections();
-      try {
-        spawn(process.execPath, [launched.launcher, '--root', launched.root, '--', '--port', String(port()), '--no-open'], {
-          cwd: launched.root, detached: true, stdio: 'ignore',
-        }).unref();
-      } catch (e) {
-        console.error(`solution-map: cannot start the launcher: ${e.message}; open the map from its shortcut again`);
-        process.exit(1);
-      }
-      console.log('solution-map: restarting with the newer map from main');
-      process.exit(0);
+      console.log('solution-map: restarting with main\'s newest map');
+      process.send({ restart: { port: port() } }, () => process.exit(RESTART_CODE));
     },
   };
 }

@@ -4,7 +4,7 @@
 //
 // Setup copies this file alone into the backlog's repository's git folder, so it imports nothing
 // but Node's own modules. The map imports what it shares from here (MAP_PATHS, mapTree,
-// missingObjects, fetchObjects), so the two never hold two versions of one rule.
+// missingObjects, fetchObjects, RESTART_CODE), so the two never hold two versions of one rule.
 //
 // 1. Fetches every clone `origin/main:tools/gate/config.json` names (`solutionMap.repos`, paths
 //    relative to --root), 20 s each, in parallel.
@@ -13,11 +13,14 @@
 // 3. When `<git common dir of --root>/faster-spec/maps/<tree id>/` is missing, fetches the blobs a
 //    clone without them lacks in one request and writes those paths there with `checkout-index`.
 // 4. Takes main's copy of this file from that folder when it differs and passes `node --check`:
-//    a launcher fix on main reaches the shortcut on its next opening. Only a launcher in a git
-//    directory, where setup puts it, is replaced; a copy in a checkout never is.
-// 5. Runs `tools/solution-map/solution-map.mjs` from that folder with `--launched <tree id> --root
-//    <root> --launcher <this file>`, a `--repo <id>=<folder>` for each entry of the folder's own
-//    config and the arguments after `--`, and exits with its code.
+//    a launcher fix on main runs from the shortcut's next opening (this process goes on with the
+//    code it started with). Only a launcher in a git directory, where setup puts it, is replaced;
+//    a copy in a checkout never is.
+// 5. Runs `tools/solution-map/solution-map.mjs` from that folder as its child, in this window, with
+//    `--launched <tree id> --root <root>`, a `--repo <id>=<folder>` for each entry of the folder's
+//    own config and the arguments after `--`, and waits. A map that exits with RESTART_CODE
+//    (Restart to update) has the steps run again, its port and `--no-open` added to the map's
+//    arguments; any other exit code is the launcher's.
 //
 // When the fetch of --root fails, or main's map cannot be written, it runs the map last run here
 // (the newest folder in maps/; each run touches its folder). It never moves a clone's HEAD, never
@@ -35,6 +38,12 @@ const LAUNCH_SCRIPT = 'tools/solution-map/launcher/launch.mjs';
 const CONFIG = 'tools/gate/config.json';
 /** A tree id, SHA-1 or SHA-256: the name of a folder in maps/. */
 export const TREE_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+/**
+ * The exit code a launched map gives for Restart to update: the launcher runs main's newest map in
+ * its place. Before it exits, the map sends `{ restart: { port } }` over the IPC channel the
+ * launcher opens, so the newer map takes the same port.
+ */
+export const RESTART_CODE = 75;
 const FETCH_TIMEOUT = 20000;
 const SELF = fileURLToPath(import.meta.url);
 const USAGE = 'usage: node <git common dir>/faster-spec/launcher/launch.mjs --root <repository folder> [-- <map arguments>]';
@@ -206,23 +215,52 @@ export function lastRun(maps) {
   return best;
 }
 
-/** Runs the map and resolves its exit code. */
+/** Ctrl+C, a closed window, a stop: passed on to the map, whose exit then ends the launcher. */
+const PASSED_ON = ['SIGINT', 'SIGTERM', 'SIGHUP'];
+
+/**
+ * Runs the map as this process's child, in this window, and resolves `{ code, port }` once it has
+ * gone: its exit code (1 for a signal or a map that cannot start), and the port it sent before a
+ * restart. A signal this process gets meanwhile is passed on to the map.
+ */
 function runMap(node, args, { cwd }) {
   return new Promise((resolve) => {
-    const child = spawn(node, args, { cwd, stdio: 'inherit' });
-    child.on('error', (e) => { console.error(`launch: cannot start the map: ${e.message}`); resolve(1); });
-    child.on('exit', (code) => resolve(code ?? 1));
+    let port = null;
+    let done = false;
+    const child = spawn(node, args, { cwd, stdio: ['inherit', 'inherit', 'inherit', 'ipc'] });
+    const pass = (signal) => { try { child.kill(signal); } catch { /* it has gone */ } };
+    for (const s of PASSED_ON) process.on(s, pass);
+    const end = (code) => {
+      if (done) return;
+      done = true;
+      for (const s of PASSED_ON) process.off(s, pass);
+      resolve({ code, port });
+    };
+    child.on('message', (m) => { if (Number.isInteger(m?.restart?.port)) port = m.restart.port; });
+    child.on('error', (e) => { console.error(`launch: cannot start the map: ${e.message}`); end(1); });
+    child.on('close', (code) => end(code ?? 1));
   });
 }
 
 /**
- * Fetches, picks the map to run (main's, else the last run) and runs it. Resolves the exit code.
- * `run(node, args, { cwd })` starts the map; `mapArgs` go to it last; `self` is the launcher that
- * main's copy replaces; `log` and `warn` take a line each.
+ * Fetches, picks the map to run (main's, else the last run) and runs it; a map that exits with
+ * RESTART_CODE has all of it done again, on the port it had and with `--no-open`. Resolves the exit
+ * code. `run(node, args, { cwd })` runs the map and resolves `{ code, port }`; `mapArgs` go to it
+ * last; `self` is the launcher that main's copy replaces; `log` and `warn` take a line each.
  */
-export async function launch({ root, mapArgs = [], self = SELF, node = process.execPath, run = runMap, log = console.log, warn = console.error }) {
+export async function launch({ mapArgs = [], log = console.log, ...o }) {
+  for (let args = mapArgs; ;) {
+    const { code, port } = await launchOnce({ ...o, mapArgs: args, log });
+    if (code !== RESTART_CODE) return code;
+    log('launch: restarting with main\'s newest map');
+    args = [...mapArgs, ...(port ? ['--port', String(port)] : []), '--no-open'];
+  }
+}
+
+/** One run of the steps: resolves the map's `{ code, port }`, or `{ code: 1 }` when no map could start. */
+async function launchOnce({ root, mapArgs, self = SELF, node = process.execPath, run = runMap, log, warn = console.error }) {
   const common = await git(root, ['rev-parse', '--git-common-dir']);
-  if (!common.ok) { warn(`launch: ${root} is not a clone: ${lastLine(common.err)}`); return 1; }
+  if (!common.ok) { warn(`launch: ${root} is not a clone: ${lastLine(common.err)}`); return { code: 1 }; }
   const maps = path.join(path.resolve(root, String(common.out).trim()), 'faster-spec', 'maps');
   fs.mkdirSync(maps, { recursive: true });
 
@@ -264,7 +302,7 @@ export async function launch({ root, mapArgs = [], self = SELF, node = process.e
   chosen ??= lastRun(maps);
   if (!chosen) {
     warn('launch: no map has run on this computer yet; connect to the network and open it again');
-    return 1;
+    return { code: 1 };
   }
   try {
     const now = new Date();
@@ -273,7 +311,7 @@ export async function launch({ root, mapArgs = [], self = SELF, node = process.e
   let config = null;
   try { config = parseJson(fs.readFileSync(path.join(chosen.dir, CONFIG))); } catch { /* the map says what is missing */ }
   const repoArgs = configRepos(config, root).flatMap((r) => ['--repo', `${r.id}=${r.dir}`]);
-  return run(node, [path.join(chosen.dir, MAP_SCRIPT), '--launched', chosen.tree, '--root', root, '--launcher', self, ...repoArgs, ...mapArgs], { cwd: chosen.dir });
+  return run(node, [path.join(chosen.dir, MAP_SCRIPT), '--launched', chosen.tree, '--root', root, ...repoArgs, ...mapArgs], { cwd: chosen.dir });
 }
 
 export async function main(argv) {

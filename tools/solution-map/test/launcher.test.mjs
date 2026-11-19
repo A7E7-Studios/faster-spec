@@ -2,6 +2,7 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -421,11 +422,10 @@ function launched(tmp) {
   return { api, app, root, apiClone, launcher, open, maps: path.join(root, '.git', 'faster-spec', 'maps') };
 }
 
-/** What the launcher gives the map before its `--repo` arguments, the launcher's path compared as the file it is. */
-function launchArgs(argv, tree, root, launcher) {
-  assert.deepEqual(argv.slice(0, 5), ['--launched', tree, '--root', root, '--launcher']);
-  assert.equal(real(argv[5]), real(launcher));
-  return argv.slice(6);
+/** What the launcher gives the map before its `--repo` arguments; the rest. */
+function launchArgs(argv, tree, root) {
+  assert.deepEqual(argv.slice(0, 4), ['--launched', tree, '--root', root]);
+  return argv.slice(4);
 }
 
 /** The tree of the map's paths at the origin's main, by porcelain in a full clone. */
@@ -438,7 +438,7 @@ function expectedTree(o, tmp) {
 
 test('the launched map runs from main\'s code', () => withTmp(async (tmp) => {
   identity(true);
-  const { api, app, root, apiClone, launcher, open, maps } = launched(tmp);
+  const { api, app, root, apiClone, open, maps } = launched(tmp);
   const head = g(root, 'rev-parse', 'HEAD');
 
   // What follows -- goes to the map, after the launcher's own arguments.
@@ -447,7 +447,7 @@ test('the launched map runs from main\'s code', () => withTmp(async (tmp) => {
   const t1 = expectedTree(app, tmp);
   assert.equal(first.ran.version, 'v1');
   assert.equal(real(first.ran.cwd), real(path.join(maps, t1)));
-  assert.deepEqual(launchArgs(first.ran.argv, t1, root, launcher), ['--repo', `app=${root}`, '--repo', `api=${apiClone}`, '--port', '0']);
+  assert.deepEqual(launchArgs(first.ran.argv, t1, root), ['--repo', `app=${root}`, '--repo', `api=${apiClone}`, '--port', '0']);
 
   // Main gets a newer map, and the backend a new commit.
   land(app, { 'tools/solution-map/solution-map.mjs': standIn('v2') }, 'a newer map');
@@ -458,7 +458,7 @@ test('the launched map runs from main\'s code', () => withTmp(async (tmp) => {
   assert.notEqual(t2, t1);
   assert.equal(second.ran.version, 'v2');
   assert.equal(real(second.ran.cwd), real(path.join(maps, t2)));
-  assert.deepEqual(launchArgs(second.ran.argv, t2, root, launcher), ['--repo', `app=${root}`, '--repo', `api=${apiClone}`]);
+  assert.deepEqual(launchArgs(second.ran.argv, t2, root), ['--repo', `app=${root}`, '--repo', `api=${apiClone}`]);
   assert.equal(g(apiClone, 'rev-parse', 'origin/main'), apiMain);
 
   // A commit outside the map's code is the same map: no new folder.
@@ -551,16 +551,20 @@ test('the launcher takes main\'s copy of itself, never into a checkout', () => w
   assert.equal(fs.readFileSync(launcher, 'utf8'), fixed);
 }));
 
-test('the launcher\'s three arguments make a launched map, all or none', () => {
+test('the launcher\'s two arguments make a launched map, both or none', () => {
   const tree = 'a'.repeat(40);
-  const args = ['--launched', tree, '--root', 'base/notes-app', '--launcher', 'base/notes-app/.git/faster-spec/launcher/launch.mjs'];
-  assert.deepEqual(parseMapArgs(args).launched, { tree, root: path.resolve('base/notes-app'), launcher: path.resolve('base/notes-app/.git/faster-spec/launcher/launch.mjs') });
+  const args = ['--launched', tree, '--root', 'base/notes-app'];
+  assert.deepEqual(parseMapArgs(args).launched, { tree, root: path.resolve('base/notes-app') });
   assert.equal('launched' in parseMapArgs(['--port', '0']), false);
-  assert.throws(() => parseMapArgs(args.slice(0, 4)), /go together/);
+  assert.throws(() => parseMapArgs(args.slice(0, 2)), /go together/);
   assert.throws(() => parseMapArgs(['--root', 'x']), /go together/);
   assert.throws(() => parseMapArgs(['--launched', 'not-a-tree', ...args.slice(2)]), /tree id/);
   assert.throws(() => parseMapArgs([...args, '--from', 'overview.json']), /do not go together/);
-  assert.deepEqual(launchArgv(['--root', 'base/notes-app', '--', '--port', '7318', '--no-open']), { root: path.resolve('base/notes-app'), help: false, mapArgs: ['--port', '7318', '--no-open'] });
+  assert.throws(() => parseMapArgs([...args, '--launcher', 'launch.mjs']), /unknown argument/);
+  // What follows -- goes to the map; a restart's run adds the port and --no-open after it, which win.
+  assert.deepEqual(launchArgv(['--root', 'base/notes-app', '--', '--port', '0', '--port', '7318', '--no-open']),
+    { root: path.resolve('base/notes-app'), help: false, mapArgs: ['--port', '0', '--port', '7318', '--no-open'] });
+  assert.equal(parseMapArgs(['--port', '0', '--port', '7318', '--no-open']).port, 7318);
 });
 
 /* ---------- a launched map, running ---------- */
@@ -595,9 +599,9 @@ function mapProject(tmp) {
 }
 
 /**
- * Every node process a test's map starts, launchers and maps, records itself in `dir` (through
- * NODE_OPTIONS `--import`) and exits once `dir/stop` exists: `stop` ends them all, a map a restart
- * started detached among them, and waits until they have, without killing anything by its id.
+ * Every node process a test's map starts, launchers and maps, records itself and its parent in
+ * `dir` (through NODE_OPTIONS `--import`) and exits once `dir/stop` exists: `stop` ends them all and
+ * waits until they have, without killing anything by its id.
  */
 function processes(dir) {
   fs.mkdirSync(dir, { recursive: true });
@@ -607,7 +611,7 @@ function processes(dir) {
   fs.writeFileSync(hook, [
     "import fs from 'node:fs';",
     `const note = (o) => fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify(o) + '\\n');`,
-    'note({ pid: process.pid, argv: process.argv.slice(1) });',
+    'note({ pid: process.pid, ppid: process.ppid, argv: process.argv.slice(1) });',
     "process.on('exit', () => note({ exited: process.pid }));",
     `setInterval(() => { if (fs.existsSync(${JSON.stringify(stopFile)})) process.exit(0); }, 100).unref();`,
     '',
@@ -628,10 +632,12 @@ function processes(dir) {
       await new Promise((r) => setTimeout(r, 100));
     }
   };
-  return { env: { ...process.env, NODE_OPTIONS: `--import=${pathToFileURL(hook).href}` }, ran, stop };
+  /** The maps of `tree` started so far. */
+  const maps = (tree) => ran().filter((r) => r.argv?.[0]?.endsWith('solution-map.mjs') && r.argv[r.argv.indexOf('--launched') + 1] === tree);
+  return { env: { ...process.env, NODE_OPTIONS: `--import=${pathToFileURL(hook).href}` }, ran, maps, alive, stop };
 }
 
-/** The address a started map prints, and the exit of the process started; rejects when it ends first. */
+/** The address a started map prints, the process started and its exit; rejects when it ends first. */
 function serving(child) {
   return new Promise((resolve, reject) => {
     let out = '';
@@ -639,7 +645,7 @@ function serving(child) {
     child.stdout.on('data', (c) => {
       out += c;
       const m = /http:\/\/127\.0\.0\.1:\d+/.exec(out);
-      if (m) resolve({ base: m[0], exited });
+      if (m) resolve({ base: m[0], port: Number(m[0].split(':').pop()), child, exited });
     });
     child.stderr.on('data', (c) => { out += c; });
     exited.then((code) => reject(new Error(`it ended (${code}) before the map served: ${out}`)));
@@ -657,6 +663,19 @@ async function post(base, route, body = {}) {
 }
 const updates = (model) => model.banners.filter((b) => b.kind === 'map-update');
 const NEWER = { 'tools/solution-map/lib/newer.mjs': '// a newer map\n' };
+
+/** Whether nothing holds `port` on 127.0.0.1: a server of this test can listen there (asked again for up to `ms`). */
+async function portFree(port, ms = 10000) {
+  for (const deadline = Date.now() + ms; ;) {
+    const free = await new Promise((resolve) => {
+      const s = net.createServer();
+      s.once('error', () => resolve(false));
+      s.listen(port, '127.0.0.1', () => s.close(() => resolve(true)));
+    });
+    if (free || Date.now() > deadline) return free;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+}
 
 /** The view model of the map at `base`, asked again until a map answers (a restart's map takes a moment). */
 async function mapAt(base, ms = 90000) {
@@ -703,18 +722,46 @@ test('restart runs the newer map and keeps the drafts', () => withTmp(async (tmp
     const tree = expectedTree(p.app, tmp);
     assert.deepEqual(updates((await post(m.base, '/api/refresh')).body), [{ kind: 'map-update', tree }]);
 
+    let ended = false;
+    m.exited.then(() => { ended = true; });
     assert.deepEqual(await post(m.base, '/api/restart'), { status: 200, body: { ok: true } });
-    // The map the shortcut opened ends, and its launcher with it; main's newer map, started by the
-    // launcher again, answers at the same address with no banner left to offer.
-    assert.equal(await m.exited, 0);
+    // The old map ends; the launcher the shortcut started runs main's newer map as its child again,
+    // in the same window, at the same address, with no banner left to offer.
     assert.deepEqual(updates(await mapAt(m.base)), []);
-    const newer = procs.ran().filter((r) => r.argv?.[0]?.endsWith('solution-map.mjs') && r.argv[r.argv.indexOf('--launched') + 1] === tree);
+    assert.equal(ended, false, 'the shortcut\'s launcher still runs');
+    const newer = procs.maps(tree);
     assert.equal(newer.length, 1, 'main\'s newer map runs');
+    assert.equal(newer[0].ppid, m.child.pid, 'as the child of the launcher the shortcut started');
     assert.ok(fs.existsSync(path.join(p.root, '.git', 'faster-spec', 'maps', tree, 'tools', 'solution-map', 'lib', 'newer.mjs')));
     // The unsent drafts are unchanged.
     const b = await (await fetch(`${m.base}/api/backlog`)).json();
     assert.deepEqual(b.drafts.map((d) => [d.op, d.request]), [['add', key], ['note', key]]);
     assert.equal(fs.readFileSync(p.drafts, 'utf8'), unsent);
+    // Ending the launcher, as Ctrl+C or closing its window does, ends the newer map with it: nothing
+    // is left holding the port.
+    m.child.kill('SIGINT');
+    await m.exited;
+    for (const deadline = Date.now() + 10000; procs.alive(newer[0].pid) && Date.now() < deadline;) await new Promise((r) => setTimeout(r, 100));
+    assert.equal(procs.alive(newer[0].pid), false, 'the newer map ended with its launcher');
+    assert.equal(await portFree(m.port), true);
+  } finally { await procs.stop(); }
+}));
+
+test('a launched map no launcher waits on does not restart', () => withTmp(async (tmp) => {
+  identity(true);
+  const app = mapOrigin(tmp);
+  const checkout = path.join(tmp, 'checkout');
+  execFileSync('git', ['clone', '-q', app.url, checkout], { stdio: 'pipe' });
+  const procs = processes(path.join(tmp, 'processes'));
+  try {
+    // Started by hand with the launcher's arguments: no launcher is there to run it again.
+    const map = path.join(checkout, 'tools', 'solution-map', 'solution-map.mjs');
+    const m = await serving(spawn(process.execPath, [map, '--launched', 'a'.repeat(40), '--root', checkout, '--port', '0', '--no-open'], { cwd: checkout, env: procs.env, stdio: ['ignore', 'pipe', 'pipe'] }));
+    assert.equal(updates(await mapAt(m.base)).length, 1, 'main holds another map than the one named');
+    const r = await post(m.base, '/api/restart');
+    assert.deepEqual([r.status, r.body.ok], [409, false]);
+    assert.match(r.body.error, /no longer waits on it/);
+    assert.equal((await fetch(`${m.base}/api/map`)).status, 200, 'it keeps serving');
   } finally { await procs.stop(); }
 }));
 

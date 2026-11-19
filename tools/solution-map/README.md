@@ -22,9 +22,10 @@ node tools/solution-map/solution-map.mjs --from <overview.json> [--port <n>] [--
 | `--pages <address>` | the base address a Looks `page:` path is joined to; default `solutionMap.pages` |
 | `--from <file>` | serve a saved overview instead of fetching and building one; boards are not served, and there is no backlog |
 | `--no-open` | do not open the browser |
-| `--launched <tree id>`, `--root <folder>`, `--launcher <file>` | given by the launcher, all three or none: the tree id of main's map code this map runs, the clone it runs for, and the launcher that started it. They make it a launched map: [Restart to update](#launcher), and the theme from that clone's `origin/main` |
+| `--launched <tree id>`, `--root <folder>` | given by the launcher, both or neither: the tree id of main's map code this map runs, and the clone it runs for. They make it a launched map: [Restart to update](#launcher), and the theme from that clone's `origin/main`; it ends when the launcher waiting on it goes |
 
-Exit: **2** on a usage error or a port it cannot listen on; otherwise it runs until stopped.
+Exit: **2** on a usage error or a port it cannot listen on; **75** (`RESTART_CODE`) for Restart to
+update; otherwise it runs until stopped.
 
 ## Config
 
@@ -82,7 +83,7 @@ moves. Fetches and Submit's push take turns.
 | `GET /api/backlog` | | the backlog's view model (below) |
 | `POST /api/drafts` | `{ "save": <operation> }` adds a draft, and with the draft's `key` changes it; `{ "drop": "<key>" }` drops it (an unsent request with the drafts naming it); `{ "apply": "<key>" }` applies a held draft again over the other person's value | `{ ok: true, draft, backlog }`; a draft that is not one: `400 { ok: false, error }` |
 | `POST /api/submit` | `{}` | `{ ok, unreachable, error, commit, sent: [{ key, op, id }], held: [{ key, op, id, field, theirs, yours }], refused: [{ key, op, reason }], backlog }`; `ok` false when nothing was sent, every draft kept |
-| `POST /api/restart` | `{}` | a launched map: `{ ok: true }`, then [Restart to update](#launcher); any other, a launcher no longer there or a restart under way: `409 { ok: false, error }` |
+| `POST /api/restart` | `{}` | a launched map: `{ ok: true }`, then [Restart to update](#launcher); any other, one no launcher waits on, or a restart under way: `409 { ok: false, error }` |
 | `GET /board/<repo>/<path>?section=<id>` | | a board at the commit read |
 
 - **Only the map's own page writes.** Every POST needs the header `x-solution-map: 1`, which a
@@ -153,7 +154,8 @@ when the backlog lives in another of those repositories ([Config](#config)).
   repository; and writes the shortcut and prints its path. Run again, it keeps the clones and the
   drafts. Exit: 0 done, 1 something missing or failed, 2 a usage error.
 - **The shortcut** runs `<node> launch.mjs --root <clone>`, with the node setup ran under, in a
-  terminal window; closing the window stops the map. Windows: `<Desktop>\<name> map.cmd`, the
+  terminal window; closing the window, or Ctrl+C, stops the launcher and the map, a restarted one
+  too. Windows: `<Desktop>\<name> map.cmd`, the
   Desktop from `[Environment]::GetFolderPath('Desktop')`; macOS: `~/Desktop/<name> map.command`,
   executable; Linux: `~/.local/share/applications/<name>-map.desktop`, and a copy on the desktop
   `xdg-user-dir DESKTOP` names.
@@ -162,18 +164,21 @@ when the backlog lives in another of those repositories ([Config](#config)).
   `tools/gate/config.json` (`MAP_PATHS`, `mapTree`); when `maps/<tree id>/` is missing, fetches the
   blobs the clone lacks in one request and writes those paths there with `checkout-index`. It
   takes main's copy of itself from that folder when the two differ and the copy passes
-  `node --check`, so a launcher fix reaches the shortcut on its next opening; a copy in a checkout
-  is never replaced. It runs the map from that folder with `--launched <tree id> --root <clone>
-  --launcher <itself>`, a `--repo` per entry of that folder's config and the arguments after `--`.
-  When the fetch fails it runs the map last run (the folder it touched last). It never moves a
-  clone's HEAD, index or working files.
+  `node --check`; the copy runs from the shortcut's next opening, as the launcher running goes on
+  with the code it started with. A copy in a checkout is never replaced. It runs the map from that
+  folder as its child, in the shortcut's window (inherited output, and an IPC channel), with
+  `--launched <tree id> --root <clone>`, a `--repo` per entry of that folder's config and the
+  arguments after `--`, and waits; Ctrl+C or a closed window it passes on to the map. When the
+  fetch fails it runs the map last run (the folder it touched last). It never moves a clone's
+  HEAD, index or working files.
 - **Restart to update**: at every build a launched map compares its `--launched` tree id with
   main's and, when they differ, gives the `map-update` banner. `POST /api/restart` answers
-  `{ ok: true }`, stops listening, starts `launch.mjs --root <clone> -- --port <its port> --no-open`
-  detached from the shortcut's window with its output dropped, and exits, which ends the launcher
-  that window runs; the newer map runs apart from it. It waits up to 10 s for the port, and the
-  page, asking `/api/map` until it answers, reloads. A map started without `--launched` answers
-  409.
+  `{ ok: true }`; once the answer is out, the map stops listening, sends its port to the launcher
+  over the IPC channel and exits with the restart code (`RESTART_CODE`). The launcher, waiting in
+  the same window, runs all of the above again in the same process, the port and `--no-open` added
+  to the map's arguments; any other exit code ends the launcher with that code. The newer map
+  waits up to 10 s for the port, and the page, asking `/api/map` until it answers, reloads. A map
+  started without `--launched`, or one no launcher waits on, answers 409.
 - **What it keeps** lives under the clone's `<git common dir>/faster-spec/`: `setup/`,
   `launcher/launch.mjs` and `maps/<tree id>/`, beside the drafts (`backlog-drafts.json`), which a
   restart, a newer map and setup run again all keep. None of it shows in `git status`, and it goes
@@ -185,7 +190,7 @@ when the backlog lives in another of those repositories ([Config](#config)).
 |---|---|
 | `solution-map.mjs` | the command line; Restart to update's hand-over to the launcher |
 | `launcher/setup.mjs` | setup and the printed command; imports only `lib/sources.mjs`, which the command takes with it |
-| `launcher/launch.mjs` | what the shortcut runs; Node's own modules only, since setup copies it alone. The map imports its `MAP_PATHS`, `mapTree`, `mainMapTree`, `missingObjects` and `fetchObjects` |
+| `launcher/launch.mjs` | what the shortcut runs; Node's own modules only, since setup copies it alone. The map imports its `MAP_PATHS`, `TREE_ID`, `RESTART_CODE`, `mapTree`, `mainMapTree`, `missingObjects` and `fetchObjects` |
 | `lib/sources.mjs` | naming, fetching and reading the repositories |
 | `lib/build.mjs` | one build: fetch, the backlog's fetch, the blobs a clone without them lacks, overview, page probes, adapt, the `map-update` banner; who set a held draft's field |
 | `lib/adapt.mjs` | the overview's JSON to the view model: features, the queue, the groups, links, banners |
@@ -222,6 +227,6 @@ blobs is counted in requests from git's trace2 events (`GIT_TRACE2_EVENT`).
 The launcher tests run setup and the launcher against bare origins and blobless clones, with a
 throwaway home folder and git config and no system config; each system's shortcut is written into
 the throwaway home. Those of a running map put this checkout's map code on a project's main, open
-it as the shortcut does and Restart it; every node process they start, the detached ones a restart
-starts too, loads a hook (`NODE_OPTIONS=--import`) that notes it and ends it when the test says
-so.
+it as the shortcut does and Restart it; every node process they start loads a hook
+(`NODE_OPTIONS=--import`) that notes it with its parent, so a test sees the restarted map is the
+first launcher's child, and ends it when the test says so.
