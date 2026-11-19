@@ -9,6 +9,7 @@ import { resolveRepos, readConfig, git } from './lib/sources.mjs';
 import { buildMap } from './lib/build.mjs';
 import { createMapServer } from './lib/server.mjs';
 import { reviewCommand, startReview } from './lib/review.mjs';
+import { locateBacklog } from '../backlog/lib/store.mjs';
 
 export const DEFAULT_PORT = 7317;
 const USAGE = `usage: node tools/solution-map/solution-map.mjs [--repo <id>=<folder>]... [--port <n>] [--pages <address>] [--no-open]
@@ -61,16 +62,25 @@ export async function main(argv) {
       JSON.parse(fs.readFileSync(file, 'utf8'));
       repos = [];
       o.build = () => buildMap({ repos: [], pages: o.pages, overview: () => JSON.parse(fs.readFileSync(file, 'utf8')), fromFile: true });
-    } else repos = resolveRepos({ args: o.repoArgs, config, root });
+    } else {
+      repos = resolveRepos({ args: o.repoArgs, config, root });
+      // A backlog the config names wrongly leaves the map without one, said in a banner.
+      try {
+        o.backlog = { where: locateBacklog({ config, repos, root }), repos };
+      } catch (e) {
+        o.backlog = { error: e.message };
+      }
+    }
   } catch (e) {
     console.error(`solution-map: ${e.message}\n${USAGE}`);
     return 2;
   }
   const reviewCmd = reviewCommand({ config: o.config });
   const { listen, refresh } = createMapServer({
-    build: o.build || (() => buildMap({ repos, pages: o.pages })),
+    build: o.build || (() => buildMap({ repos, pages: o.pages, backlog: o.backlog?.where ?? null })),
     themeFile: path.join(root, 'kit-pages', 'theme.css'),
     review: () => startReview(reviewCmd),
+    backlog: o.backlog ?? null,
   });
   let port;
   try {

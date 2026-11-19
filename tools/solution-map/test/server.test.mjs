@@ -1,14 +1,20 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { buildMap } from '../lib/build.mjs';
-import { createMapServer, withSection, PAGE_DIR } from '../lib/server.mjs';
+import { createMapServer, withSection, PAGE_DIR, MAX_BODY } from '../lib/server.mjs';
+import { fetchRepo } from '../lib/sources.mjs';
 import http from 'node:http';
 import { reviewCommand, startReview } from '../lib/review.mjs';
 import { EventEmitter } from 'node:events';
+// Git reads no global or system config while these tests run (the backlog's test helpers set it).
+import { project, commits, hasRef } from '../../backlog/test/helpers.mjs';
+import { writeBacklog, fetchBacklog } from '../../backlog/lib/store.mjs';
+import { readDrafts } from '../../backlog/lib/drafts.mjs';
 
 const ID = ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', '-c', 'init.defaultBranch=main'];
 const g = (dir, ...args) => execFileSync('git', ['-C', dir, ...ID, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -116,6 +122,10 @@ test('serves the page and the map on 127.0.0.1 only', () => withTmp(async (tmp) 
     const map = await (await fetch(`${s.base}/api/map`)).json();
     assert.equal(map.repos[0].state, 'current');
     assert.equal((await fetch(`${s.base}/page/%2e%2e%2flib%2fserver.mjs`)).status, 404);
+    // The backlog's addresses are the page too.
+    for (const p of ['/backlog', '/backlog/dark-mode', '/backlog/new?about=editing/export']) {
+      assert.match(await (await fetch(`${s.base}${p}`)).text(), /<script type="module" src="\/page\/app\.mjs">/, p);
+    }
     // A name rebound to 127.0.0.1 is not this server's.
     assert.equal(await getWithHost(s.port, '/api/map', `evil.example:${s.port}`), 403);
     assert.equal(await getWithHost(s.port, '/api/map', `localhost:${s.port}`), 200);
@@ -249,3 +259,246 @@ test('a saved overview is served without reading a repository', async () => {
   const old = await buildMap({ repos: [], overview: () => ({ ...sample, version: 2 }), fromFile: true });
   assert.deepEqual(old.model.banners, [{ kind: 'version', found: 2, reads: 3 }]);
 });
+
+/* ---------- the backlog ---------- */
+
+const at = (dir) => ({ dir, branch: 'backlog', repo: 'app' });
+const WRITE = { 'x-solution-map': '1', 'content-type': 'application/json' };
+
+/** A map of one clone whose backlog is that clone's branch `backlog`, wired as the command line wires it. */
+function serveBacklog(dir, more = {}) {
+  const where = at(dir);
+  const repos = [{ id: 'app', dir }];
+  return serve(() => buildMap({ repos, overview: standIn(), backlog: where, ...more }), { backlog: { where, repos } });
+}
+
+/** A write as the map's page sends it; resolves the JSON answer. */
+async function write(s, route, body = {}) {
+  const r = await fetch(`${s.base}${route}`, { method: 'POST', headers: WRITE, body: JSON.stringify(body) });
+  const out = await r.json();
+  assert.equal(r.status, 200, out.error);
+  return out;
+}
+
+const backlogOf = async (s) => (await fetch(`${s.base}/api/backlog`)).json();
+
+/** A POST with a `Host` header of our choosing; resolves its status. */
+const postWithHost = (port, p, host, body) => new Promise((resolve, reject) => {
+  const req = http.request({ host: '127.0.0.1', port, path: p, method: 'POST', headers: { ...WRITE, host } }, (res) => { res.resume(); resolve(res.statusCode); });
+  req.on('error', reject);
+  req.end(body);
+});
+
+const CLI = fileURLToPath(new URL('../solution-map.mjs', import.meta.url));
+
+/** The map's command line started in `cwd` on a free port; resolves its address and `stop`, which waits for it to end. */
+function startMap(cwd, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [CLI, ...args, '--port', '0', '--no-open'], { cwd, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+    let out = '';
+    const seen = (c) => {
+      out += c;
+      const m = /http:\/\/127\.0\.0\.1:\d+/.exec(out);
+      if (m) resolve({ base: m[0], stop: () => new Promise((r) => { child.once('exit', r); child.kill(); }) });
+    };
+    child.stdout.on('data', seen);
+    child.stderr.on('data', (c) => { out += c; });
+    child.on('exit', (code) => reject(new Error(`the map stopped (${code}): ${out}`)));
+  });
+}
+
+test('Refresh shows what others sent to the backlog', () => withTmp(async (tmp) => {
+  const { clones: [pat, sam] } = project(tmp, 'notes-app', { people: ['Pat Example', 'Sam Example'] });
+  // Pat's clone fetches main alone, so only the backlog's own fetch can bring what Sam sends.
+  g(pat, 'config', 'remote.origin.fetch', '+refs/heads/main:refs/remotes/origin/main');
+  const order = [];
+  const s = await serveBacklog(pat, {
+    fetchRepo: async (dir) => { order.push('repo'); const r = await fetchRepo(dir); order.push('repo done'); return r; },
+    fetchBacklog: async (w) => { order.push('backlog'); return fetchBacklog(w); },
+  });
+  try {
+    const opened = await backlogOf(s);
+    assert.equal(opened.status, 'absent');
+    assert.deepEqual(opened.requests, {});
+    // Sam sends a request and a note on it after Pat's page opened.
+    const sent = await writeBacklog(at(sam), [{ op: 'add', key: 'a', title: 'Sync notes offline' }, { op: 'note', ref: 'a', text: 'On the train, mostly.' }]);
+    const id = sent.results[0].id;
+    assert.deepEqual((await backlogOf(s)).requests, {}, 'not before Refresh');
+    assert.equal((await fetch(`${s.base}/api/refresh`, { method: 'POST', headers: { 'x-solution-map': '1' } })).status, 200);
+    const after = await backlogOf(s);
+    assert.equal(after.status, 'current');
+    const r = after.requests[id];
+    assert.deepEqual([r.title, r.by, r.label], ['Sync notes offline', 'Sam Example', 'New']);
+    assert.deepEqual(r.notes.map((n) => [n.by, n.text, n.draft]), [['Sam Example', 'On the train, mostly.', false]]);
+    assert.deepEqual(after.waiting, [id]);
+    // Each build fetches the backlog's branch after the repository's own fetch, never beside it.
+    assert.deepEqual(order, ['repo', 'repo done', 'backlog', 'repo', 'repo done', 'backlog']);
+  } finally { await s.close(); }
+}));
+
+test('drafts survive a restart of the map', () => withTmp(async (tmp) => {
+  const { origin, clones: [pat] } = project(tmp, 'notes-app', { people: ['Pat Example'] });
+  const args = ['--repo', `app=${pat}`];
+  const first = await startMap(pat, args);
+  let key;
+  try {
+    const post = async (body) => (await fetch(`${first.base}/api/drafts`, { method: 'POST', headers: WRITE, body: JSON.stringify(body) })).json();
+    key = (await post({ save: { op: 'add', title: 'Dark mode', about: ['editing/theme'] } })).draft.key;
+    assert.equal((await post({ save: { op: 'note', ref: key, text: 'For night shifts.' } })).ok, true);
+  } finally { await first.stop(); }
+  const again = await startMap(pat, args);
+  try {
+    const b = await (await fetch(`${again.base}/api/backlog`)).json();
+    assert.deepEqual(b.drafts.map((d) => [d.op, d.request]), [['add', key], ['note', key]]);
+    assert.deepEqual([b.requests[key].draft, b.requests[key].title, b.requests[key].notes.map((n) => [n.text, n.draft])], [true, 'Dark mode', [['For night shifts.', true]]]);
+    assert.equal(b.totals.unsent, 2);
+  } finally { await again.stop(); }
+  // Still unsent: the backlog's branch does not exist.
+  assert.equal(hasRef(origin, 'refs/heads/backlog'), false);
+}));
+
+test('submit sends every draft as one commit', () => withTmp(async (tmp) => {
+  const { origin, clones: [pat, sam] } = project(tmp, 'notes-app', { people: ['Pat Example', 'Sam Example'] });
+  const id = (await writeBacklog(at(sam), [{ op: 'add', title: 'Sync notes offline' }])).results[0].id;
+  const s = await serveBacklog(pat);
+  try {
+    const add = (await write(s, '/api/drafts', { save: { op: 'add', title: 'Dark mode', happens: 'The app is white at night.', should: 'It follows the system.', where: 'Every screen.', about: ['editing/theme'] } })).draft;
+    await write(s, '/api/drafts', { save: { op: 'note', ref: add.key, text: 'For night shifts.' } });
+    await write(s, '/api/drafts', { save: { op: 'move', ref: add.key, to: 'ready' } });
+    const drafted = await write(s, '/api/drafts', { save: { op: 'note', id, text: 'Offline matters most.' } });
+    assert.equal(drafted.backlog.totals.unsent, 4);
+    const before = commits(origin, 'backlog').length;
+    const r = await write(s, '/api/submit');
+    assert.equal(r.ok, true);
+    const log = commits(origin, 'backlog');
+    assert.equal(log.length, before + 1);
+    assert.deepEqual([log[0].sha, log[0].author, log[0].subject], [r.commit, 'Pat Example', 'Pat Example: 1 new request, 2 notes, 1 move']);
+    assert.deepEqual(r.sent.map((d) => [d.op, d.id]), [['add', 'dark-mode'], ['note', 'dark-mode'], ['move', 'dark-mode'], ['note', id]]);
+    assert.deepEqual([r.held, r.refused, r.unreachable, r.error], [[], [], false, null]);
+    // Nothing is left unsent, and the map shows what was sent.
+    const b = await backlogOf(s);
+    assert.deepEqual([b.drafts, b.totals.unsent, b.status], [[], 0, 'current']);
+    const dark = b.requests['dark-mode'];
+    assert.deepEqual([dark.draft, dark.by, dark.state, dark.label, dark.happens], [false, 'Pat Example', 'ready', 'Ready', 'The app is white at night.']);
+    assert.deepEqual(dark.notes.map((n) => [n.by, n.text, n.draft]), [['Pat Example', 'For night shifts.', false]]);
+    assert.deepEqual(b.requests[id].notes.map((n) => n.text), ['Offline matters most.']);
+    assert.deepEqual(readDrafts(pat), []);
+    // A Submit with nothing to send sends nothing.
+    const none = await write(s, '/api/submit');
+    assert.deepEqual([none.ok, none.commit, commits(origin, 'backlog').length], [true, null, before + 1]);
+  } finally { await s.close(); }
+}));
+
+test('a clashing draft stays unsent with both values', () => withTmp(async (tmp) => {
+  const { origin, clones: [pat, sam] } = project(tmp, 'notes-app', { people: ['Pat Example', 'Sam Example'] });
+  const [undo, sync] = (await writeBacklog(at(sam), [{ op: 'add', title: 'Undo after closing a note' }, { op: 'add', title: 'Sync notes' }])).results.map((x) => x.id);
+  const s = await serveBacklog(pat);
+  try {
+    await backlogOf(s); // the page opens: the map fetches the backlog
+    // Pat's move, as the page sends it, carries the state Pat saw; then a note and a rename.
+    const move = (await write(s, '/api/drafts', { save: { op: 'move', id: undo, to: 'ready' } })).draft;
+    assert.equal(move.from, 'new');
+    await write(s, '/api/drafts', { save: { op: 'note', id: undo, text: 'Same on the tablet.' } });
+    const rename = (await write(s, '/api/drafts', { save: { op: 'edit', id: sync, field: 'title', to: 'Sync notes offline' } })).draft;
+    assert.equal(rename.from, 'Sync notes');
+    // Sam parks the one and renames the other before Pat submits.
+    await writeBacklog(at(sam), [{ op: 'move', id: undo, to: 'parked' }, { op: 'edit', id: sync, field: 'title', to: 'Sync notes between devices' }]);
+    const r = await write(s, '/api/submit');
+    assert.equal(r.ok, true);
+    assert.deepEqual(r.sent.map((d) => [d.op, d.id]), [['note', undo]]);
+    assert.deepEqual(r.held, [
+      { key: move.key, op: 'move', id: undo, field: 'state', theirs: 'parked', yours: 'ready' },
+      { key: rename.key, op: 'edit', id: sync, field: 'title', theirs: 'Sync notes between devices', yours: 'Sync notes offline' },
+    ]);
+    assert.equal(commits(origin, 'backlog')[0].subject, 'Pat Example: 1 note');
+    // Both stay unsent, showing whose value holds and Pat's.
+    const b = await backlogOf(s);
+    assert.deepEqual(b.drafts.map((d) => [d.key, d.held]), [
+      [move.key, { theirs: 'parked', yours: 'ready', by: 'Sam Example' }],
+      [rename.key, { theirs: 'Sync notes between devices', yours: 'Sync notes offline', by: 'Sam Example' }],
+    ]);
+    assert.deepEqual([b.requests[undo].state, b.requests[undo].label, b.requests[undo].held], ['parked', 'Parked', [{ key: move.key, field: 'state', theirs: 'parked', yours: 'ready', by: 'Sam Example' }]]);
+    assert.equal(b.requests[sync].title, 'Sync notes between devices');
+    // Pat applies the move again over Sam's value, and drops the rename.
+    const again = await write(s, '/api/drafts', { apply: move.key });
+    assert.deepEqual([again.draft.from, again.draft.held], ['parked', undefined]);
+    assert.deepEqual((await write(s, '/api/drafts', { drop: rename.key })).backlog.drafts.map((d) => d.key), [move.key]);
+    const r2 = await write(s, '/api/submit');
+    assert.deepEqual([r2.ok, r2.sent.map((d) => d.key), r2.backlog.drafts], [true, [move.key], []]);
+    assert.equal(r2.backlog.requests[undo].state, 'ready');
+    assert.equal(r2.backlog.requests[sync].title, 'Sync notes between devices');
+    const bad = await fetch(`${s.base}/api/drafts`, { method: 'POST', headers: WRITE, body: JSON.stringify({ apply: move.key }) });
+    assert.deepEqual([bad.status, (await bad.json()).error], [400, `no held draft "${move.key}"`]);
+  } finally { await s.close(); }
+}));
+
+test('submit without the network keeps every draft', () => withTmp(async (tmp) => {
+  const { origin, clones: [pat] } = project(tmp, 'notes-app', { people: ['Pat Example'] });
+  const s = await serveBacklog(pat);
+  try {
+    const add = (await write(s, '/api/drafts', { save: { op: 'add', title: 'Dark mode' } })).draft;
+    await write(s, '/api/drafts', { save: { op: 'note', ref: add.key, text: 'For night shifts.' } });
+    const before = readDrafts(pat);
+    g(pat, 'remote', 'set-url', 'origin', path.join(tmp, 'gone.git'));
+    const r = await write(s, '/api/submit');
+    assert.deepEqual([r.ok, r.unreachable, r.commit, r.sent, r.held, r.refused], [false, true, null, [], [], []]);
+    assert.ok(r.error, 'says why');
+    assert.deepEqual(r.backlog.banners.filter((x) => x.kind === 'submit-unreachable').map((x) => x.drafts), [2]);
+    assert.deepEqual(r.backlog.drafts.map((d) => d.key), before.map((d) => d.key));
+    assert.deepEqual(readDrafts(pat), before);
+    assert.equal(hasRef(origin, 'refs/heads/backlog'), false);
+  } finally { await s.close(); }
+}));
+
+test('a write from another page is refused', () => withTmp(async (tmp) => {
+  const { origin, clones: [pat] } = project(tmp, 'notes-app', { people: ['Pat Example'] });
+  const s = await serveBacklog(pat);
+  try {
+    const body = JSON.stringify({ save: { op: 'add', title: 'Dark mode' } });
+    const status = async (route, headers, b = body, method = 'POST') => (await fetch(`${s.base}${route}`, { method, headers, body: b })).status;
+    for (const route of ['/api/drafts', '/api/submit']) {
+      // A page of another site cannot send the map's header without asking first ...
+      assert.equal(await status(route, { 'content-type': 'application/json' }), 403, route);
+      // ... and the map never says yes to that question.
+      const asked = await fetch(`${s.base}${route}`, { method: 'OPTIONS', headers: { origin: 'http://evil.example', 'access-control-request-method': 'POST', 'access-control-request-headers': 'content-type, x-solution-map' } });
+      assert.equal(asked.headers.get('access-control-allow-origin'), null, route);
+      assert.equal(asked.headers.get('access-control-allow-headers'), null, route);
+      // A page that names another origin, a name rebound to 127.0.0.1, a form's text.
+      assert.equal(await status(route, { ...WRITE, origin: 'http://evil.example' }), 403, route);
+      assert.equal(await status(route, { ...WRITE, origin: 'null' }), 403, route);
+      assert.equal(await postWithHost(s.port, route, `evil.example:${s.port}`, body), 403, route);
+      assert.equal(await status(route, { 'x-solution-map': '1', 'content-type': 'text/plain' }), 415, route);
+      assert.equal(await status(route, { 'x-solution-map': '1', 'content-type': 'application/x-www-form-urlencoded' }, 'save=1'), 415, route);
+    }
+    // Too big, or not JSON.
+    const big = JSON.stringify({ save: { op: 'add', title: 'Dark mode', happens: 'x'.repeat(MAX_BODY) } });
+    assert.equal(await status('/api/drafts', WRITE, big), 413);
+    assert.equal(await status('/api/drafts', WRITE, '{"save":'), 400);
+    assert.equal(await status('/api/drafts', WRITE, '[]'), 400);
+    // Nothing was kept or sent.
+    assert.deepEqual(readDrafts(pat), []);
+    assert.equal(hasRef(origin, 'refs/heads/backlog'), false);
+    // The map's own page writes.
+    assert.equal(await status('/api/drafts', { ...WRITE, origin: s.base }), 200);
+    assert.equal(await status('/api/drafts', { ...WRITE, origin: `http://localhost:${s.port}` }), 200);
+    assert.equal(readDrafts(pat).length, 2);
+  } finally { await s.close(); }
+}));
+
+test('a map without a backlog says why, and writes nothing', () => withTmp(async (tmp) => {
+  const { work } = repoPair(tmp, 'app');
+  const s = await serve(() => buildMap({ repos: [{ id: 'app', dir: work }], overview: standIn() }), { backlog: { error: 'backlog.repo "api" is not an id in solutionMap.repos' } });
+  try {
+    const b = await backlogOf(s);
+    assert.deepEqual([b.status, b.banners], ['unavailable', [{ kind: 'backlog-off', error: 'this map has no backlog: backlog.repo "api" is not an id in solutionMap.repos' }]]);
+    const r = await fetch(`${s.base}/api/drafts`, { method: 'POST', headers: WRITE, body: JSON.stringify({ save: { op: 'add', title: 'Dark mode' } }) });
+    assert.equal(r.status, 409);
+    assert.match((await r.json()).error, /this map has no backlog/);
+    assert.deepEqual(readDrafts(work), []);
+  } finally { await s.close(); }
+  // A saved overview has no backlog, and no banner for it.
+  const saved = await serve(async () => ({ model: { features: {} }, dirs: {}, commits: {}, backlog: null }));
+  try {
+    assert.deepEqual([(await backlogOf(saved)).status, (await backlogOf(saved)).banners], ['unavailable', []]);
+  } finally { await saved.close(); }
+}));

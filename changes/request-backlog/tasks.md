@@ -17,9 +17,9 @@ nearest the code it changes.
 
 ## 2. The map's server (after 1)
 
-- [ ] 2.1 `GET /api/backlog`, `POST /api/drafts`, `POST /api/submit` behind the existing guard; Refresh fetches the backlog's branch; test: tools/solution-map/test/server.test.mjs
-- [ ] 2.2 `lib/backlog-view.mjs`: board columns, the dialog's model, each feature's open requests, New requests for Waiting for you; test: tools/solution-map/test/backlog.test.mjs
-- [ ] 2.3 Update `tools/solution-map/README.md`: routes, the writes and where drafts live; test: node tools/gate/gate.mjs --local
+- [x] 2.1 `GET /api/backlog`, `POST /api/drafts`, `POST /api/submit` behind the existing guard; Refresh fetches the backlog's branch; test: tools/solution-map/test/server.test.mjs
+- [x] 2.2 `lib/backlog-view.mjs`: board columns, the dialog's model, each feature's open requests, New requests for Waiting for you; test: tools/solution-map/test/backlog.test.mjs
+- [x] 2.3 Update `tools/solution-map/README.md`: routes, the writes and where drafts live; test: node tools/gate/gate.mjs --local
 
 ## 3. The map's page (after 2)
 
