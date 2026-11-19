@@ -93,8 +93,9 @@ anything.
 #### Scenario: Old maps are removed
 - **GIVEN** the shortcut ran several maps before
 - **WHEN** it opens
-- **THEN** only the map it runs and the one run before it stay on the computer
-- **PROOF** test: tools/solution-map/test/launcher.test.mjs::the launcher keeps the map it runs and the one run before, and removes the others
+- **THEN** only the map it runs, the one run before it and any still open in another window stay on
+  the computer
+- **PROOF** test: tools/solution-map/test/launcher.test.mjs::the launcher keeps the map it runs, the one run before and any still open, and removes the others
 
 #### Scenario: The shortcut opens the browser on the map
 - **WHEN** a person double-clicks the shortcut on their desktop

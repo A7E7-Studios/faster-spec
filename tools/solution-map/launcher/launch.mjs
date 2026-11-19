@@ -16,9 +16,10 @@
 //    a launcher fix on main runs from the shortcut's next opening (this process goes on with the
 //    code it started with). Only a launcher in a git directory, where setup puts it, is replaced;
 //    a copy in a checkout never is.
-// 5. Removes every map folder in maps/ but the one it runs and the one run before (`pruneMaps`),
-//    which may still run in another window. A folder another launch is writing,
-//    `<tree id>.part-<pid>`, stays.
+// 5. Marks the folder as running (`<tree id>.running-<pid>` beside it, this process's id) until the
+//    map exits, and removes every map folder in maps/ but the one it runs, the one run before, and
+//    any whose mark names a launcher still there (`pruneMaps`): a map still open in another window.
+//    A folder another launch is writing, `<tree id>.part-<pid>`, stays.
 // 6. Runs `tools/solution-map/solution-map.mjs` from that folder as its child, in this window, with
 //    `--launched <tree id> --root <root>`, a `--repo <id>=<folder>` for each entry of the folder's
 //    own config and the arguments after `--`, and waits. A map that exits with RESTART_CODE
@@ -220,21 +221,39 @@ export function lastRun(maps) {
 
 /** A map folder a prune renamed aside to remove it: `<tree id>.prune-<pid>`. */
 const PRUNED = /^(?:[0-9a-f]{40}|[0-9a-f]{64})\.prune-\d+$/;
+/** The mark of a map that runs: `<tree id>.running-<pid>`, the pid its launcher's, which the map never outlives. */
+const RUNNING = /^((?:[0-9a-f]{40}|[0-9a-f]{64}))\.running-(\d+)$/;
+
+/** The mark a launcher with process id `pid` keeps in `maps` while it runs the map of `tree`. */
+export const runningMark = (maps, tree, pid = process.pid) => path.join(maps, `${tree}.running-${pid}`);
+
+/** Whether a process is there: signal 0 only asks. */
+function alive(pid) {
+  try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; }
+}
 
 /**
- * Removes the map folders in `maps` (those named for a tree id) but the ones `keep` names. Each is
- * renamed aside first, then removed, so no launch runs a half-removed map; on Windows a folder a
- * running map works in cannot be renamed, and stays. A folder left aside by a prune that did not
- * finish goes too. Anything else stays: a folder another launch is writing (`.part-<pid>`) among it.
+ * Removes the map folders in `maps` (those named for a tree id) but the ones `keep` names and the
+ * ones a map runs from: a mark (`runningMark`) of a launcher that is still there keeps its folder,
+ * and the mark of one that has gone is removed. Each folder is renamed aside first, then removed,
+ * so no launch runs a half-removed map. A folder left aside by a prune that did not finish goes
+ * too. Anything else stays: a folder another launch is writing (`.part-<pid>`) among it.
  */
 export function pruneMaps(maps, keep) {
   let names = [];
   try { names = fs.readdirSync(maps); } catch { return; }
+  const running = new Set();
+  for (const name of names) {
+    const m = RUNNING.exec(name);
+    if (!m) continue;
+    if (alive(Number(m[2]))) running.add(m[1]);
+    else fs.rmSync(path.join(maps, name), { force: true });
+  }
   for (const name of names) {
     const dir = path.join(maps, name);
     try {
       if (PRUNED.test(name)) fs.rmSync(dir, { recursive: true, force: true });
-      else if (TREE_ID.test(name) && !keep.includes(name)) {
+      else if (TREE_ID.test(name) && !keep.includes(name) && !running.has(name)) {
         const aside = `${dir}.prune-${process.pid}`;
         fs.renameSync(dir, aside);
         fs.rmSync(aside, { recursive: true, force: true });
@@ -334,15 +353,22 @@ async function launchOnce({ root, mapArgs, self = SELF, node = process.execPath,
     warn('launch: no map has run on this computer yet; connect to the network and open it again');
     return { code: 1 };
   }
+  // While its map runs, no launch in another window prunes its folder.
+  const mark = runningMark(maps, chosen.tree);
+  try { fs.writeFileSync(mark, ''); } catch { /* it still runs; another launch may prune its folder */ }
   try {
-    const now = new Date();
-    fs.utimesSync(chosen.dir, now, now); // marks it the map last run
-  } catch { /* it still runs; the next failed fetch may pick an older one */ }
-  pruneMaps(maps, [chosen.tree, previous?.tree].filter(Boolean));
-  let config = null;
-  try { config = parseJson(fs.readFileSync(path.join(chosen.dir, CONFIG))); } catch { /* the map says what is missing */ }
-  const repoArgs = configRepos(config, root).flatMap((r) => ['--repo', `${r.id}=${r.dir}`]);
-  return run(node, [path.join(chosen.dir, MAP_SCRIPT), '--launched', chosen.tree, '--root', root, ...repoArgs, ...mapArgs], { cwd: chosen.dir });
+    try {
+      const now = new Date();
+      fs.utimesSync(chosen.dir, now, now); // marks it the map last run
+    } catch { /* it still runs; the next failed fetch may pick an older one */ }
+    pruneMaps(maps, [chosen.tree, previous?.tree].filter(Boolean));
+    let config = null;
+    try { config = parseJson(fs.readFileSync(path.join(chosen.dir, CONFIG))); } catch { /* the map says what is missing */ }
+    const repoArgs = configRepos(config, root).flatMap((r) => ['--repo', `${r.id}=${r.dir}`]);
+    return await run(node, [path.join(chosen.dir, MAP_SCRIPT), '--launched', chosen.tree, '--root', root, ...repoArgs, ...mapArgs], { cwd: chosen.dir });
+  } finally {
+    fs.rmSync(mark, { force: true });
+  }
 }
 
 export async function main(argv) {

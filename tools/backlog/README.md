@@ -165,8 +165,21 @@ backlog's repository: per clone and shared by its worktrees, never committed, ou
 kept across restarts. `{ "version": 1, "drafts": [<operation> + { key, rev, savedAt }] }`, oldest
 first. Submit sends every draft as one write: a sent draft goes, and a draft naming a sent request
 by `ref` names it by its `id`; a held one stays with `held: { theirs }`, a refused one with
-`refused: <reason>`; a draft saved while the write was out stays as saved; when nothing could be
-sent, every draft stays. Submits of one clone run one after the other.
+`refused: <reason>`; when nothing could be sent, every draft stays. The file is only ever replaced
+whole (written beside it, then renamed), so a reader never sees half of it.
+
+Every map and tool on one clone (two windows, two worktrees) writes the same file, so each change
+of it, and a Submit from its read of the drafts to their clearing, holds the lock beside it,
+`backlog-drafts.lock`: created exclusively, holding `{ pid, at, what, token }`, removed by its
+holder only. A draft change waits up to 2 s (`LOCK_WAIT`) for another holder, then is refused
+(`DRAFTS_BUSY`) having changed nothing; a Submit never waits on another Submit: it sends nothing
+and says another map on this computer is sending (`busy`). A lock whose process has gone, or older
+than an hour (`LOCK_STALE`, well past the longest Submit), is stale and taken over. Should a draft
+change all the same while a Submit is out, its lock taken over, it keeps its change on top of what
+was sent, so nothing goes twice: an unsent request that went becomes one `edit` of its new `id`
+per field changed, `from` the value sent, so a field someone else set meanwhile is held; a move or
+an edit that went takes the value it sent as its `from`. Submits of one clone in one process run
+one after the other.
 
 ## Library
 
@@ -174,7 +187,7 @@ sent, every draft stays. Submits of one clone run one after the other.
 |---|---|
 | `lib/store.mjs` | `locateBacklog({ config, repos, root })` → `{ dir, branch, repo }`; `backlogConfig(config)` → `{ repo, branch }`; `fetchBacklog(where)` → `{ state: 'current' \| 'absent' \| 'unreachable', tip, error? }`; `readBacklog(where, { tip? })` → `{ tip, items, problems }`; `writeBacklog(where, ops, { now? })` → `{ ok: true, commit, results }` or `{ ok: false, unreachable, error }`; `gitIdentity(dir)`; `backlogTip(where)` |
 | `lib/state.mjs` | `withShownStates(items, repos)` → items with `shown` and `changes: [{ id, state }]`; `shownState(item, facts)`; `changeState(fact)`; `changeFacts(repos, ids)`; `SHOWN_STATES`; `STATE_LABELS` |
-| `lib/drafts.mjs` | `readDrafts(dir)`; `saveDraft(dir, draft)` → `{ draft, drafts }` (a `key` changes that draft); `dropDraft(dir, key)` → drafts left (an `add` takes the drafts naming it); `submitDrafts(where, { now? })` → `{ ok, commit, sent, held, refused, drafts, unreachable?, error? }`; `draftsPath(dir)` |
+| `lib/drafts.mjs` | `readDrafts(dir)`; `saveDraft(dir, draft, { wait? })` → promise of `{ draft, drafts }` (a `key` changes that draft); `dropDraft(dir, key, { wait? })` → promise of the drafts left (an `add` takes the drafts naming it); both reject with `code` `DRAFTS_BUSY` when the lock stays held; `submitDrafts(where, { now? })` → `{ ok, commit, sent, held, refused, drafts, unreachable?, busy?, error? }`; `draftsPath(dir)`; `lockPath(dir)`; `LOCK_WAIT`, `LOCK_STALE`, `SENDING_ELSEWHERE` |
 | `lib/ops.mjs` | `applyOps(tip, ops, { name, now })` → `{ files, results }`; `opProblem(op)`; `fieldOf(op)`, the field a move (`state`) or an edit sets; `summary(results)`; `commitMessage(name, results)` |
 | `lib/item.mjs` | `parseItem(text, { id })`; `writeItem(item)`; `newId(title, taken)`; `itemProblem(item)`; `SET_STATES`; `SECTIONS` |
 

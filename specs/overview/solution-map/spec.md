@@ -223,6 +223,12 @@ what they wrote before others see it, and nothing is lost when the page closes.
 - **THEN** the map refuses it and says Submit is sending, and the drafts being sent stay as they were
 - **PROOF** test: tools/solution-map/test/server.test.mjs::a draft is not changed while Submit sends, and says why
 
+#### Scenario: Two maps on one computer send each draft once
+- **GIVEN** two maps run on one copy of the repository, as two windows do
+- **WHEN** both press Submit at the same moment
+- **THEN** each draft is sent once, and the map that did not send says another map is sending
+- **PROOF** test: tools/backlog/test/drafts.test.mjs::two Submits at once from two maps on one clone send each draft once
+
 ### Requirement: Looks are drawn from the repository
 The Solution map SHALL draw a board line from the board's section with that id, and show a page
 line's page live, because the design is drawn once, beside the spec.

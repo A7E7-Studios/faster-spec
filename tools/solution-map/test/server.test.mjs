@@ -10,13 +10,14 @@ import { createMapServer, withSection, PAGE_DIR, MAX_BODY, SENDING } from '../li
 import { gitAsync } from '../../gate/lib/git.mjs';
 import { fetchRepo } from '../../gate/lib/repos.mjs';
 import { readAt } from '../lib/sources.mjs';
+import { RESTART_CODE } from '../launcher/launch.mjs';
 import http from 'node:http';
 import { reviewCommand, startReview } from '../lib/review.mjs';
 import { EventEmitter } from 'node:events';
 // Git reads no global or system config while these tests run (the backlog's test helpers set it).
 import { project, commits, hasRef } from '../../backlog/test/helpers.mjs';
 import { writeBacklog, fetchBacklog, readBacklog } from '../../backlog/lib/store.mjs';
-import { readDrafts } from '../../backlog/lib/drafts.mjs';
+import { readDrafts, lockPath, SENDING_ELSEWHERE } from '../../backlog/lib/drafts.mjs';
 
 const ID = ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', '-c', 'init.defaultBranch=main'];
 const g = (dir, ...args) => execFileSync('git', ['-C', dir, ...ID, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
@@ -309,15 +310,19 @@ const postWithHost = (port, p, host, body) => new Promise((resolve, reject) => {
 
 const CLI = fileURLToPath(new URL('../solution-map.mjs', import.meta.url));
 
-/** The map's command line started in `cwd` on a free port; resolves its address and `stop`, which waits for it to end. */
-function startMap(cwd, args) {
+/**
+ * The map's command line started in `cwd` on a free port; resolves its address, `stop`, which waits
+ * for it to end, the process and its exit code. With `ipc` it has the channel a launcher opens.
+ */
+function startMap(cwd, args, { ipc = false } = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [CLI, ...args, '--port', '0', '--no-open'], { cwd, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+    const child = spawn(process.execPath, [CLI, ...args, '--port', '0', '--no-open'], { cwd, stdio: ['ignore', 'pipe', 'pipe', ...(ipc ? ['ipc'] : [])], windowsHide: true });
+    const exited = new Promise((r) => child.once('exit', (code) => r(code)));
     let out = '';
     const seen = (c) => {
       out += c;
       const m = /http:\/\/127\.0\.0\.1:\d+/.exec(out);
-      if (m) resolve({ base: m[0], stop: () => new Promise((r) => { child.once('exit', r); child.kill(); }) });
+      if (m) resolve({ base: m[0], child, exited, stop: () => new Promise((r) => { if (child.exitCode !== null) r(); else { child.once('exit', r); child.kill(); } }) });
     };
     child.stdout.on('data', seen);
     child.stderr.on('data', (c) => { out += c; });
@@ -497,6 +502,28 @@ test('a draft is not changed while Submit sends, and says why', () => withTmp(as
   }
 }));
 
+test('while another map on this computer sends, a Submit and a draft change are refused as Submit is', () => withTmp(async (tmp) => {
+  const { origin, clones: [pat] } = project(tmp, 'notes-app', { people: ['Pat Example'] });
+  const s = await serveBacklog(pat);
+  try {
+    await write(s, '/api/drafts', { save: { op: 'add', title: 'Dark mode' } });
+    // Another map's Submit holds the drafts lock: a live process, this test's.
+    fs.writeFileSync(lockPath(pat), JSON.stringify({ pid: process.pid, at: Date.now(), what: 'submit', token: 'other-map' }));
+    const post = async (route, body) => {
+      const r = await fetch(`${s.base}${route}`, { method: 'POST', headers: WRITE, body: JSON.stringify(body) });
+      return [r.status, await r.json()];
+    };
+    assert.deepEqual(await post('/api/submit', {}), [409, { ok: false, error: SENDING_ELSEWHERE }]);
+    assert.deepEqual(await post('/api/drafts', { save: { op: 'add', title: 'Export as PDF' } }), [409, { ok: false, error: SENDING_ELSEWHERE }]);
+    assert.deepEqual(readDrafts(pat).map((d) => d.title), ['Dark mode']);
+    assert.equal(hasRef(origin, 'refs/heads/backlog'), false);
+    // Once it lets go, both go through.
+    fs.rmSync(lockPath(pat));
+    assert.equal((await write(s, '/api/submit')).ok, true);
+    assert.equal(commits(origin, 'backlog').length, 1);
+  } finally { await s.close(); }
+}));
+
 test('Restart hands over only once a Submit out has cleared what it sent', () => withTmp(async (tmp) => {
   const { origin, clones: [pat] } = project(tmp, 'notes-app', { people: ['Pat Example'] });
   const push = heldPush();
@@ -509,6 +536,8 @@ test('Restart hands over only once a Submit out has cleared what it sent', () =>
     assert.deepEqual(await write(s, '/api/restart'), { ok: true });
     await new Promise((r) => setTimeout(r, 200));
     assert.deepEqual(handed, [], 'not while the push is out');
+    const twice = await fetch(`${s.base}/api/restart`, { method: 'POST', headers: WRITE, body: '{}' });
+    assert.deepEqual([twice.status, (await twice.json()).error], [409, 'the map is restarting']);
     // A Submit asked for now would never run: it is refused, not left waiting.
     const late = await fetch(`${s.base}/api/submit`, { method: 'POST', headers: WRITE, body: '{}', signal: AbortSignal.timeout(10000) });
     assert.deepEqual([late.status, (await late.json()).error], [409, 'the map is restarting']);
@@ -521,6 +550,40 @@ test('Restart hands over only once a Submit out has cleared what it sent', () =>
     push.release();
     s.server.closeAllConnections();
     await s.close();
+  }
+}));
+
+test('a Submit out when the map restarts gets its answer before the map exits', () => withTmp(async (tmp) => {
+  const { origin, clones: [pat] } = project(tmp, 'notes-app', { people: ['Pat Example'] });
+  // The origin takes a push only once `release` exists, so the push is out while the map restarts.
+  const started = path.join(tmp, 'push-started');
+  const release = path.join(tmp, 'push-release');
+  const slash = (p) => p.split(path.sep).join('/');
+  fs.writeFileSync(path.join(origin, 'hooks', 'pre-receive'), `#!/bin/sh\n: > '${slash(started)}'\nwhile [ ! -f '${slash(release)}' ]; do sleep 1; done\n`, { mode: 0o755 });
+  // The real map with the channel a launcher opens, so its own hand-over runs.
+  const m = await startMap(pat, ['--repo', `app=${pat}`, '--launched', 'a'.repeat(40), '--root', pat], { ipc: true });
+  const told = [];
+  m.child.on('message', (msg) => told.push(msg));
+  try {
+    const add = (await (await fetch(`${m.base}/api/drafts`, { method: 'POST', headers: WRITE, body: JSON.stringify({ save: { op: 'add', title: 'Dark mode' } }) })).json()).draft;
+    // Another tab's Submit, then Restart to update while its push is out.
+    const sending = fetch(`${m.base}/api/submit`, { method: 'POST', headers: WRITE, body: '{}' });
+    for (const until = Date.now() + 60000; !fs.existsSync(started) && Date.now() < until;) await new Promise((r) => setTimeout(r, 50));
+    assert.ok(fs.existsSync(started), 'the push is out');
+    const r = await fetch(`${m.base}/api/restart`, { method: 'POST', headers: WRITE, body: '{}' });
+    assert.deepEqual([r.status, await r.json()], [200, { ok: true }]);
+    fs.writeFileSync(release, '');
+    // The Submit's page hears that its drafts went, though the map stops right after.
+    const answer = await sending;
+    const body = await answer.json();
+    assert.deepEqual([answer.status, body.ok, body.sent.map((d) => [d.key, d.id])], [200, true, [[add.key, 'dark-mode']]]);
+    assert.equal(await m.exited, RESTART_CODE);
+    assert.deepEqual(told, [{ restart: { port: Number(m.base.split(':').pop()) } }]);
+    assert.deepEqual(readDrafts(pat), []);
+    assert.equal(commits(origin, 'backlog').length, 1);
+  } finally {
+    fs.writeFileSync(release, '');
+    await m.stop();
   }
 }));
 
@@ -675,11 +738,13 @@ test('Restart to update answers on a launched map only, behind the guard of ever
     assert.match(body.error, /shortcut/);
   } finally { await fromCheckout.close(); }
 
-  // A launched map: the hand-over runs once, after the answer, which it would cut off if it ran first.
+  // A launched map: the hand-over runs once, after the answer, which it would cut off if it ran
+  // first, and once the server has stopped.
   let can = { ok: false, error: 'the launcher is not at /gone/launch.mjs' };
   let handed = 0;
+  let listening = null;
   let s;
-  s = await serve(build, { restart: async () => (can.ok ? { ok: true, handOver: () => { handed++; s.server.closeAllConnections(); } } : can) });
+  s = await serve(build, { restart: async () => (can.ok ? { ok: true, handOver: () => { handed++; listening = s.server.listening; } } : can) });
   try {
     assert.equal((await restartAt(s, { 'content-type': 'application/json' })).status, 403);
     assert.equal((await restartAt(s, { ...WRITE, origin: 'http://evil.example' })).status, 403);
@@ -691,9 +756,9 @@ test('Restart to update answers on a launched map only, behind the guard of ever
     can = { ok: true };
     const r = await restartAt(s);
     assert.deepEqual([r.status, await r.json()], [200, { ok: true }]);
-    assert.equal(handed, 1);
-    const again = await restartAt(s);
-    assert.deepEqual([again.status, (await again.json()).error], [409, 'the map is restarting']);
+    for (const until = Date.now() + 5000; !handed && Date.now() < until;) await new Promise((done) => setTimeout(done, 20));
+    assert.deepEqual([handed, listening], [1, false]);
+    await assert.rejects(restartAt(s), 'nothing listens once it has handed over');
     assert.equal(handed, 1);
   } finally { await s.close(); }
 }));

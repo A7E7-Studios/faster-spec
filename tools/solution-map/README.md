@@ -82,8 +82,8 @@ moves. Fetches and Submit's push take turns.
 | `POST /api/refresh` | | builds again (above); the map's view model |
 | `POST /api/review` | | opens CueReview: `{ ok, error? }` |
 | `GET /api/backlog` | | the backlog's view model (below) |
-| `POST /api/drafts` | `{ "save": <operation> }` adds a draft, and with the draft's `key` changes it; `{ "drop": "<key>" }` drops it (an unsent request with the drafts naming it); `{ "apply": "<key>" }` applies a held draft again over the other person's value | `{ ok: true, draft, backlog }`; a draft that is not one: `400 { ok: false, error }`; while a Submit is out: `409 { ok: false, error }` (`SENDING`), nothing changed |
-| `POST /api/submit` | `{}` | `{ ok, unreachable, error, commit, sent: [{ key, op, id }], held: [{ key, op, id, field, theirs, yours }], refused: [{ key, op, reason }], backlog }`; `ok` false when nothing was sent, every draft kept; once a restart is under way: `409 { ok: false, error }` |
+| `POST /api/drafts` | `{ "save": <operation> }` adds a draft, and with the draft's `key` changes it; `{ "drop": "<key>" }` drops it (an unsent request with the drafts naming it); `{ "apply": "<key>" }` applies a held draft again over the other person's value | `{ ok: true, draft, backlog }`; a draft that is not one: `400 { ok: false, error }`; while a Submit is out: `409 { ok: false, error }` (`SENDING`), nothing changed; the same when another map on this computer holds the drafts longer than 2 s ([the drafts lock](../backlog/README.md#drafts)) |
+| `POST /api/submit` | `{}` | `{ ok, unreachable, error, commit, sent: [{ key, op, id }], held: [{ key, op, id, field, theirs, yours }], refused: [{ key, op, reason }], backlog }`; `ok` false when nothing was sent, every draft kept; once a restart is under way, or while another map on this computer sends: `409 { ok: false, error }`, nothing sent |
 | `POST /api/restart` | `{}` | a launched map: `{ ok: true }`, then [Restart to update](#launcher); any other, one no launcher waits on, or a restart under way: `409 { ok: false, error }` |
 | `GET /board/<repo>/<path>?section=<id>` | | a board at the commit read |
 
@@ -174,29 +174,34 @@ when the backlog lives in another of those repositories ([Config](#config)).
   blobs the clone lacks in one request and writes those paths there with `checkout-index`. It
   takes main's copy of itself from that folder when the two differ and the copy passes
   `node --check`; the copy runs from the shortcut's next opening, as the launcher running goes on
-  with the code it started with. A copy in a checkout is never replaced. It removes every map
-  folder but the one it runs and the one run before it, which may still run in another window
-  (`pruneMaps`): each is renamed aside, then removed, and on Windows one a running map works in
-  cannot be renamed and stays; a folder another launch is writing (`<tree id>.part-<pid>`) stays.
-  It runs the map from that folder as its child, in the shortcut's window (inherited output, and
-  an IPC channel), with `--launched <tree id> --root <clone>`, a `--repo` per entry of that
-  folder's config and the arguments after `--`, and waits; Ctrl+C or a closed window it passes on
-  to the map. When the fetch fails it runs the map last run (the folder it touched last). It never
-  moves a clone's HEAD, index or working files.
+  with the code it started with. A copy in a checkout is never replaced. While its map runs it
+  keeps a mark beside the folder, `maps/<tree id>.running-<pid>` with its own process id, which
+  the map never outlives. It removes every map folder but the one it runs, the one run before it,
+  and any whose mark names a launcher still there: a map still open in another window, whose page
+  reads its files at every request (`pruneMaps`). A mark whose launcher has gone is removed. Each
+  folder is renamed aside, then removed; a folder another launch is writing
+  (`<tree id>.part-<pid>`) stays. It runs the map from that folder as its child, in the shortcut's
+  window (inherited output, and an IPC channel), with `--launched <tree id> --root <clone>`, a
+  `--repo` per entry of that folder's config and the arguments after `--`, and waits; Ctrl+C or a
+  closed window it passes on to the map. When the fetch fails it runs the map last run (the folder
+  it touched last). It never moves a clone's HEAD, index or working files.
 - **Restart to update**: at every build a launched map compares its `--launched` tree id with
   main's and, when they differ, gives the `map-update` banner. `POST /api/restart` answers
   `{ ok: true }`; once the answer is out and the fetches and Submits taken before it are done (they
-  take turns), the map stops listening, sends its port to the launcher over the IPC channel and
-  exits with the restart code (`RESTART_CODE`), so it never exits between a Submit's push and the
-  clearing of the drafts it sent. The launcher, waiting in the same window, runs all of the above
-  again in the same process, the port and `--no-open` added to the map's arguments; any other exit
-  code ends the launcher with that code. The newer map waits up to 10 s for the port, and the page,
-  asking `/api/map` until it answers, reloads. A map started without `--launched`, or one no
-  launcher waits on, answers 409.
+  take turns), the map stops listening, lets every answer under way go out (10 s at most,
+  `RESTART_WAIT`; a request meanwhile gets 503, and a Refresh or Submit asked once the restart is
+  answered gets 409), sends its port to the launcher over the IPC channel and exits with the
+  restart code (`RESTART_CODE`). So it never exits between a Submit's push and the clearing of the
+  drafts it sent, nor before that Submit's page hears what was sent. The launcher, waiting in the
+  same window, runs all of the above again in the same process, the port and `--no-open` added to
+  the map's arguments; any other exit code ends the launcher with that code. The newer map waits up
+  to 10 s for the port, and the page, asking `/api/map` until it answers, reloads. A map started
+  without `--launched`, or one no launcher waits on, answers 409.
 - **What it keeps** lives under the clone's `<git common dir>/faster-spec/`: `setup/`,
-  `launcher/launch.mjs` and `maps/<tree id>/` (the map run last and the one before it), beside the
-  drafts (`backlog-drafts.json`), which a restart, a newer map and setup run again all keep. None
-  of it shows in `git status`, and it goes with the clone.
+  `launcher/launch.mjs` and `maps/<tree id>/` (the map run last, the one before it and any still
+  open, a running one marked beside it), beside the drafts (`backlog-drafts.json`), which a
+  restart, a newer map and setup run again all keep. None of it shows in `git status`, and it goes
+  with the clone.
 
 ## Files
 

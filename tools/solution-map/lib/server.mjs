@@ -11,7 +11,7 @@ import { backlogView } from './backlog-view.mjs';
 import { backlogTip, readBacklog, gitIdentity } from '../../backlog/lib/store.mjs';
 import { fieldOf } from '../../backlog/lib/ops.mjs';
 import { withShownStates } from '../../backlog/lib/state.mjs';
-import { readDrafts, saveDraft, dropDraft, submitDrafts } from '../../backlog/lib/drafts.mjs';
+import { readDrafts, saveDraft, dropDraft, submitDrafts, DRAFTS_BUSY } from '../../backlog/lib/drafts.mjs';
 
 export const PAGE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'page');
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml' };
@@ -19,6 +19,8 @@ const JSON_TYPE = 'application/json; charset=utf-8';
 const VIEW = /^\/(?:$|waiting(?:\/|$)|explore(?:\/|$)|search(?:\/|$)|backlog(?:\/|$))/;
 /** The largest body a write takes, in bytes. */
 export const MAX_BODY = 256 * 1024;
+/** How long a restart waits for the answers under way to be written before it hands over, in ms. */
+export const RESTART_WAIT = 10000;
 const BOARD = /^\/board\/([a-z0-9]+(?:-[a-z0-9]+)*)\/(specs\/[a-z0-9/-]+\/looks\/[a-z0-9-]+\.html)$/;
 
 /**
@@ -104,13 +106,17 @@ export const SENDING = 'Submit is sending your drafts; try again once it is done
  *   `net`, the runner for Submit's fetches and push (`submitDrafts`), git by default
  * @param {(() => Promise<{ ok: true, handOver: () => void } | { ok: false, error: string }>)|null} [o.restart]
  *   Restart to update, for a map the launcher started: whether it can, and `handOver`, run once the
- *   answer is sent and the fetches and Submits before it are done
+ *   answer is sent, the fetches and Submits before it are done, and the server has stopped with
+ *   every answer under way written
  * @returns {{ server: http.Server, refresh: () => Promise<object>, listen: (port: number, o?: { wait?: number }) => Promise<number> }}
  */
 export function createMapServer({ build, theme = async () => null, review = async () => ({ ok: false, error: 'Start review is not set up here.' }), backlog = null, restart = null }) {
   let current = null;
   let pending = null;
   let fetched = null; // the backlog's last fetch, or Submit's: { state, error? }
+  let restarting = false; // a restart was answered: no fetch or Submit starts any more
+  let closing = false; // the server is stopping for the hand-over
+  const open = new Set(); // the answers not yet written
   // Fetches and pushes take turns: two at once in one repository race for its refs.
   let turn = Promise.resolve();
   const inTurn = (fn) => {
@@ -119,6 +125,8 @@ export function createMapServer({ build, theme = async () => null, review = asyn
     return run;
   };
   const refresh = () => {
+    // A build asked for once the restart is under way would wait behind the hand-over for ever.
+    if (!pending && restarting) return Promise.reject(new Refused(409, 'the map is restarting'));
     pending ??= inTurn(build).then((b) => { current = b; fetched = b.backlog ?? null; return b; }).finally(() => { pending = null; });
     return pending;
   };
@@ -170,8 +178,8 @@ export function createMapServer({ build, theme = async () => null, review = asyn
     const item = readBranch(b).items.find((i) => i.id === save.id);
     return item && !item.problems.length ? { ...save, from: item[fieldOf(save)] } : save;
   };
-  // How many Submits are out. A draft changed while one is out is sent as Submit read it and kept
-  // as changed: an unsent request changed then would be sent twice, as two requests.
+  // How many Submits this map has out: a draft change waits for none of them, it is refused at once.
+  // The drafts lock (drafts.mjs) keeps it from one another map on the clone has out.
   let sending = 0;
   /** POST /api/drafts: `{ save }` adds a draft, or changes the one its `key` names; `{ drop }` drops one; `{ apply }` applies a held one again over the other person's value. */
   const changeDrafts = async (req) => {
@@ -179,23 +187,23 @@ export function createMapServer({ build, theme = async () => null, review = asyn
     const off = noBacklog();
     if (off) throw new Refused(409, off);
     const b = await latest();
-    // From here to the write nothing waits, so no Submit starts in between.
+    // From here the drafts lock is tried before anything waits, so no Submit of this map starts in between.
     if (sending) throw new Refused(409, SENDING);
     let draft = null;
     try {
-      if (typeof body.drop === 'string') dropDraft(where.dir, body.drop);
+      if (typeof body.drop === 'string') await dropDraft(where.dir, body.drop);
       else if (typeof body.apply === 'string') {
         const d = readDrafts(where.dir).find((x) => x.key === body.apply);
         if (!d?.held) throw new Error(`no held draft "${body.apply}"`);
-        draft = saveDraft(where.dir, { ...d, from: d.held.theirs }).draft;
-      } else if (body.save && typeof body.save === 'object' && !Array.isArray(body.save)) draft = saveDraft(where.dir, withFrom(body.save, b)).draft;
+        draft = (await saveDraft(where.dir, { ...d, from: d.held.theirs })).draft;
+      } else if (body.save && typeof body.save === 'object' && !Array.isArray(body.save)) draft = (await saveDraft(where.dir, withFrom(body.save, b))).draft;
       else throw new Error('send { "save": <draft> }, { "drop": "<key>" } or { "apply": "<key>" }');
     } catch (e) {
-      throw new Refused(400, e.message);
+      // Another map on this computer holds the drafts: the same refusal as this map's own Submit.
+      throw new Refused(e.code === DRAFTS_BUSY ? 409 : 400, e.message);
     }
     return { ok: true, draft, backlog: await backlogModel() };
   };
-  let restarting = false;
   /** POST /api/submit: every draft as one commit, in turn with the fetches. */
   const submit = async (req) => {
     await readJson(req);
@@ -209,6 +217,8 @@ export function createMapServer({ build, theme = async () => null, review = asyn
     } finally {
       sending--;
     }
+    // Another map on this computer is sending these drafts: nothing was sent from here.
+    if (s.busy) throw new Refused(409, s.error);
     if (s.ok) fetched = { state: 'current', tip: backlogTip(where) };
     return {
       ok: s.ok,
@@ -223,9 +233,26 @@ export function createMapServer({ build, theme = async () => null, review = asyn
   };
 
   /**
+   * Stops the server for the hand-over: it takes no new connection, each connection closes once its
+   * answer is out, and it resolves when every answer under way is written (RESTART_WAIT at most),
+   * the last connections closed. A request that comes meanwhile is answered 503.
+   */
+  const drain = async () => {
+    closing = true;
+    server.close();
+    for (const r of open) r.shouldKeepAlive = false;
+    server.closeIdleConnections();
+    let timer;
+    const written = Promise.all([...open].map((r) => new Promise((done) => r.once('close', done))));
+    await Promise.race([written, new Promise((done) => { timer = setTimeout(done, RESTART_WAIT); })]);
+    clearTimeout(timer);
+    server.closeAllConnections();
+  };
+  /**
    * POST /api/restart: answers `{ ok: true }`, then hands over to the launcher (`restart().handOver`)
    * in turn with the fetches and Submits: one out finishes first, so the map never exits between a
-   * push and the drafts it sent being cleared. Nothing in turn after it runs.
+   * push and the drafts it sent being cleared, and its answer is written before the server stops
+   * (`drain`). Nothing in turn after it runs.
    */
   const restartMap = async (req, res) => {
     await readJson(req);
@@ -237,12 +264,18 @@ export function createMapServer({ build, theme = async () => null, review = asyn
     // Only once the page has the answer; a page gone before it can ask again.
     res.once('close', () => {
       if (!res.writableFinished) { restarting = false; return; }
-      inTurn(() => new Promise(() => r.handOver())).catch(() => { restarting = false; });
+      inTurn(() => new Promise((_, failed) => { drain().then(() => r.handOver()).catch(failed); })).catch(() => { restarting = false; });
     });
     return send(res, 200, JSON_TYPE, JSON.stringify({ ok: true }));
   };
 
   const server = http.createServer(async (req, res) => {
+    if (closing) {
+      res.shouldKeepAlive = false;
+      return send(res, 503, 'text/plain', 'the map is restarting');
+    }
+    open.add(res);
+    res.once('close', () => open.delete(res));
     try {
       if (!hostAllowed(req.headers.host, server.address()?.port)) return send(res, 403, 'text/plain', 'this server answers only to 127.0.0.1 and localhost');
       const url = new URL(req.url, 'http://127.0.0.1');

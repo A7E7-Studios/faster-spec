@@ -100,7 +100,7 @@ export async function main(argv) {
   if (launched && process.connected) process.once('disconnect', () => process.exit(0));
   const reviewCmd = reviewCommand({ config: o.config });
   let port;
-  const { server, listen, refresh } = createMapServer({
+  const { listen, refresh } = createMapServer({
     build: o.build || (() => buildMap({ repos, pages: o.pages, backlog: o.backlog?.where ?? null, launched })),
     // A launched map runs from a folder of main's map code alone: the theme is main's, read from git.
     theme: launched
@@ -108,7 +108,7 @@ export async function main(argv) {
       : async () => { const f = path.join(root, THEME); return fs.existsSync(f) ? fs.readFileSync(f) : null; },
     review: () => startReview(reviewCmd),
     backlog: o.backlog ?? null,
-    restart: launched ? async () => restartWith({ server, port: () => port }) : null,
+    restart: launched ? async () => restartWith({ port: () => port }) : null,
   });
   try {
     port = await listen(o.port, { wait: launched ? PORT_WAIT : 0 });
@@ -125,17 +125,15 @@ export async function main(argv) {
 
 /**
  * Restart to update: whether the launcher that started this map waits on it (its IPC channel), and
- * `handOver`, run once the page has its answer: stop listening, tell the launcher this map's port,
- * and exit with RESTART_CODE. The launcher then runs main's newest map, in the same window, on
- * that port.
+ * `handOver`, which the server runs once it has stopped with every answer under way written: tell
+ * the launcher this map's port, and exit with RESTART_CODE. The launcher then runs main's newest
+ * map, in the same window, on that port.
  */
-function restartWith({ server, port }) {
+function restartWith({ port }) {
   if (!process.connected) return { ok: false, error: 'the launcher that started this map no longer waits on it; open the map from its shortcut again' };
   return {
     ok: true,
     handOver: () => {
-      server.close();
-      server.closeAllConnections();
       console.log('solution-map: restarting with main\'s newest map');
       process.send({ restart: { port: port() } }, () => process.exit(RESTART_CODE));
     },

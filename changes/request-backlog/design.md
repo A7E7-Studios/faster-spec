@@ -84,6 +84,7 @@ supports, no product names, and nothing the backlog does may touch main or a che
 | Submit without the network keeps the drafts | `tools/solution-map/test/server.test.mjs::submit without the network keeps every draft`, new |
 | Only the map's own page can write | `tools/solution-map/test/server.test.mjs::a write from another page is refused`, new |
 | A draft waits while Submit sends | `tools/solution-map/test/server.test.mjs::a draft is not changed while Submit sends, and says why`, new |
+| Two maps on one computer send each draft once | `tools/backlog/test/drafts.test.mjs::two Submits at once from two maps on one clone send each draft once`, new |
 | Every view has its own address (the backlog's) | `tools/solution-map/test/view.test.mjs::every view has its own address`, existing, extended |
 | Something missing stops setup and says what to install | `tools/solution-map/test/launcher.test.mjs::setup names what is missing and stops`, new; the printed commands' checks run under `sh` where the test has one |
 | Setup asks for a name and email when git has none | `tools/solution-map/test/launcher.test.mjs::setup asks for a git name and email when none is set`, new |
@@ -94,7 +95,7 @@ supports, no product names, and nothing the backlog does may touch main or a che
 | The map runs from main's code | `tools/solution-map/test/launcher.test.mjs::the launched map runs from main's code`, new |
 | Without the network the last map runs | `tools/solution-map/test/launcher.test.mjs::without the network the last map runs`, new |
 | A launcher fixed on main reaches the shortcut | `tools/solution-map/test/launcher.test.mjs::the launcher takes main's copy of itself, never into a checkout`, new |
-| Old maps are removed | `tools/solution-map/test/launcher.test.mjs::the launcher keeps the map it runs and the one run before, and removes the others`, new |
+| Old maps are removed | `tools/solution-map/test/launcher.test.mjs::the launcher keeps the map it runs, the one run before and any still open, and removes the others`, new |
 | A newer map on main shows a banner | `tools/solution-map/test/launcher.test.mjs::a newer map on main offers a restart`, new |
 | Restart runs the newer map and keeps the drafts | `tools/solution-map/test/launcher.test.mjs::restart runs the newer map and keeps the drafts`, new |
 | A map run from a checkout never offers a restart | `tools/solution-map/test/launcher.test.mjs::a map run from a checkout offers no restart`, new |

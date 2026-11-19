@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { setup, setupCommands, shortcutFiles, repoName, gitVersionOf, gitTooOld, GIT_PAGE, GIT_MIN, NODE_PAGE, SETUP_PATHS } from '../launcher/setup.mjs';
-import { MAP_PATHS, TREE_ID, pruneMaps, parseArgs as launchArgv } from '../launcher/launch.mjs';
+import { MAP_PATHS, TREE_ID, pruneMaps, runningMark, parseArgs as launchArgv } from '../launcher/launch.mjs';
 import { parseArgs as parseMapArgs } from '../solution-map.mjs';
 
 const KIT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -415,8 +415,8 @@ test('a repository is named for its address', () => {
   assert.throws(() => setupCommands({ url: 'x', name: 'two words' }), /folder name/);
 });
 
-/** A stand-in for the map that records where it ran and with what, then exits. */
-const standIn = (version) => `import fs from 'node:fs';\nfs.writeFileSync(process.env.LAUNCH_RECORD, JSON.stringify({ version: '${version}', cwd: process.cwd(), argv: process.argv.slice(2) }));\n`;
+/** A stand-in for the map that records where it ran, with what and what lay beside its folder, then exits. */
+const standIn = (version) => `import fs from 'node:fs';\nfs.writeFileSync(process.env.LAUNCH_RECORD, JSON.stringify({ version: '${version}', cwd: process.cwd(), argv: process.argv.slice(2), beside: fs.readdirSync('..') }));\n`;
 
 /** A notes app whose main holds the stand-in map, its backend, both cloned as setup clones them, and the launcher copied in. */
 function launched(tmp) {
@@ -538,7 +538,7 @@ test('without the network the last map runs', () => withTmp(async (tmp) => {
   assert.equal(real(lastRun.ran.cwd), real(path.join(maps, t1)));
 }));
 
-test('the launcher keeps the map it runs and the one run before, and removes the others', () => withTmp(async (tmp) => {
+test('the launcher keeps the map it runs, the one run before and any still open, and removes the others', () => withTmp(async (tmp) => {
   identity(true);
   const { app, open, maps } = launched(tmp);
   const t1 = open().ran.argv[1];
@@ -546,12 +546,22 @@ test('the launcher keeps the map it runs and the one run before, and removes the
   const t2 = open().ran.argv[1];
   assert.deepEqual(fs.readdirSync(maps).sort(), [t1, t2].sort(), 'the map before stays: it may run in another window');
 
-  // An older map, a folder another launch is still writing, and one a prune left aside.
+  // An older map whose launcher has gone, one still open in another window (its launcher is this
+  // test's process), a folder another launch is still writing, and one a prune left aside.
+  const mapFolder = (tree, version) => {
+    fs.mkdirSync(path.join(maps, tree, 'tools', 'solution-map'), { recursive: true });
+    fs.writeFileSync(path.join(maps, tree, 'tools', 'solution-map', 'solution-map.mjs'), standIn(version));
+    const longAgo = new Date(Date.now() - 86400000);
+    fs.utimesSync(path.join(maps, tree), longAgo, longAgo);
+  };
   const older = '0'.repeat(40);
-  fs.mkdirSync(path.join(maps, older, 'tools', 'solution-map'), { recursive: true });
-  fs.writeFileSync(path.join(maps, older, 'tools', 'solution-map', 'solution-map.mjs'), standIn('v0'));
-  const longAgo = new Date(Date.now() - 86400000);
-  fs.utimesSync(path.join(maps, older), longAgo, longAgo);
+  mapFolder(older, 'v0');
+  const gone = spawnSync(process.execPath, ['-e', '']).pid;
+  fs.writeFileSync(runningMark(maps, older, gone), '');
+  const stillOpen = '3'.repeat(40);
+  mapFolder(stillOpen, 'v-1');
+  const openMark = path.basename(runningMark(maps, stillOpen, process.pid));
+  fs.writeFileSync(path.join(maps, openMark), '');
   const writing = `${'1'.repeat(40)}.part-4242`;
   fs.mkdirSync(path.join(maps, writing, 'tools'), { recursive: true });
   const aside = `${'2'.repeat(40)}.prune-77`;
@@ -562,16 +572,19 @@ test('the launcher keeps the map it runs and the one run before, and removes the
   assert.equal(third.status, 0, third.stderr);
   const t3 = third.ran.argv[1];
   assert.equal(third.ran.version, 'v3');
-  assert.deepEqual(fs.readdirSync(maps).sort(), [t2, t3, writing].sort());
+  // While it ran, its folder was marked with its launcher's process id; once it ended, no longer.
+  assert.ok(third.ran.beside.includes(`${t3}.running-${third.pid}`), third.ran.beside.join(' '));
+  assert.deepEqual(fs.readdirSync(maps).sort(), [t2, t3, writing, stillOpen, openMark].sort());
 
-  // Offline, the map last run runs, and it alone is kept.
+  // Offline, the map last run runs; it and the map still open are kept.
   fs.renameSync(app.bare, `${app.bare}-unreachable`);
   const offline = open();
   assert.equal(offline.ran.version, 'v3');
-  assert.deepEqual(fs.readdirSync(maps).filter((n) => TREE_ID.test(n)), [t3]);
+  assert.deepEqual(fs.readdirSync(maps).filter((n) => TREE_ID.test(n)).sort(), [t3, stillOpen].sort());
   assert.ok(fs.existsSync(path.join(maps, writing)));
 
-  // Nothing there to prune, and a prune of nothing, change nothing.
+  // The other window closes: its map goes at the next prune. Nothing there to prune changes nothing.
+  fs.rmSync(path.join(maps, openMark));
   pruneMaps(path.join(tmp, 'no-maps-here'), []);
   pruneMaps(maps, [t3]);
   assert.deepEqual(fs.readdirSync(maps).sort(), [t3, writing].sort());
