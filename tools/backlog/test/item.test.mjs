@@ -147,3 +147,9 @@ test('a taken id gets -2, -3, still within 60 characters', () => {
   assert.equal(id, `${'a'.repeat(58)}-2`);
   assert.equal(id.length, 60);
 });
+
+test('no title gives the id new, the map\'s address of a request being written', () => {
+  assert.equal(newId('New'), 'new-2');
+  assert.equal(newId('  NEW!  ', ['new-2']), 'new-3');
+  assert.equal(newId('New export'), 'new-export');
+});

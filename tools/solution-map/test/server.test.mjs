@@ -4,16 +4,16 @@ import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { buildMap } from '../lib/build.mjs';
 import { createMapServer, withSection, PAGE_DIR, MAX_BODY } from '../lib/server.mjs';
-import { fetchRepo } from '../lib/sources.mjs';
+import { fetchRepo, readAt } from '../lib/sources.mjs';
 import http from 'node:http';
 import { reviewCommand, startReview } from '../lib/review.mjs';
 import { EventEmitter } from 'node:events';
 // Git reads no global or system config while these tests run (the backlog's test helpers set it).
 import { project, commits, hasRef } from '../../backlog/test/helpers.mjs';
-import { writeBacklog, fetchBacklog } from '../../backlog/lib/store.mjs';
+import { writeBacklog, fetchBacklog, readBacklog } from '../../backlog/lib/store.mjs';
 import { readDrafts } from '../../backlog/lib/drafts.mjs';
 
 const ID = ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', '-c', 'commit.gpgsign=false', '-c', 'init.defaultBranch=main'];
@@ -502,3 +502,123 @@ test('a map without a backlog says why, and writes nothing', () => withTmp(async
     assert.deepEqual([(await backlogOf(saved)).status, (await backlogOf(saved)).banners], ['unavailable', []]);
   } finally { await saved.close(); }
 }));
+
+/* ---------- a clone without blobs; Restart to update ---------- */
+
+/**
+ * How many requests for objects (`git fetch … --stdin`) the git processes `fn` starts make: git's
+ * own for an object it lacks, and the map's for many at once. Read from git's trace2 events.
+ */
+async function objectRequests(tmp, fn) {
+  const trace = path.join(fs.mkdtempSync(path.join(tmp, 'trace-')), 'events.json');
+  const before = process.env.GIT_TRACE2_EVENT;
+  process.env.GIT_TRACE2_EVENT = trace;
+  try {
+    await fn();
+  } finally {
+    if (before === undefined) delete process.env.GIT_TRACE2_EVENT;
+    else process.env.GIT_TRACE2_EVENT = before;
+  }
+  if (!fs.existsSync(trace)) return 0;
+  return fs.readFileSync(trace, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
+    .filter((e) => e.event === 'start' && e.argv.includes('fetch') && e.argv.includes('--stdin')).length;
+}
+
+test('a clone without blobs gets what a build reads in one request', () => withTmp(async (tmp) => {
+  // An origin that serves clones without blobs; its main has two versions of the spec, and a request.
+  const { origin, work } = repoPair(tmp, 'app');
+  g(origin, 'config', 'uploadpack.allowFilter', 'true');
+  const specFile = path.join(work, 'specs', 'editing', 'offline-edits', 'spec.md');
+  fs.writeFileSync(specFile, SPEC.replace('review: unreviewed', 'review: approved'));
+  g(work, 'commit', '-q', '-am', 'approve offline edits');
+  const approved = g(work, 'rev-parse', 'HEAD');
+  g(work, 'push', '-q', 'origin', 'HEAD:main');
+  g(work, 'config', 'user.name', 'Pat Example');
+  g(work, 'config', 'user.email', 'pat@example.com');
+  const sent = (await writeBacklog(at(work), [{ op: 'add', title: 'Sync notes offline' }])).results[0].id;
+  const blobless = (name) => {
+    const dir = path.join(tmp, name);
+    execFileSync('git', ['clone', '-q', '--filter=blob:none', '--no-checkout', pathToFileURL(origin).href, dir], { stdio: 'pipe' });
+    return dir;
+  };
+  const build = (dir, more = {}) => buildMap({ repos: [{ id: 'app', dir }], backlog: at(dir), probe: async () => true, webOf: async () => null, ...more });
+
+  // Left to git, each file comes in a request of its own.
+  const plain = blobless('plain');
+  assert.ok(await objectRequests(tmp, () => build(plain, { prefetch: async () => {} })) > 1);
+
+  const dir = blobless('clone');
+  let built;
+  assert.equal(await objectRequests(tmp, async () => { built = await build(dir); }), 1);
+  const f = built.model.features['editing/offline-edits'];
+  assert.deepEqual([f.review, f.reviewed?.commit], ['approved', approved]); // the review stamp reads the spec's history
+  // The board and the backlog then read with no request more.
+  assert.equal(await objectRequests(tmp, async () => {
+    assert.match(String(await readAt(dir, built.commits.app, 'specs/editing/offline-edits/looks/offline-banner.html')), /offline banner/);
+    assert.deepEqual(readBacklog(at(dir)).items.map((i) => i.id), [sent]);
+  }), 0);
+
+  // Main moves: the next build fetches what changed, again in one request.
+  fs.writeFileSync(specFile, SPEC.replace('review: unreviewed', 'review: changes-requested'));
+  fs.writeFileSync(path.join(work, 'src', 'offline.js'), '// keeps edits\n');
+  g(work, 'add', '.');
+  g(work, 'commit', '-q', '-m', 'changes requested');
+  g(work, 'push', '-q', 'origin', 'HEAD:main');
+  assert.equal(await objectRequests(tmp, async () => { built = await build(dir); }), 1);
+  assert.equal(built.model.features['editing/offline-edits'].review, 'changes-requested');
+  // A full clone has every blob: nothing is asked for.
+  assert.equal(await objectRequests(tmp, () => build(work)), 0);
+}));
+
+test('Restart to update answers on a launched map only, behind the guard of every write', () => withTmp(async (tmp) => {
+  const { work } = repoPair(tmp, 'app');
+  const build = () => buildMap({ repos: [{ id: 'app', dir: work }], overview: standIn() });
+  const restartAt = (s, headers = WRITE, body = '{}') => fetch(`${s.base}/api/restart`, { method: 'POST', headers, body });
+
+  const fromCheckout = await serve(build);
+  try {
+    const r = await restartAt(fromCheckout);
+    const body = await r.json();
+    assert.deepEqual([r.status, body.ok], [409, false]);
+    assert.match(body.error, /shortcut/);
+  } finally { await fromCheckout.close(); }
+
+  // A launched map: the hand-over runs once, after the answer, which it would cut off if it ran first.
+  let can = { ok: false, error: 'the launcher is not at /gone/launch.mjs' };
+  let handed = 0;
+  let s;
+  s = await serve(build, { restart: async () => (can.ok ? { ok: true, handOver: () => { handed++; s.server.closeAllConnections(); } } : can) });
+  try {
+    assert.equal((await restartAt(s, { 'content-type': 'application/json' })).status, 403);
+    assert.equal((await restartAt(s, { ...WRITE, origin: 'http://evil.example' })).status, 403);
+    assert.equal(await postWithHost(s.port, '/api/restart', `evil.example:${s.port}`, '{}'), 403);
+    assert.equal((await restartAt(s, { 'x-solution-map': '1', 'content-type': 'text/plain' })).status, 415);
+    const missing = await restartAt(s);
+    assert.deepEqual([missing.status, await missing.json()], [409, can]);
+    assert.equal(handed, 0);
+    can = { ok: true };
+    const r = await restartAt(s);
+    assert.deepEqual([r.status, await r.json()], [200, { ok: true }]);
+    assert.equal(handed, 1);
+    const again = await restartAt(s);
+    assert.deepEqual([again.status, (await again.json()).error], [409, 'the map is restarting']);
+    assert.equal(handed, 1);
+  } finally { await s.close(); }
+}));
+
+test('a launched map waits for its port while the map it replaces lets go of it', async () => {
+  const before = http.createServer();
+  await new Promise((r) => before.listen(0, '127.0.0.1', r));
+  const port = before.address().port;
+  const empty = async () => ({ model: { features: {}, banners: [] }, dirs: {}, commits: {} });
+  // Not waiting, it takes another port.
+  const elsewhere = createMapServer({ build: empty });
+  assert.notEqual(await elsewhere.listen(port), port);
+  await new Promise((r) => elsewhere.server.close(r));
+  // Waiting, it takes the port once the map before it closes.
+  const next = createMapServer({ build: empty });
+  setTimeout(() => before.close(), 500);
+  try {
+    assert.equal(await next.listen(port, { wait: 10000 }), port);
+  } finally { await new Promise((r) => next.server.close(r)); }
+});

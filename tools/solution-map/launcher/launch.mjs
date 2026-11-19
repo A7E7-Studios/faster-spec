@@ -1,9 +1,10 @@
 // The shortcut's script: runs the newest Solution map from main, never from a checkout.
 //
-//   node <git common dir>/faster-spec/launcher/launch.mjs --root <repository folder>
+//   node <git common dir>/faster-spec/launcher/launch.mjs --root <repository folder> [-- <map arguments>]
 //
 // Setup copies this file alone into the backlog's repository's git folder, so it imports nothing
-// but Node's own modules, and the setup command is the only thing that ever replaces it.
+// but Node's own modules. The map imports what it shares from here (MAP_PATHS, mapTree,
+// missingObjects, fetchObjects), so the two never hold two versions of one rule.
 //
 // 1. Fetches every clone `origin/main:tools/gate/config.json` names (`solutionMap.repos`, paths
 //    relative to --root), 20 s each, in parallel.
@@ -11,24 +12,32 @@
 //    temporary index (GIT_INDEX_FILE), then `write-tree`.
 // 3. When `<git common dir of --root>/faster-spec/maps/<tree id>/` is missing, fetches the blobs a
 //    clone without them lacks in one request and writes those paths there with `checkout-index`.
-// 4. Runs `tools/solution-map/solution-map.mjs` from that folder with `--launched <tree id>` and a
-//    `--repo <id>=<folder>` for each entry of the folder's own config, and exits with its code.
+// 4. Takes main's copy of this file from that folder when it differs and passes `node --check`:
+//    a launcher fix on main reaches the shortcut on its next opening. Only a launcher in a git
+//    directory, where setup puts it, is replaced; a copy in a checkout never is.
+// 5. Runs `tools/solution-map/solution-map.mjs` from that folder with `--launched <tree id> --root
+//    <root> --launcher <this file>`, a `--repo <id>=<folder>` for each entry of the folder's own
+//    config and the arguments after `--`, and exits with its code.
 //
 // When the fetch of --root fails, or main's map cannot be written, it runs the map last run here
 // (the newest folder in maps/; each run touches its folder). It never moves a clone's HEAD, never
 // reads or writes its index, and never writes its working files.
 import { execFile, spawn } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 /** The paths on main the map runs from; one tree id names them together. */
 export const MAP_PATHS = ['tools/solution-map/', 'tools/backlog/', 'tools/overview/', 'tools/gate/lib/', 'tools/gate/config.json'];
 const MAP_SCRIPT = 'tools/solution-map/solution-map.mjs';
+const LAUNCH_SCRIPT = 'tools/solution-map/launcher/launch.mjs';
 const CONFIG = 'tools/gate/config.json';
-const TREE_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+/** A tree id, SHA-1 or SHA-256: the name of a folder in maps/. */
+export const TREE_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 const FETCH_TIMEOUT = 20000;
-const USAGE = 'usage: node <git common dir>/faster-spec/launcher/launch.mjs --root <repository folder>';
+const SELF = fileURLToPath(import.meta.url);
+const USAGE = 'usage: node <git common dir>/faster-spec/launcher/launch.mjs --root <repository folder> [-- <map arguments>]';
 
 /** Runs git in a folder; resolves `{ ok, out, err }` (out a Buffer), never rejects. */
 function git(dir, args, { input, env, timeout = 0 } = {}) {
@@ -50,11 +59,15 @@ async function gitOrThrow(dir, args, opts) {
   return r.out;
 }
 
-/** The parsed command line: `{ root, help }`; throws on a bad argument. */
+/** The parsed command line: `{ root, help, mapArgs }`, `mapArgs` what follows `--`; throws on a bad argument. */
 export function parseArgs(argv) {
-  const o = { root: null, help: false };
+  const o = { root: null, help: false, mapArgs: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
+    if (a === '--') {
+      o.mapArgs = argv.slice(i + 1);
+      break;
+    }
     if (a === '--root') {
       const v = argv[++i];
       if (v === undefined || v.startsWith('--')) throw new Error('--root needs a folder');
@@ -75,7 +88,7 @@ export function configRepos(config, root) {
 }
 
 function parseJson(buf) {
-  try { return JSON.parse(String(buf).replace(/^\uFEFF/, '')); } catch { return null; }
+  try { return JSON.parse(String(buf).replace(/^﻿/, '')); } catch { return null; }
 }
 
 /** The tree id of the map's code at `commit`, read into a temporary index that is removed after. */
@@ -94,16 +107,40 @@ export async function mapTree(root, commit, scratch) {
   }
 }
 
+/** The tree id of the map's code on `root`'s `origin/main`, as the launcher names its folder; null without an `origin/main`. */
+export async function mainMapTree(root, scratch = os.tmpdir()) {
+  const commit = await git(root, ['rev-parse', '--verify', '--quiet', 'origin/main^{commit}']);
+  if (!commit.ok) return null;
+  const { tree, index } = await mapTree(root, String(commit.out).trim(), scratch);
+  fs.rmSync(index, { force: true });
+  return tree;
+}
+
+/**
+ * The objects a clone lacks among those `git rev-list --objects <args> --stdin` walks, `input` the
+ * revisions (and after a `--` line, the paths): in a clone made without blobs, the files' blobs. It
+ * fetches nothing.
+ */
+export async function missingObjects(dir, args, input) {
+  const out = String(await gitOrThrow(dir, ['rev-list', '--objects', '--missing=print', '--no-object-names', ...args, '--stdin'], { input }));
+  return [...new Set(out.split('\n').filter((l) => l.startsWith('?')).map((l) => l.slice(1).trim()))];
+}
+
+/**
+ * Fetches `oids` from origin in one request: the request git sends for a single object it lacks,
+ * asking for all of them at once. Resolves `{ ok, err }`; nothing to fetch is ok.
+ */
+export async function fetchObjects(dir, oids, { timeout = 120000 } = {}) {
+  if (!oids.length) return { ok: true, err: '' };
+  return git(dir, ['-c', 'fetch.negotiationAlgorithm=noop', 'fetch', '--quiet', 'origin', '--no-tags', '--no-write-fetch-head',
+    '--recurse-submodules=no', '--filter=blob:none', '--stdin'], { input: oids.join('\n') + '\n', timeout });
+}
+
 /** Writes the map's code, held in `index`, into `dest` (a new folder, renamed into place when complete). */
 async function writeMap(root, tree, index, dest) {
   const env = { GIT_INDEX_FILE: index };
-  // A clone made without blobs fetches the ones it lacks in one request, not one per file.
-  const objects = String(await gitOrThrow(root, ['rev-list', '--objects', '--missing=print', tree]));
-  const missing = objects.split('\n').filter((l) => l.startsWith('?')).map((l) => l.slice(1).trim());
-  if (missing.length) {
-    await gitOrThrow(root, ['-c', 'fetch.negotiationAlgorithm=noop', 'fetch', '--quiet', 'origin', '--no-tags', '--no-write-fetch-head',
-      '--recurse-submodules=no', '--filter=blob:none', '--stdin'], { input: missing.join('\n') + '\n', timeout: 120000 });
-  }
+  const f = await fetchObjects(root, await missingObjects(root, [], `${tree}\n`));
+  if (!f.ok) throw new Error(`git fetch: ${lastLine(f.err)}`);
   const part = `${dest}.part-${process.pid}`;
   fs.rmSync(part, { recursive: true, force: true });
   try {
@@ -116,6 +153,42 @@ async function writeMap(root, tree, index, dest) {
   } finally {
     fs.rmSync(part, { recursive: true, force: true });
   }
+}
+
+/** Whether `node --check` reads a file without a syntax error. */
+function checks(node, file) {
+  return new Promise((resolve) => {
+    execFile(node, ['--check', file], { timeout: 20000, windowsHide: true }, (e) => resolve(!e));
+  });
+}
+
+/**
+ * Replaces the launcher at `self` with the copy in the map folder `mapDir` when the two differ, the
+ * copy passes `node --check` and `self` lives in a git directory, where setup installs it.
+ * Resolves `'updated'`, `'same'`, `'kept'` (not one setup installed, or no copy in the map) or
+ * `'broken'` (the copy does not check).
+ */
+export async function updateLauncher(self, mapDir, { node = process.execPath } = {}) {
+  const copy = path.join(mapDir, LAUNCH_SCRIPT);
+  let next, now;
+  try {
+    next = fs.readFileSync(copy);
+    now = fs.readFileSync(self);
+  } catch {
+    return 'kept';
+  }
+  if (next.equals(now)) return 'same';
+  const installed = await git(path.dirname(self), ['rev-parse', '--is-inside-git-dir']);
+  if (!installed.ok || String(installed.out).trim() !== 'true') return 'kept';
+  if (!(await checks(node, copy))) return 'broken';
+  const part = `${self}.part-${process.pid}`;
+  try {
+    fs.writeFileSync(part, next);
+    fs.renameSync(part, self);
+  } finally {
+    fs.rmSync(part, { force: true });
+  }
+  return 'updated';
 }
 
 /** The folder in `maps` run last (the newest of those named for a tree id), or null. */
@@ -144,9 +217,10 @@ function runMap(node, args, { cwd }) {
 
 /**
  * Fetches, picks the map to run (main's, else the last run) and runs it. Resolves the exit code.
- * `run(node, args, { cwd })` starts the map; `log` and `warn` take a line each.
+ * `run(node, args, { cwd })` starts the map; `mapArgs` go to it last; `self` is the launcher that
+ * main's copy replaces; `log` and `warn` take a line each.
  */
-export async function launch({ root, node = process.execPath, run = runMap, log = console.log, warn = console.error }) {
+export async function launch({ root, mapArgs = [], self = SELF, node = process.execPath, run = runMap, log = console.log, warn = console.error }) {
   const common = await git(root, ['rev-parse', '--git-common-dir']);
   if (!common.ok) { warn(`launch: ${root} is not a clone: ${lastLine(common.err)}`); return 1; }
   const maps = path.join(path.resolve(root, String(common.out).trim()), 'faster-spec', 'maps');
@@ -178,6 +252,15 @@ export async function launch({ root, node = process.execPath, run = runMap, log 
       if (index) fs.rmSync(index, { force: true });
     }
   }
+  if (chosen) {
+    try {
+      const u = await updateLauncher(self, chosen.dir, { node });
+      if (u === 'updated') log(`launch: took main's launcher into ${self}; it runs from the next opening`);
+      if (u === 'broken') warn(`launch: main's ${LAUNCH_SCRIPT} does not pass node --check; kept this launcher`);
+    } catch (e) {
+      warn(`launch: could not take main's launcher: ${e.message}`);
+    }
+  }
   chosen ??= lastRun(maps);
   if (!chosen) {
     warn('launch: no map has run on this computer yet; connect to the network and open it again');
@@ -190,7 +273,7 @@ export async function launch({ root, node = process.execPath, run = runMap, log 
   let config = null;
   try { config = parseJson(fs.readFileSync(path.join(chosen.dir, CONFIG))); } catch { /* the map says what is missing */ }
   const repoArgs = configRepos(config, root).flatMap((r) => ['--repo', `${r.id}=${r.dir}`]);
-  return run(node, [path.join(chosen.dir, MAP_SCRIPT), '--launched', chosen.tree, ...repoArgs], { cwd: chosen.dir });
+  return run(node, [path.join(chosen.dir, MAP_SCRIPT), '--launched', chosen.tree, '--root', root, '--launcher', self, ...repoArgs, ...mapArgs], { cwd: chosen.dir });
 }
 
 export async function main(argv) {
@@ -202,7 +285,7 @@ export async function main(argv) {
     return 2;
   }
   if (o.help) { console.log(USAGE); return 0; }
-  return launch({ root: o.root });
+  return launch({ root: o.root, mapArgs: o.mapArgs });
 }
 
 if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {

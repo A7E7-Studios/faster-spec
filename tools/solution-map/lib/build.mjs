@@ -1,12 +1,15 @@
-// One build of the map: fetch every repository and then the backlog's branch, build the overview,
-// ask each live page whether it answers, and adapt the result into the view model.
-import fs from 'node:fs';
+// One build of the map: fetch every repository and then the backlog's branch, bring the blobs a
+// clone made without them lacks, build the overview, ask each live page whether it answers, adapt
+// the result into the view model, and for a launched map, say when main holds a newer map.
+import path from 'node:path';
 import { buildOverview } from '../../overview/overview.mjs';
 import { Repo } from '../../gate/lib/git.mjs';
+import { SPEC_FILE } from '../../gate/lib/spec.mjs';
 import { parseItem, itemPath } from '../../backlog/lib/item.mjs';
 import { fetchBacklog as fetchBranch } from '../../backlog/lib/store.mjs';
+import { mainMapTree, missingObjects, fetchObjects } from '../launcher/launch.mjs';
 import { adapt, emptyModel, webBase, OVERVIEW_VERSION } from './adapt.mjs';
-import { fetchRepo as fetchOne, remoteUrl } from './sources.mjs';
+import { fetchRepo as fetchOne, remoteUrl, git, samePath } from './sources.mjs';
 
 /** Whether anything answers at an address within 2 s. */
 export async function probeUrl(url) {
@@ -28,10 +31,18 @@ export async function probeUrl(url) {
  * @param {Function} [o.webOf] `(dir) => GitHub web base | null`
  * @param {{ dir: string, branch: string }|null} [o.backlog] where the backlog lives, as `locateBacklog` gives it
  * @param {Function} [o.fetchBacklog] `(where) => { state, tip, error? }`
+ * @param {{ tree: string, root: string }|null} [o.launched] for a map the launcher started: the tree id
+ *   of the map's code it runs and the clone it runs for; a different one on that clone's `origin/main`
+ *   gives the banner `{ kind: 'map-update', tree }`
+ * @param {Function} [o.mapTreeOf] `(root) => tree id | null`, the map's code on `origin/main`
+ * @param {Function} [o.prefetch] `(dir, { main, trees }) => void`, see `prefetchClone`
  * @returns {Promise<{ model: object, dirs: Record<string, string>, commits: Record<string, string>, backlog: object|null }>}
  *   `backlog` is the backlog's fetch: `{ state: 'current'|'absent'|'unreachable', tip, error? }`, or null without one
  */
-export async function buildMap({ repos, pages = null, overview = buildOverview, fetchRepo = fetchOne, probe = probeUrl, webOf = async (dir) => webBase(await remoteUrl(dir)), fromFile = false, backlog = null, fetchBacklog = fetchBacklogIn }) {
+export async function buildMap({
+  repos, pages = null, overview = buildOverview, fetchRepo = fetchOne, probe = probeUrl, webOf = async (dir) => webBase(await remoteUrl(dir)),
+  fromFile = false, backlog = null, fetchBacklog = fetchBranch, launched = null, mapTreeOf = mainMapTree, prefetch = prefetchClone,
+}) {
   if (fromFile) {
     // A saved overview: no repository is fetched or read; its boards are not served.
     const ov = await overview([]);
@@ -40,15 +51,20 @@ export async function buildMap({ repos, pages = null, overview = buildOverview, 
     for (const f of Object.values(model.features)) for (const l of f.looks) if (l.kind === 'board') l.unserved = true;
     return { model, dirs: {}, commits: {}, backlog: null };
   }
-  const fetched = await Promise.all(repos.map((r) => fetchRepo(r.dir)));
+  // The clone a launched map runs for is fetched with the others, should the config not list it.
+  const extra = launched && !repos.some((r) => samePath(r.dir, launched.root)) ? [launched.root] : [];
+  const fetched = await Promise.all([...repos.map((r) => r.dir), ...extra].map((dir) => fetchRepo(dir)));
   // The backlog's branch after the repositories' own fetch, never beside it: two fetches in one
   // repository race for its refs.
   const branch = backlog ? await fetchBacklog(backlog) : null;
   const states = Object.fromEntries(repos.map((r, i) => [r.id, { ...fetched[i], dir: r.dir }]));
+  await prefetchBuild({ repos, states, backlog, branch, prefetch });
+  const update = launched ? await mapUpdate(launched, mapTreeOf) : [];
   const present = repos.filter((r) => states[r.id].state !== 'missing');
   const dirs = Object.fromEntries(present.map((r) => [r.id, r.dir]));
+  const withUpdate = (b) => ({ ...b, model: { ...b.model, banners: [...update, ...b.model.banners] } });
   // A map with no overview: each repository's state and banner, and the banners given.
-  const plain = (banners) => ({ model: emptyModel(banners, repos.map((r) => ({ id: r.id, name: r.id, commit: null, state: states[r.id].state, fetchedAt: states[r.id].fetchedAt ?? null, web: null, dir: r.dir }))), dirs, commits: {}, backlog: branch });
+  const plain = (banners) => withUpdate({ model: emptyModel(banners, repos.map((r) => ({ id: r.id, name: r.id, commit: null, state: states[r.id].state, fetchedAt: states[r.id].fetchedAt ?? null, web: null, dir: r.dir }))), dirs, commits: {}, backlog: branch });
   if (!present.length) return plain([]);
   let ov;
   try {
@@ -63,13 +79,91 @@ export async function buildMap({ repos, pages = null, overview = buildOverview, 
   const urls = [...new Set(Object.values(adapt(ov, ctx).features).flatMap((f) => f.looks).filter((l) => l.kind === 'page' && l.url).map((l) => l.url))];
   const answered = await Promise.all(urls.map((u) => probe(u)));
   const pageAnswers = Object.fromEntries(urls.map((u, i) => [u, answered[i]]));
-  return { model: adapt(ov, { ...ctx, pageAnswers }), dirs, commits, backlog: branch };
+  return withUpdate({ model: adapt(ov, { ...ctx, pageAnswers }), dirs, commits, backlog: branch });
 }
 
-/** `fetchBacklog`, which says `unreachable` for a folder that is not there instead of throwing. */
-async function fetchBacklogIn(where) {
-  if (!fs.existsSync(where.dir)) return { state: 'unreachable', tip: null, error: `no repository at ${where.dir}` };
-  return fetchBranch(where);
+/** `[{ kind: 'map-update', tree }]` when the launched map's clone holds another map on `origin/main`, else `[]`. */
+async function mapUpdate(launched, mapTreeOf) {
+  try {
+    const tree = await mapTreeOf(launched.root);
+    return tree && tree !== launched.tree ? [{ kind: 'map-update', tree }] : [];
+  } catch {
+    return []; // the map runs on; the next build asks again
+  }
+}
+
+/** A clone's git directory shared by its worktrees, or null. */
+async function commonDir(dir) {
+  const r = await git(dir, ['rev-parse', '--git-common-dir']);
+  return r.ok ? path.resolve(dir, String(r.out).trim()) : null;
+}
+
+/**
+ * Brings the blobs this build reads, one request per clone made without them: main's files in each
+ * repository fetched now, and the backlog's items with the clone it lives in (its own request when
+ * it lives in none of them).
+ */
+async function prefetchBuild({ repos, states, backlog, branch, prefetch }) {
+  const clones = repos.filter((r) => states[r.id].state === 'current').map((r) => ({ dir: r.dir, main: true, trees: [] }));
+  if (backlog && branch?.state === 'current' && branch.tip) {
+    const home = await commonDir(backlog.dir);
+    const commons = await Promise.all(clones.map((c) => commonDir(c.dir)));
+    const at = clones.find((c, i) => home && commons[i] && samePath(home, commons[i]));
+    const tree = `${branch.tip}^{tree}`;
+    if (at) at.trees.push(tree);
+    else clones.push({ dir: backlog.dir, main: false, trees: [tree] });
+  }
+  await Promise.all(clones.map((c) => prefetch(c.dir, c)));
+}
+
+/** How long the one request for a clone's missing blobs may take, in ms. */
+export const PREFETCH_TIMEOUT = 10 * 60 * 1000;
+
+/** Whether a clone was made without blobs from origin: origin is its promisor remote (`extensions.partialClone` in older clones). */
+async function fetchesBlobsFromOrigin(dir) {
+  const r = await git(dir, ['config', '--get-regexp', '^(remote\\.origin\\.promisor|extensions\\.partialclone)$']);
+  if (!r.ok) return false;
+  return String(r.out).split('\n').some((l) => {
+    const [key, value = ''] = l.trim().split(/\s+/);
+    return key === 'extensions.partialclone' ? value === 'origin' : /^(true|yes|on|1)$/i.test(value);
+  });
+}
+
+/**
+ * In a clone made without blobs (a partial clone, as the launcher's setup makes), fetches in one
+ * request the blobs a build reads that it lacks: with `main`, every file of `origin/main` (the
+ * overview lists the tree with each file's size, which git answers by fetching the file) and every
+ * version of each spec on main's first-parent history (the review stamp searches their diffs);
+ * every file of each tree in `trees` (the backlog's tip). Git would otherwise fetch each blob, or
+ * each commit's, in a request of its own. A full clone, or a failed fetch, changes nothing: what is
+ * still missing comes as git asks for it. The first build of a clone brings main's whole tree, so
+ * the request may take PREFETCH_TIMEOUT.
+ * @param {string} dir
+ * @param {{ main?: boolean, trees?: string[] }} [o]
+ * @returns {Promise<{ fetched: number, error?: string }>}
+ */
+export async function prefetchClone(dir, { main = true, trees = [] } = {}) {
+  if (!(await fetchesBlobsFromOrigin(dir))) return { fetched: 0 };
+  const tips = [...trees];
+  let history = null;
+  if (main) {
+    const c = await git(dir, ['rev-parse', '--verify', '--quiet', 'origin/main^{commit}']);
+    if (c.ok) {
+      const commit = String(c.out).trim();
+      tips.push(`${commit}^{tree}`);
+      const ls = await git(dir, ['ls-tree', '-r', '-z', '--name-only', '--full-tree', commit, '--', 'specs']);
+      const specs = ls.ok ? String(ls.out).split('\0').filter((p) => SPEC_FILE.test(p)) : [];
+      if (specs.length) history = `${commit}\n--\n${specs.join('\n')}\n`;
+    }
+  }
+  try {
+    const missing = new Set(tips.length ? await missingObjects(dir, [], tips.join('\n') + '\n') : []);
+    if (history) for (const oid of await missingObjects(dir, ['--first-parent'], history)) missing.add(oid);
+    const f = await fetchObjects(dir, [...missing], { timeout: PREFETCH_TIMEOUT });
+    return f.ok ? { fetched: missing.size } : { fetched: 0, error: f.err.trim().split('\n').pop() || 'the fetch failed' };
+  } catch (e) {
+    return { fetched: 0, error: e.message };
+  }
 }
 
 /**

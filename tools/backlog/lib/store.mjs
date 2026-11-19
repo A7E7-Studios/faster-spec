@@ -83,11 +83,13 @@ export function backlogTip(where) {
 /**
  * Fetches the backlog's branch into this clone's `origin/<branch>`, nothing else. Resolves
  * `{ state, tip, error? }`: `current` (fetched now), `absent` (the remote has no such branch yet:
- * nobody has written), or `unreachable` (the fetch failed; `tip` is what this clone last fetched).
+ * nobody has written), or `unreachable` (the fetch failed, `tip` what this clone last fetched; or
+ * no folder is there, `tip` null).
  * @param {{ dir: string, branch: string }} where
  * @param {{ net?: Function }} [o] runs git for the network: `(dir, args, { timeout }) => { ok, out, err }`
  */
 export async function fetchBacklog(where, { net = gitAsync } = {}) {
+  if (!fs.existsSync(where.dir)) return { state: 'unreachable', tip: null, error: `no repository at ${where.dir}` };
   const f = await net(where.dir, ['fetch', '--quiet', '--no-tags', '--no-write-fetch-head', REMOTE, `+refs/heads/${where.branch}:${trackingRef(where)}`], { timeout: NET_TIMEOUT });
   if (f.ok) return { state: 'current', tip: backlogTip(where) };
   const ls = await net(where.dir, ['ls-remote', REMOTE, `refs/heads/${where.branch}`], { timeout: NET_TIMEOUT });

@@ -278,6 +278,14 @@ test('a remote that cannot be reached sends nothing and says so', () => withTmp(
   assert.ok(w.error);
 }));
 
+test('a backlog whose folder is missing is unreachable, not an error', () => withTmp(async (tmp) => {
+  const gone = path.join(tmp, 'notes-app-moved');
+  let ran = 0;
+  const f = await fetchBacklog(at(gone), { net: async () => { ran++; return { ok: true, out: Buffer.alloc(0), err: '' }; } });
+  assert.deepEqual(f, { state: 'unreachable', tip: null, error: `no repository at ${gone}` });
+  assert.equal(ran, 0, 'no git runs in a folder that is not there');
+}));
+
 test('a push the remote refuses, with nobody pushing first, is reported once', () => withTmp(async (tmp) => {
   const { origin, clones: [dir] } = project(tmp);
   await writeBacklog(at(dir), [REQUEST], { now: NOW });

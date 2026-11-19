@@ -34,8 +34,8 @@ nearest the code it changes.
 
 - [x] 4.1 `launcher/setup.mjs`: Node check, git identity, clones of each `solutionMap.repos` entry with a `url`, the copied `launch.mjs`, the shortcut per system; `--print-command`; test: tools/solution-map/test/launcher.test.mjs
 - [x] 4.2 `launcher/launch.mjs`: fetch, the map's tree id, `maps/<tree id>/` by `checkout-index`, the last folder when the fetch fails, `--launched`; test: tools/solution-map/test/launcher.test.mjs::the launched map runs from main's code
-- [ ] 4.3 The restart banner and route in the map; test: tools/solution-map/test/launcher.test.mjs::restart runs the newer map and keeps the drafts
-- [ ] 4.4 README: setup, the printed command, the shortcut, what a project adds to its config; test: node tools/gate/gate.mjs --local
+- [x] 4.3 The restart banner and route in the map; test: tools/solution-map/test/launcher.test.mjs::restart runs the newer map and keeps the drafts
+- [x] 4.4 README: setup, the printed command, the shortcut, what a project adds to its config; test: node tools/gate/gate.mjs --local
 
 ## 5. The skills and the kit (after 1)
 

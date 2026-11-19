@@ -5,6 +5,12 @@ import path from 'node:path';
 
 const REPO_ID = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
+/** Whether two paths name one folder: resolved, and on Windows in any case. */
+export function samePath(a, b) {
+  const [x, y] = [path.resolve(a), path.resolve(b)];
+  return process.platform === 'win32' ? x.toLowerCase() === y.toLowerCase() : x === y;
+}
+
 /** Runs git in a folder; resolves `{ ok, out, err }`, never rejects. */
 export function git(dir, args, { timeout = 20000 } = {}) {
   return new Promise((resolve) => {

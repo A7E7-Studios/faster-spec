@@ -1,5 +1,6 @@
-// The map's HTTP server, on 127.0.0.1 only: the page, its data, Refresh, the design boards, and the
-// backlog: its view, the drafts and Submit, the only writes the map makes.
+// The map's HTTP server, on 127.0.0.1 only: the page, its data, Refresh, the design boards, Restart
+// to update for a launched map, and the backlog: its view, the drafts and Submit, the only writes
+// the map makes.
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -94,13 +95,15 @@ const fieldOf = (d) => (d.op === 'move' ? 'state' : d.field);
  * @param {object} o
  * @param {() => Promise<{ model, dirs, commits, backlog? }>} o.build one build of the map; its
  *   `backlog` is the backlog's fetch (`buildMap`)
- * @param {string|null} [o.themeFile] the project's `kit-pages/theme.css`, served as `/theme.css` when it exists
+ * @param {() => Promise<string|Buffer|null>} [o.theme] the project's `kit-pages/theme.css`, served as `/theme.css`; null when it has none
  * @param {() => Promise<{ ok: boolean, error?: string }>} [o.review] opens CueReview
  * @param {{ where?: { dir: string, branch: string, repo: string|null }, repos?: { dir: string }[], error?: string }|null} [o.backlog]
  *   where the backlog lives (`locateBacklog`) and the solution's repositories, or why there is none
- * @returns {{ server: http.Server, refresh: () => Promise<object>, listen: (port: number) => Promise<number> }}
+ * @param {(() => Promise<{ ok: true, handOver: () => void } | { ok: false, error: string }>)|null} [o.restart]
+ *   Restart to update, for a map the launcher started: whether it can, and `handOver`, run once the answer is sent
+ * @returns {{ server: http.Server, refresh: () => Promise<object>, listen: (port: number, o?: { wait?: number }) => Promise<number> }}
  */
-export function createMapServer({ build, themeFile = null, review = async () => ({ ok: false, error: 'Start review is not set up here.' }), backlog = null }) {
+export function createMapServer({ build, theme = async () => null, review = async () => ({ ok: false, error: 'Start review is not set up here.' }), backlog = null, restart = null }) {
   let current = null;
   let pending = null;
   let fetched = null; // the backlog's last fetch, or Submit's: { state, error? }
@@ -198,6 +201,20 @@ export function createMapServer({ build, themeFile = null, review = async () => 
     };
   };
 
+  let restarting = false;
+  /** POST /api/restart: answers `{ ok: true }`, then hands over to the launcher (`restart().handOver`). */
+  const restartMap = async (req, res) => {
+    await readJson(req);
+    if (!restart) throw new Refused(409, 'only a map its shortcut opened restarts; start this one again from its checkout');
+    if (restarting) throw new Refused(409, 'the map is restarting');
+    const r = await restart();
+    if (!r?.ok) throw new Refused(409, r?.error || 'the map cannot restart');
+    restarting = true;
+    // Only once the page has the answer; a page gone before it can ask again.
+    res.once('close', () => { if (res.writableFinished) r.handOver(); else restarting = false; });
+    return send(res, 200, JSON_TYPE, JSON.stringify({ ok: true }));
+  };
+
   const server = http.createServer(async (req, res) => {
     try {
       if (!hostAllowed(req.headers.host, server.address()?.port)) return send(res, 403, 'text/plain', 'this server answers only to 127.0.0.1 and localhost');
@@ -214,6 +231,7 @@ export function createMapServer({ build, themeFile = null, review = async () => 
         if (p === '/api/review') return send(res, 200, JSON_TYPE, JSON.stringify(await review()));
         if (p === '/api/drafts') return send(res, 200, JSON_TYPE, JSON.stringify(await changeDrafts(req)));
         if (p === '/api/submit') return send(res, 200, JSON_TYPE, JSON.stringify(await submit(req)));
+        if (p === '/api/restart') return await restartMap(req, res);
       }
       if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405, 'text/plain', 'method not allowed');
       const b = BOARD.exec(p);
@@ -225,10 +243,7 @@ export function createMapServer({ build, themeFile = null, review = async () => 
         if (html === null) return send(res, 404, 'text/plain', 'the board has no such section');
         return send(res, 200, TYPES['.html'], html, { 'content-security-policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:" });
       }
-      if (p === '/theme.css') {
-        const css = themeFile && fs.existsSync(themeFile) ? fs.readFileSync(themeFile) : '';
-        return send(res, 200, TYPES['.css'], css);
-      }
+      if (p === '/theme.css') return send(res, 200, TYPES['.css'], (await theme()) ?? '');
       if (p.startsWith('/page/')) {
         const name = p.slice('/page/'.length);
         if (!/^[a-z-]+\.(css|mjs|svg)$/.test(name)) return send(res, 404, 'text/plain', 'not found');
@@ -244,13 +259,20 @@ export function createMapServer({ build, themeFile = null, review = async () => 
     }
   });
 
-  /** Listens on 127.0.0.1 at `port`, or the next free port of the 20 after it; resolves the port. */
-  const listen = (port) => new Promise((resolve, reject) => {
+  /**
+   * Listens on 127.0.0.1 at `port`, or the next free port of the 20 after it; resolves the port.
+   * With `wait` (ms), a taken `port` is tried again for that long first: the map a restart replaces
+   * may still be closing it.
+   */
+  const listen = (port, { wait = 0 } = {}) => new Promise((resolve, reject) => {
+    const until = Date.now() + wait;
     let tries = 0;
     const attempt = (p) => {
       const onError = (e) => {
         server.off('listening', onListening);
-        if (e.code === 'EADDRINUSE' && p !== 0 && ++tries <= 20) attempt(p + 1);
+        if (e.code !== 'EADDRINUSE' || p === 0) reject(e);
+        else if (p === port && Date.now() < until) setTimeout(() => attempt(p), 250);
+        else if (++tries <= 20) attempt(p + 1);
         else reject(e);
       };
       const onListening = () => { server.off('error', onError); resolve(server.address().port); };

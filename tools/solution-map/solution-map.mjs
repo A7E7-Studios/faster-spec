@@ -1,25 +1,34 @@
 #!/usr/bin/env node
 // The Solution map's command line: name the repositories, build the map, serve it on 127.0.0.1
 // and open it in the browser.
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { resolveRepos, readConfig, git } from './lib/sources.mjs';
+import { resolveRepos, readConfig, readAt, git } from './lib/sources.mjs';
 import { buildMap } from './lib/build.mjs';
 import { createMapServer } from './lib/server.mjs';
 import { reviewCommand, startReview } from './lib/review.mjs';
 import { locateBacklog } from '../backlog/lib/store.mjs';
+import { TREE_ID } from './launcher/launch.mjs';
 
 export const DEFAULT_PORT = 7317;
+/** How long a launched map waits for its port: the map a restart replaces may still be closing it. */
+export const PORT_WAIT = 10000;
+const THEME = 'kit-pages/theme.css';
 const USAGE = `usage: node tools/solution-map/solution-map.mjs [--repo <id>=<folder>]... [--port <n>] [--pages <address>] [--no-open]
        node tools/solution-map/solution-map.mjs --from <overview.json> [--port <n>] [--no-open]
   without --repo, the repositories are tools/gate/config.json's solutionMap.repos;
-  --from serves a saved overview instead of fetching and building one`;
+  --from serves a saved overview instead of fetching and building one;
+  the launcher adds --launched <tree id> --root <folder> --launcher <file>`;
 
-/** The parsed command line: `{ repoArgs, port, pages, open }`; throws on a bad argument. */
+/**
+ * The parsed command line: `{ repoArgs, port, pages, open, help, from }`, and `launched: { tree,
+ * root, launcher }` when the launcher started the map; throws on a bad argument.
+ */
 export function parseArgs(argv) {
   const o = { repoArgs: [], port: DEFAULT_PORT, pages: null, open: true, help: false, from: null };
+  const launch = {};
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const val = () => {
@@ -34,8 +43,18 @@ export function parseArgs(argv) {
     } else if (a === '--pages') o.pages = val();
     else if (a === '--from') o.from = val();
     else if (a === '--no-open') o.open = false;
+    else if (a === '--launched') {
+      launch.tree = val();
+      if (!TREE_ID.test(launch.tree)) throw new Error('--launched takes the tree id of the map\'s code');
+    } else if (a === '--root') launch.root = path.resolve(val());
+    else if (a === '--launcher') launch.launcher = path.resolve(val());
     else if (a === '-h' || a === '--help') o.help = true;
     else throw new Error(`unknown argument ${a}`);
+  }
+  if (Object.keys(launch).length) {
+    if (!launch.tree || !launch.root || !launch.launcher) throw new Error('--launched, --root and --launcher go together; the launcher gives them');
+    if (o.from) throw new Error('--from and --launched do not go together');
+    o.launched = launch;
   }
   return o;
 }
@@ -75,16 +94,21 @@ export async function main(argv) {
     console.error(`solution-map: ${e.message}\n${USAGE}`);
     return 2;
   }
+  const launched = o.launched ?? null;
   const reviewCmd = reviewCommand({ config: o.config });
-  const { listen, refresh } = createMapServer({
-    build: o.build || (() => buildMap({ repos, pages: o.pages, backlog: o.backlog?.where ?? null })),
-    themeFile: path.join(root, 'kit-pages', 'theme.css'),
+  let port;
+  const { server, listen, refresh } = createMapServer({
+    build: o.build || (() => buildMap({ repos, pages: o.pages, backlog: o.backlog?.where ?? null, launched })),
+    // A launched map runs from a folder of main's map code alone: the theme is main's, read from git.
+    theme: launched
+      ? () => readAt(launched.root, 'origin/main', THEME)
+      : async () => { const f = path.join(root, THEME); return fs.existsSync(f) ? fs.readFileSync(f) : null; },
     review: () => startReview(reviewCmd),
     backlog: o.backlog ?? null,
+    restart: launched ? async () => restartWith({ launched, server, port: () => port }) : null,
   });
-  let port;
   try {
-    port = await listen(o.port);
+    port = await listen(o.port, { wait: launched ? PORT_WAIT : 0 });
   } catch (e) {
     console.error(`solution-map: cannot listen on 127.0.0.1: ${e.message}`);
     return 2;
@@ -94,6 +118,33 @@ export async function main(argv) {
   refresh().catch((e) => console.error(`solution-map: ${e.message}`));
   if (o.open) openBrowser(url);
   return null;
+}
+
+/**
+ * Restart to update: whether the launcher is there to run, and `handOver`, run once the page has
+ * its answer: stop listening, start the launcher detached on this map's port without opening
+ * another browser tab, and exit. The launcher runs main's newest map, which waits for the port.
+ * A launcher that cannot be started is said, and the exit code is 1.
+ */
+function restartWith({ launched, server, port }) {
+  if (!fs.existsSync(launched.launcher)) return { ok: false, error: `the launcher is not at ${launched.launcher}; open the map from its shortcut again` };
+  return {
+    ok: true,
+    handOver: () => {
+      server.close();
+      server.closeAllConnections();
+      try {
+        spawn(process.execPath, [launched.launcher, '--root', launched.root, '--', '--port', String(port()), '--no-open'], {
+          cwd: launched.root, detached: true, stdio: 'ignore',
+        }).unref();
+      } catch (e) {
+        console.error(`solution-map: cannot start the launcher: ${e.message}; open the map from its shortcut again`);
+        process.exit(1);
+      }
+      console.log('solution-map: restarting with the newer map from main');
+      process.exit(0);
+    },
+  };
 }
 
 if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {

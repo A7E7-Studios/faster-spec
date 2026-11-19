@@ -17,6 +17,8 @@ export const NOTES = 'Notes';
 export const FEATURE_ID = /^[a-z0-9]+(-[a-z0-9]+)*\/[a-z0-9]+(-[a-z0-9]+)*$/;
 /** The longest id a title gives. */
 export const ID_MAX = 60;
+/** Ids no title gives: `new` is the map's address of a request being written, `/backlog/new`. */
+export const RESERVED_IDS = ['new'];
 /** `backlog/<id>.md` */
 export const ITEM_FILE = /^backlog\/([^/]+)\.md$/;
 
@@ -263,16 +265,17 @@ function cut(s, max) {
 
 /**
  * The id a title gives: kebab-case, ASCII-folded, at most 60 characters; `-2`, `-3` … when the id
- * is taken. A title with no letter or digit left gives `request`.
+ * is taken, and RESERVED_IDS always are. A title with no letter or digit left gives `request`.
  * @param {string} title
  * @param {Iterable<string>} [taken] the ids in use
  */
 export function newId(title, taken = []) {
   const used = taken instanceof Set ? taken : new Set(taken);
+  const free = (id) => !used.has(id) && !RESERVED_IDS.includes(id);
   const base = cut(scenarioSlug(asciiFold(title)) || 'request', ID_MAX);
-  if (!used.has(base)) return base;
+  if (free(base)) return base;
   for (let n = 2; ; n++) {
     const id = `${cut(base, ID_MAX - String(n).length - 1)}-${n}`;
-    if (!used.has(id)) return id;
+    if (free(id)) return id;
   }
 }

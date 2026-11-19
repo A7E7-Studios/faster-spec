@@ -28,7 +28,7 @@ import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { git, resolveRepos, readAt, remoteUrl, hasRef } from '../lib/sources.mjs';
+import { git, resolveRepos, readAt, remoteUrl, hasRef, samePath } from '../lib/sources.mjs';
 
 export const GIT_PAGE = 'https://git-scm.com/downloads';
 export const NODE_PAGE = 'https://nodejs.org/en/download';
@@ -44,10 +44,6 @@ const USAGE = `usage: node tools/solution-map/launcher/setup.mjs [--root <reposi
   repository holding the current folder; --print-command prints the setup command per system`;
 
 const lastLine = (s) => String(s).trim().split('\n').pop() || 'failed';
-const samePath = (a, b) => {
-  const [x, y] = [path.resolve(a), path.resolve(b)];
-  return process.platform === 'win32' ? x.toLowerCase() === y.toLowerCase() : x === y;
-};
 
 /** A short name from a repository's address: `notes-app` from `.../notes-app.git`; '' when none. */
 export function repoName(address) {
