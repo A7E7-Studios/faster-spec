@@ -185,7 +185,7 @@ test('an item shows its notes, its features and its changes', () => {
   assert.equal(d.cls, 'dlg');
   const h = d.html;
   // The title takes focus, and opens for editing; who asked and when sit under it.
-  assert.match(h, /<h2 class="s-h1" id="dlg-t" tabindex="-1"><button class="ed" data-edit="title" aria-describedby="dlg-te">Show the offline banner sooner<\/button><\/h2><span class="vh" id="dlg-te">Edit the title<\/span><span class="s-faint">jdoe · 11 Nov<\/span>/);
+  assert.match(h, /<div class="tt"><h2 class="s-h1" id="dlg-t" tabindex="-1"><button class="ed" data-edit="title" aria-describedby="dlg-te">Show the offline banner sooner<\/button><\/h2><\/div><span class="vh" id="dlg-te">Edit the title<\/span><span class="s-faint">jdoe · 11 Nov<\/span>/);
   assert.match(h, /<button class="s-btn icon sm x" data-act="close" aria-label="Close">×<\/button>/);
   // The request: its description as its Markdown's blocks, opened for editing by a click or its button.
   assert.match(h, /<div class="ed ds" data-edit="description"><button class="s-btn sm eb" data-edit="description">Edit the description<\/button><p>The offline banner shows five seconds after the connection drops, so people keep typing and think their edits are lost\.<\/p><p>It should show within a second or two and say the edits are kept\. Seen on:<\/p><ul><li>any open note, when the network drops<\/li><li>the note list while it syncs<\/li><\/ul><\/div>/);
@@ -226,7 +226,7 @@ test('an edited field shows its draft value in the request dialog', () => {
   const bk = backlogView({ items: ITEMS, drafts, features: vm.features, me: 'asmith' });
   const h = dialogView(vm, ui({ tab: 'backlog', req: id }), { backlog: bk }).html;
   // Each field shows what the person wrote, marked as a draft; the feature they added is outlined.
-  assert.match(h, /<button class="ed" data-edit="title" aria-describedby="dlg-te">Show the offline banner within two seconds<\/button><span class="dtag">Draft<\/span><\/h2>/);
+  assert.match(h, /<h2 class="s-h1" id="dlg-t" tabindex="-1"><button class="ed" data-edit="title" aria-describedby="dlg-te">Show the offline banner within two seconds<\/button><\/h2><span class="dtag">Draft<\/span><\/div>/);
   assert.match(h, /<div class="ed ds dft" data-edit="description"><button class="s-btn sm eb" data-edit="description">Edit the description<\/button><p><span class="dtag">Draft<\/span><\/p><p>Within <b>two seconds<\/b>\.<\/p><\/div>/);
   assert.match(h, /<dt>Features <span class="dtag">Draft<\/span><\/dt><dd><span class="tg"><a [^>]*>Offline edits<\/a>.*?<\/span><span class="tg dft"><a class="s-link" href="\/explore\/sharing\/share-links" data-open="sharing\/share-links">Share links<\/a><button type="button" data-about-drop="sharing\/share-links" aria-label="Remove Share links">×<\/button><\/span>/);
   // The unsent line counts them.
@@ -263,6 +263,9 @@ test('a description shows as the blocks its Markdown makes, escaped', () => {
     '<p>One <b>bold</b><br>line two</p><p class="mh">Steps</p><ol><li>open</li><li>share</li></ol><ul><li>a</li><li>b more</li></ul>');
   assert.equal(mdBlocks('```\n<b>x</b>\n## not a heading\n```\nafter'), '<pre>&lt;b&gt;x&lt;/b&gt;\n## not a heading</pre><p>after</p>');
   assert.equal(mdBlocks('```\nleft open'), '<pre>left open</pre>');
+  // A closing run of # needs a space before it; an ordered list keeps the number it starts at.
+  assert.equal(mdBlocks('## Support C#\n### Steps ##'), '<p class="mh">Support C#</p><p class="mh">Steps</p>');
+  assert.equal(mdBlocks('3. third\n4. fourth'), '<ol start="3"><li>third</li><li>fourth</li></ol>');
   assert.equal(mdBlocks('<img src=x onerror="alert(1)">'), '<p>&lt;img src=x onerror=&quot;alert(1)&quot;&gt;</p>');
   assert.equal(mdBlocks(''), '');
 });

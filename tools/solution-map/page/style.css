@@ -263,7 +263,7 @@ select[data-addabout], select[data-about-add] { width: 7em; }
 .eo textarea { min-height: 150px; resize: vertical; }
 .eo.et { margin: 0; max-width: none; } .eo.et input { font-size: 22px; font-weight: 800; line-height: 1.25; padding: 4px 8px; }
 .ea { display: flex; justify-content: flex-end; gap: 8px; }
-h2 .dtag { vertical-align: middle; margin-left: 10px; } .dd dt .dtag { text-transform: none; letter-spacing: 0; margin-left: 6px; }
+.tt { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; } .dd dt .dtag { text-transform: none; letter-spacing: 0; margin-left: 6px; }
 select.s-btn { appearance: auto; }
 .ft { display: flex; gap: 8px; justify-content: flex-end; padding: 10px 16px; border-top: 1px solid var(--divider); }
 @container (max-width: 720px) {

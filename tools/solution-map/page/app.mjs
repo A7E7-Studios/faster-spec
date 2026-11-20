@@ -296,20 +296,45 @@ const editKey = (r, field) => r.held.find((h) => h.field === field)?.key ?? r.dr
 const sameText = (a, b) => String(a ?? '').replace(/\r\n?/g, '\n').trim() === String(b ?? '').replace(/\r\n?/g, '\n').trim();
 const sameSet = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
 
-/** Opens the title or the description of the request open in the dialog, the caret at its end. */
-function startEdit(field) {
+/**
+ * Opens the title or the description of the request open in the dialog, the caret at its end. A
+ * field already open is done first, as its Done would, so nothing typed in it is lost; when that
+ * cannot be kept, it stays open and the other does not open.
+ */
+async function startEdit(field) {
   const r = st.backlog?.requests[ui.req];
-  if (!r || r.draft || r.problems.length) return;
+  if (!r || r.draft || r.problems.length || st.editing?.field === field) return;
+  const open = dlg.querySelector('form[data-form="edit"]');
+  if (open && !(await doneEdit(open, { refocus: false }))) return;
   st.editing = { req: r.id, field };
   render({ focus: `#edit-${field}` });
   const el = dlg.querySelector(`#edit-${field}`);
   el?.setSelectionRange?.(el.value.length, el.value.length);
 }
 
-/** Closes the field open, what was typed in it dropped, focus back on what opens it. */
-function closeEdit(field) {
+/** Closes the field open, what was typed in it dropped, focus back on what opens it unless `refocus` is off. */
+function closeEdit(field, { refocus = true } = {}) {
   st.editing = null;
-  render({ focus: [`button[data-edit="${field}"]`, '#dlg-t'] });
+  render(refocus ? { focus: [`button[data-edit="${field}"]`, '#dlg-t'] } : {});
+}
+
+/**
+ * Done on an open field: keeps what was typed as a draft and closes it; closes it alone when
+ * nothing changed. Resolves false when the field stays open (an empty title, a draft refused).
+ */
+async function doneEdit(f, { refocus = true } = {}) {
+  const r = st.backlog?.requests[f.dataset.id];
+  const field = f.dataset.field;
+  const input = f.elements.value;
+  if (!r) return false;
+  const to = field === 'title' ? input.value.trim() : input.value.replace(/\r\n?/g, '\n').trimEnd();
+  if (field === 'title' && !to) { input.value = ''; f.reportValidity(); return false; }
+  if (sameText(to, r[field])) { closeEdit(field, { refocus }); return true; }
+  const button = f.querySelector('.s-btn.primary');
+  button.disabled = true;
+  if (await saveField(r, field, to)) { closeEdit(field, { refocus }); return true; }
+  button.disabled = false;
+  return false;
 }
 
 /**
@@ -398,7 +423,11 @@ document.addEventListener('click', (e) => {
     const r = st.backlog?.requests[ui.req];
     if (r) saveAbout(aboutOf(r).filter((a) => a !== x.dataset.aboutDrop), ['[data-about-drop]', 'select[data-about-add]']);
   } else if ((x = el('[data-edit-cancel]'))) closeEdit(x.dataset.editCancel);
-  else if ((x = el('[data-edit]'))) startEdit(x.dataset.edit);
+  else if ((x = el('[data-edit]'))) {
+    // Text selected in the description, to copy it, opens nothing.
+    const sel = getSelection();
+    if (!(sel && !sel.isCollapsed && x.contains(sel.anchorNode))) startEdit(x.dataset.edit);
+  }
   else if ((x = el('[data-suggest]'))) openDialog({ add: { about: [x.dataset.suggest] } }, x);
   else if ((x = el('[data-req]'))) {
     if (!plain && x.tagName === 'A') return;
@@ -438,16 +467,7 @@ document.addEventListener('submit', async (e) => {
   const v = (name) => f.elements[name]?.value.trim() ?? '';
   const button = f.querySelector('.s-btn.primary');
   if (f.dataset.form === 'edit') {
-    const r = st.backlog?.requests[f.dataset.id];
-    const field = f.dataset.field;
-    if (!r) return;
-    const to = field === 'title' ? v('value') : f.elements.value.value.replace(/\r\n?/g, '\n').trimEnd();
-    if (field === 'title' && !to) { f.elements.value.value = ''; f.reportValidity(); return; }
-    // Nothing changed: the field closes and no draft is kept.
-    if (sameText(to, r[field])) { closeEdit(field); return; }
-    button.disabled = true;
-    if (await saveField(r, field, to)) closeEdit(field);
-    else button.disabled = false;
+    await doneEdit(f);
     return;
   }
   if (f.dataset.form === 'note') {

@@ -6,7 +6,7 @@ export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&a
 export const md = (s) => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*]+)\*/g, '$1<i>$2</i>');
 
 const FENCE = /^ {0,3}(`{3,}|~{3,})/;
-const HEADING = /^ {0,3}#{1,6}[ \t]+(.*?)[ \t#]*$/;
+const HEADING = /^ {0,3}#{1,6}[ \t]+(.*?)(?:[ \t]+#+)?[ \t]*$/;
 const ITEM = /^ {0,3}([-*+]|\d{1,9}[.)])[ \t]+(.*)$/;
 
 /**
@@ -20,7 +20,10 @@ export function mdBlocks(s) {
   let list = null;
   let code = null;
   const endPara = () => { if (para.length) out.push(`<p>${para.map((l) => md(l.trim())).join('<br>')}</p>`); para = []; };
-  const endList = () => { if (list) out.push(`<${list.tag}>${list.items.map((i) => `<li>${md(i)}</li>`).join('')}</${list.tag}>`); list = null; };
+  const endList = () => {
+    if (list) out.push(`<${list.tag}${list.start > 1 ? ` start="${list.start}"` : ''}>${list.items.map((i) => `<li>${md(i)}</li>`).join('')}</${list.tag}>`);
+    list = null;
+  };
   for (const line of String(s ?? '').replace(/\r\n?/g, '\n').split('\n')) {
     if (code) {
       const f = FENCE.exec(line);
@@ -37,7 +40,7 @@ export function mdBlocks(s) {
     if (f || h || !line.trim() || (li && list && list.tag !== (/\d/.test(li[1]) ? 'ol' : 'ul'))) endList();
     if (f) code = { fence: f[1], lines: [] };
     else if (h) out.push(`<p class="mh">${md(h[1])}</p>`);
-    else if (li) (list ??= { tag: /\d/.test(li[1]) ? 'ol' : 'ul', items: [] }).items.push(li[2].trim());
+    else if (li) (list ??= { tag: /\d/.test(li[1]) ? 'ol' : 'ul', start: parseInt(li[1], 10), items: [] }).items.push(li[2].trim());
     else if (!line.trim()) continue;
     else if (list) list.items[list.items.length - 1] += ` ${line.trim()}`;
     else para.push(line);
