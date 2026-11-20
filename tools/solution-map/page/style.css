@@ -239,7 +239,7 @@ dialog.dlg .tray { position: sticky; bottom: 0; }
 .cv { display: grid; gap: 2px 0; }
 .cv .pre { padding-left: 8px; border-left: 2px solid var(--req); margin-bottom: 4px; }
 .fm { display: grid; gap: 12px; padding: 20px 24px; }
-.fm .t-row { display: flex; gap: 10px; align-items: center; padding-right: 40px; }
+.t-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; } .fm .t-row { padding-right: 40px; }
 .fl { display: grid; gap: 4px; font-size: 12.5px; font-weight: 700; }
 .fl input, .fl textarea { font-size: 13.5px; font-weight: 400; min-height: 32px; border: 1px solid var(--edge-strong); border-radius: 7px; padding: 5px 10px; background: var(--sheet); }
 .fl textarea { min-height: 56px; resize: vertical; }
@@ -263,7 +263,7 @@ select[data-addabout], select[data-about-add] { width: 7em; }
 .eo textarea { min-height: 150px; resize: vertical; }
 .eo.et { margin: 0; max-width: none; } .eo.et input { font-size: 22px; font-weight: 800; line-height: 1.25; padding: 4px 8px; }
 .ea { display: flex; justify-content: flex-end; gap: 8px; }
-.tt { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; } .dd dt .dtag { text-transform: none; letter-spacing: 0; margin-left: 6px; }
+ .dd dt .dtag { text-transform: none; letter-spacing: 0; margin-left: 6px; }
 select.s-btn { appearance: auto; }
 .ft { display: flex; gap: 8px; justify-content: flex-end; padding: 10px 16px; border-top: 1px solid var(--divider); }
 @container (max-width: 720px) {

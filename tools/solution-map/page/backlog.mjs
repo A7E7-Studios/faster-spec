@@ -153,7 +153,7 @@ function titleBlock(r, can, open) {
   // The dialog is named by its heading, so the heading holds the title alone: "Edit the title"
   // describes the button, and the Draft tag sits beside the heading.
   const head = can ? `<button class="ed" data-edit="title" aria-describedby="dlg-te">${esc(r.title)}</button>` : esc(r.title);
-  return `<div class="tt"><h2 class="s-h1" id="dlg-t" tabindex="-1">${head}</h2>${tag}</div>${can ? '<span class="vh" id="dlg-te">Edit the title</span>' : ''}`;
+  return `<div class="t-row"><h2 class="s-h1" id="dlg-t" tabindex="-1">${head}</h2>${tag}</div>${can ? '<span class="vh" id="dlg-te">Edit the title</span>' : ''}`;
 }
 
 /** The description: its Markdown as blocks, opened for editing by a click or its Edit button, or the field open. */

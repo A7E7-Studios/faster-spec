@@ -185,7 +185,7 @@ test('an item shows its notes, its features and its changes', () => {
   assert.equal(d.cls, 'dlg');
   const h = d.html;
   // The title takes focus, and opens for editing; who asked and when sit under it.
-  assert.match(h, /<div class="tt"><h2 class="s-h1" id="dlg-t" tabindex="-1"><button class="ed" data-edit="title" aria-describedby="dlg-te">Show the offline banner sooner<\/button><\/h2><\/div><span class="vh" id="dlg-te">Edit the title<\/span><span class="s-faint">jdoe · 11 Nov<\/span>/);
+  assert.match(h, /<div class="t-row"><h2 class="s-h1" id="dlg-t" tabindex="-1"><button class="ed" data-edit="title" aria-describedby="dlg-te">Show the offline banner sooner<\/button><\/h2><\/div><span class="vh" id="dlg-te">Edit the title<\/span><span class="s-faint">jdoe · 11 Nov<\/span>/);
   assert.match(h, /<button class="s-btn icon sm x" data-act="close" aria-label="Close">×<\/button>/);
   // The request: its description as its Markdown's blocks, opened for editing by a click or its button.
   assert.match(h, /<div class="ed ds" data-edit="description"><button class="s-btn sm eb" data-edit="description">Edit the description<\/button><p>The offline banner shows five seconds after the connection drops, so people keep typing and think their edits are lost\.<\/p><p>It should show within a second or two and say the edits are kept\. Seen on:<\/p><ul><li>any open note, when the network drops<\/li><li>the note list while it syncs<\/li><\/ul><\/div>/);
@@ -266,6 +266,8 @@ test('a description shows as the blocks its Markdown makes, escaped', () => {
   // A closing run of # needs a space before it; an ordered list keeps the number it starts at.
   assert.equal(mdBlocks('## Support C#\n### Steps ##'), '<p class="mh">Support C#</p><p class="mh">Steps</p>');
   assert.equal(mdBlocks('3. third\n4. fourth'), '<ol start="3"><li>third</li><li>fourth</li></ol>');
+  assert.equal(mdBlocks('0. zero\n1. one'), '<ol start="0"><li>zero</li><li>one</li></ol>');
+  assert.equal(mdBlocks('1. one'), '<ol><li>one</li></ol>');
   assert.equal(mdBlocks('<img src=x onerror="alert(1)">'), '<p>&lt;img src=x onerror=&quot;alert(1)&quot;&gt;</p>');
   assert.equal(mdBlocks(''), '');
 });

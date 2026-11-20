@@ -229,7 +229,9 @@ when the backlog lives in another of those repositories ([Config](#config)).
   the button keyboard focus reveals): the title an input, the description its Markdown in a text
   area, with Cancel and Done. Enter in the title or Ctrl/Cmd+Enter in the description is Done, which
   saves one `edit` draft of that field, changed again by its key, or drops that draft when the value
-  is the branch's again; Escape closes the field and keeps the dialog. A feature chip's × and the
+  is the branch's again, and a Done under way is never sent twice; Escape closes the field and keeps
+  the dialog. Opening the other field does Done on the open one first, which stays open when it
+  cannot be kept; a click with text of the description selected opens nothing. A feature chip's × and the
   + Add picker save an `about` edit the same way. Who asked, when, the notes and the changes have
   no control; a request whose file does not read has none at all.
 - **Drafts and Submit** go through `POST /api/drafts` and `/api/submit`; a failed Submit's banner

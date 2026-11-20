@@ -21,7 +21,7 @@ export function mdBlocks(s) {
   let code = null;
   const endPara = () => { if (para.length) out.push(`<p>${para.map((l) => md(l.trim())).join('<br>')}</p>`); para = []; };
   const endList = () => {
-    if (list) out.push(`<${list.tag}${list.start > 1 ? ` start="${list.start}"` : ''}>${list.items.map((i) => `<li>${md(i)}</li>`).join('')}</${list.tag}>`);
+    if (list) out.push(`<${list.tag}${list.tag === 'ol' && list.start !== 1 ? ` start="${list.start}"` : ''}>${list.items.map((i) => `<li>${md(i)}</li>`).join('')}</${list.tag}>`);
     list = null;
   };
   for (const line of String(s ?? '').replace(/\r\n?/g, '\n').split('\n')) {

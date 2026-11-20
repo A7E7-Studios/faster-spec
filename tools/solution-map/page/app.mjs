@@ -320,17 +320,18 @@ function closeEdit(field, { refocus = true } = {}) {
 
 /**
  * Done on an open field: keeps what was typed as a draft and closes it; closes it alone when
- * nothing changed. Resolves false when the field stays open (an empty title, a draft refused).
+ * nothing changed. Resolves false when the field stays open (an empty title, a draft refused) or
+ * its Done is already under way, so a second click or Ctrl+Enter never saves it twice.
  */
 async function doneEdit(f, { refocus = true } = {}) {
   const r = st.backlog?.requests[f.dataset.id];
   const field = f.dataset.field;
   const input = f.elements.value;
-  if (!r) return false;
+  const button = f.querySelector('.s-btn.primary');
+  if (!r || button.disabled) return false;
   const to = field === 'title' ? input.value.trim() : input.value.replace(/\r\n?/g, '\n').trimEnd();
   if (field === 'title' && !to) { input.value = ''; f.reportValidity(); return false; }
   if (sameText(to, r[field])) { closeEdit(field, { refocus }); return true; }
-  const button = f.querySelector('.s-btn.primary');
   button.disabled = true;
   if (await saveField(r, field, to)) { closeEdit(field, { refocus }); return true; }
   button.disabled = false;
