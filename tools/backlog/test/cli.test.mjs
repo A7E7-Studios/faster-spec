@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { withTmp, project, land, commits } from './helpers.mjs';
+import { withTmp, project, land, commits, show } from './helpers.mjs';
+import { parseItem } from '../lib/item.mjs';
 import { writeBacklog } from '../lib/store.mjs';
 import { parseArgs } from '../backlog.mjs';
 
@@ -28,12 +29,18 @@ test('each write command sends one commit', () => withTmp(async (tmp) => {
     sent.push(history[0]);
     return { ...r, commit: history[0] };
   };
-  const add = expectOne(['add', 'Export a note as PDF', '--about', 'editing/export', '--happens', 'Only a link.', '--should', 'A PDF.', '--where', 'Share'], 'Pat Example: 1 new request');
+  const add = expectOne(['add', 'Export a note as PDF', '--about', 'editing/export', '--text', 'Only a link; a PDF would help.'], 'Pat Example: 1 new request');
   assert.equal(add.out.trim(), 'export-a-note-as-pdf');
   assert.equal(add.commit.body, 'add export-a-note-as-pdf: Export a note as PDF');
   const id = add.out.trim();
   expectOne(['note', id, 'Asked twice this week.'], 'Pat Example: 1 note');
   expectOne(['note', id, '-'], 'Pat Example: 1 note', 'Read from stdin,\nwith two lines.\n');
+  const edit = expectOne(['edit', id, '--title', 'Export notes as PDF', '--text', '-', '--about', 'editing/export', '--about', 'sharing/links'], 'Pat Example: 3 edits', 'Sharing sends a link only.\n\n## Steps\n\nShare a note.\n');
+  assert.equal(edit.out.trim(), `${id}: title, description, about edited (${edit.commit.sha.slice(0, 7)})`);
+  assert.equal(edit.commit.body, `edit ${id}: title\nedit ${id}: description\nedit ${id}: about`);
+  const edited = parseItem(show(origin, 'backlog', `backlog/${id}.md`), { id });
+  assert.deepEqual([edited.title, edited.description, edited.about], ['Export notes as PDF', 'Sharing sends a link only.\n\n## Steps\n\nShare a note.', ['editing/export', 'sharing/links']]);
+  expectOne(['edit', id, '--about', 'none'], 'Pat Example: 1 edit');
   const move = expectOne(['move', id, 'ready'], 'Pat Example: 1 move');
   assert.equal(move.commit.body, `move ${id}: new -> ready`);
   const link = expectOne(['link', id, 'export-pdf'], 'Pat Example: 1 link');
@@ -42,7 +49,7 @@ test('each write command sends one commit', () => withTmp(async (tmp) => {
   assert.deepEqual(JSON.parse(json.out), { id: 'dark-mode', commit: json.commit.sha });
 
   // A write that changes nothing sends nothing; one that cannot apply says why.
-  for (const [args, code] of [[['move', id, 'ready'], 0], [['link', id, 'export-pdf'], 0], [['note', 'no-such-request', 'x'], 1], [['move', id, 'done'], 1]]) {
+  for (const [args, code] of [[['move', id, 'ready'], 0], [['link', id, 'export-pdf'], 0], [['edit', id, '--title', 'Export notes as PDF'], 0], [['note', 'no-such-request', 'x'], 1], [['edit', 'no-such-request', '--title', 'x'], 1], [['move', id, 'done'], 1]]) {
     const r = cli(dir, args);
     assert.equal(r.code, code, `${args.join(' ')}: ${r.err}`);
   }
@@ -53,7 +60,7 @@ test('each write command sends one commit', () => withTmp(async (tmp) => {
 
 test('show prints the item, its notes and its shown state', () => withTmp(async (tmp) => {
   const { clones: [pat, sam] } = project(tmp, 'notes-app', { people: ['Pat Example', 'Sam Example'] });
-  const id = cli(pat, ['add', 'Export a note as PDF', '--about', 'editing/export', '--happens', 'Only a link.', '--should', 'A PDF.', '--where', 'Share']).out.trim();
+  const id = cli(pat, ['add', 'Export a note as PDF', '--about', 'editing/export', '--text', 'Only a link.\n\nA PDF would help.']).out.trim();
   assert.equal(cli(pat, ['note', id, 'First.']).code, 0);
   assert.equal(cli(sam, ['note', id, 'Second, from another clone.']).code, 0);
   assert.equal(cli(sam, ['link', id, 'export-pdf']).code, 0);
@@ -72,7 +79,7 @@ test('show prints the item, its notes and its shown state', () => withTmp(async 
   assert.deepEqual(item.about, ['editing/export']);
   assert.deepEqual(item.change, ['export-pdf']);
   assert.deepEqual(item.changes, [{ id: 'export-pdf', state: 'to-review' }]);
-  assert.deepEqual([item.happens, item.should, item.where], ['Only a link.', 'A PDF.', 'Share']);
+  assert.equal(item.description, 'Only a link.\n\nA PDF would help.');
   assert.deepEqual(item.notes.map((n) => [n.by, n.text]), [['Pat Example', 'First.'], ['Sam Example', 'Second, from another clone.']]);
   for (const n of item.notes) assert.match(n.at, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
   assert.deepEqual(item.problems, []);
@@ -131,7 +138,11 @@ test('list filters by the state an item shows', () => withTmp(async (tmp) => {
 }));
 
 test('the command line takes the commands, arguments and options it lists, and no others', () => {
-  assert.deepEqual(parseArgs(['add', 'T', '--about', 'a/b', '--about', 'c/d', '--happens', 'h', '--json']), { cmd: 'add', args: ['T'], about: ['a/b', 'c/d'], json: true, help: false, happens: 'h' });
+  assert.deepEqual(parseArgs(['add', 'T', '--about', 'a/b', '--about', 'c/d', '--text', 'h', '--json']), { cmd: 'add', args: ['T'], about: ['a/b', 'c/d'], json: true, help: false, text: 'h' });
+  assert.deepEqual(parseArgs(['edit', 'x', '--title', 'T', '--about', 'none']), { cmd: 'edit', args: ['x'], about: ['none'], json: false, help: false, title: 'T' });
+  assert.throws(() => parseArgs(['edit', 'x']), /edit needs --title, --text or --about/);
+  assert.throws(() => parseArgs(['edit', 'x', '--about', 'none', '--about', 'a/b']), /stands alone/);
+  assert.throws(() => parseArgs(['add', 'T', '--happens', 'h']), /add takes no --happens/);
   assert.deepEqual(parseArgs(['note', 'x', '--', '--starts with dashes']).args, ['x', '--starts with dashes']);
   assert.equal(parseArgs([]).help, true);
   assert.throws(() => parseArgs(['note', 'x', 'y', '--json']), /note takes no --json/);

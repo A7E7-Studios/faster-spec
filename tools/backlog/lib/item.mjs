@@ -1,17 +1,13 @@
 // The item file, `backlog/<id>.md`: the gate's front matter subset (title, by, created, state,
-// about, change), the request's three sections, then `## Notes`, each note headed by its author and
-// its time in UTC. Pure functions over text; nothing here touches git or the file system.
+// about, change), the request's description, free Markdown, then `## Notes`, each note headed by
+// its author and its time in UTC. Pure functions over text; nothing here touches git or the file
+// system.
 import { parseFrontMatter, scenarioSlug, ID } from '../../gate/lib/spec.mjs';
 import { splitLines, fenceMask } from '../../gate/lib/markdown.mjs';
 
 /** The states people set. */
 export const SET_STATES = ['new', 'discussing', 'ready', 'parked'];
-/** The request's sections: the item's field and its heading. */
-export const SECTIONS = [
-  ['happens', 'What happens'],
-  ['should', 'What should happen'],
-  ['where', 'Where'],
-];
+/** The heading that ends the description and starts the notes. */
 export const NOTES = 'Notes';
 /** A feature id, `<domain>/<capability>`. */
 export const FEATURE_ID = /^[a-z0-9]+(-[a-z0-9]+)*\/[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -23,7 +19,6 @@ export const RESERVED_IDS = ['new'];
 export const ITEM_FILE = /^backlog\/([^/]+)\.md$/;
 
 const KEYS = ['title', 'by', 'created', 'state', 'about', 'change'];
-const HEADINGS = [...SECTIONS.map(([, h]) => h), NOTES];
 const H2 = /^ {0,3}##(?:[ \t]+(.*?))?[ \t]*$/;
 const H3 = /^ {0,3}###(?:[ \t]+(.*?))?[ \t]*$/;
 const NOTE_HEAD = /^(.+) · (\d{4}-\d{2}-\d{2} \d{2}:\d{2}) UTC$/;
@@ -58,13 +53,21 @@ export function cleanLine(s) {
   return String(s ?? '').replace(/\s+/g, ' ').trim();
 }
 
-// A line of a person's text that would read as a section heading (`## `), or inside the notes as a
-// note heading (`### `), is kept with a backslash before its `#`: Markdown shows the same line, and
-// the file keeps its shape. An unclosed code fence is closed, so it cannot swallow what follows.
+// A line of a person's text that would end it is kept with a backslash before its `#`: in the
+// description a line reading `## Notes`, in a note any `## ` or `### ` line, which would read as a
+// section or a note heading. Markdown shows the same line, and the file keeps its shape. Every other
+// heading of a description stays as it is. An unclosed code fence is closed, so it cannot swallow
+// what follows.
+const ESCAPE = {
+  description: [/^( {0,3})(##)(?=[ \t]+Notes[ \t]*$)/, /^( {0,3})\\(##)(?=[ \t]+Notes[ \t]*$)/],
+  notes: [/^( {0,3})(#{2,3})(?=[ \t]|$)/, /^( {0,3})\\(#{2,3})(?=[ \t]|$)/],
+};
+
 function escapeText(text, { notes = false } = {}) {
   const lines = text.split('\n');
   const mask = fenceMask(lines);
-  const out = lines.map((l, i) => (mask[i] ? l : l.replace(notes ? /^( {0,3})(#{2,3})(?=[ \t]|$)/ : /^( {0,3})(##)(?=[ \t]|$)/, '$1\\$2')));
+  const [re] = ESCAPE[notes ? 'notes' : 'description'];
+  const out = lines.map((l, i) => (mask[i] ? l : l.replace(re, '$1\\$2')));
   let open = null;
   for (let i = 0; i < lines.length; i++) {
     const m = mask[i] && FENCE.exec(lines[i]);
@@ -79,7 +82,8 @@ function escapeText(text, { notes = false } = {}) {
 function unescapeText(text, { notes = false } = {}) {
   const lines = text.split('\n');
   const mask = fenceMask(lines);
-  return lines.map((l, i) => (mask[i] ? l : l.replace(notes ? /^( {0,3})\\(#{2,3})(?=[ \t]|$)/ : /^( {0,3})\\(##)(?=[ \t]|$)/, '$1$2'))).join('\n');
+  const [, re] = ESCAPE[notes ? 'notes' : 'description'];
+  return lines.map((l, i) => (mask[i] ? l : l.replace(re, '$1$2'))).join('\n');
 }
 
 /** A front matter value that reads back as itself: one line, quoted when quotes would be dropped. */
@@ -128,11 +132,8 @@ export function writeItem(item) {
     '---',
   ];
   const blocks = [fm.join('\n')];
-  for (const [key, heading] of SECTIONS) {
-    blocks.push(`## ${heading}`);
-    const t = cleanText(item[key]);
-    if (t) blocks.push(escapeText(t));
-  }
+  const description = cleanText(item.description);
+  if (description) blocks.push(escapeText(description));
   blocks.push(`## ${NOTES}`);
   for (const n of item.notes ?? []) {
     blocks.push(`### ${cleanLine(n.by)} · ${n.at} UTC`);
@@ -143,9 +144,10 @@ export function writeItem(item) {
 }
 
 /**
- * Reads an item file. Returns { id, title, by, created, state, about, change, happens, should,
- * where, notes: [{ by, at, text }], problems: [{ line, message }] }: whatever the text holds, and
- * every break of the format. An item with problems is shown with them and is never written to.
+ * Reads an item file. Returns { id, title, by, created, state, about, change, description,
+ * notes: [{ by, at, text }], problems: [{ line, message }] }: whatever the text holds, and every
+ * break of the format. Everything above `## Notes` is the description, its own headings too. An
+ * item with problems is shown with them and is never written to.
  * @param {string} text
  * @param {{ id?: string|null }} [o] the id its file name gives
  */
@@ -184,31 +186,26 @@ export function parseItem(text, { id = null } = {}) {
 
   const lines = splitLines(text).slice(fm.bodyStart);
   const mask = fenceMask(lines);
-  const blocks = { happens: [], should: [], where: [] };
+  const description = [];
   const notes = [];
-  let sink = null; // the lines the current block collects, or null before the first section
+  // The lines the current block collects: the description's, a note's, or null under `## Notes`
+  // before its first note.
+  let sink = description;
   let inNotes = false;
-  let last = -1;
-  const seen = new Set();
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i];
     const n = fm.bodyStart + i + 1;
     if (!mask[i]) {
       const h2 = H2.exec(l);
-      if (h2) {
-        const heading = (h2[1] ?? '').trim();
-        const at = HEADINGS.indexOf(heading);
-        inNotes = false;
+      const heading = h2 ? (h2[1] ?? '').trim() : null;
+      if (h2 && !inNotes && heading === NOTES) {
+        inNotes = true;
+        sink = null;
+        continue;
+      }
+      if (h2 && inNotes) {
+        problems.push({ line: n, message: heading === NOTES ? `"## ${NOTES}" appears twice` : `"## ${heading}" under "## ${NOTES}" is not a note heading` });
         sink = [];
-        if (at < 0) problems.push({ line: n, message: `"## ${heading}" is not a section (${HEADINGS.join(', ')})` });
-        else if (seen.has(at)) problems.push({ line: n, message: `"## ${heading}" appears twice` });
-        else if (at < last) problems.push({ line: n, message: `"## ${heading}" is out of order (${HEADINGS.join(', ')})` });
-        else {
-          seen.add(at);
-          last = at;
-          inNotes = at === HEADINGS.length - 1;
-          sink = inNotes ? null : blocks[SECTIONS[at][0]];
-        }
         continue;
       }
       const h3 = inNotes && H3.exec(l);
@@ -222,7 +219,7 @@ export function parseItem(text, { id = null } = {}) {
       }
     }
     if (sink === null) {
-      if (l.trim()) problems.push({ line: n, message: inNotes ? 'text under "## Notes" before the first note heading' : 'text before "## What happens"' });
+      if (l.trim()) problems.push({ line: n, message: `text under "## ${NOTES}" before the first note heading` });
       continue;
     }
     sink.push(l);
@@ -236,9 +233,7 @@ export function parseItem(text, { id = null } = {}) {
     state,
     about,
     change,
-    happens: textOf(blocks.happens),
-    should: textOf(blocks.should),
-    where: textOf(blocks.where),
+    description: textOf(description),
     notes: notes.map((x) => ({ by: x.by, at: x.at, text: textOf(x.lines, { notes: true }) })),
     problems,
   };

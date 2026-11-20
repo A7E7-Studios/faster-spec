@@ -14,19 +14,12 @@ change:
   - export-pdf
 ---
 
-## What happens
+Sharing a note sends a link only, so people without an account cannot open it.
 
-Sharing a note sends a link only.
+### What would help
 
-People without an account cannot open it.
-
-## What should happen
-
-Share offers "PDF", which saves the note as one file.
-
-## Where
-
-The share sheet on a note, at https://example.com/notes/share
+- Share offers "PDF", which saves the note as one file.
+- The share sheet on a note, at https://example.com/notes/share
 
 ## Notes
 
@@ -52,8 +45,7 @@ test('an item file reads into its fields and writes back unchanged', () => {
   assert.equal(item.state, 'discussing');
   assert.deepEqual(item.about, ['editing/export', 'editing/offline-edits']);
   assert.deepEqual(item.change, ['export-pdf']);
-  assert.equal(item.happens, 'Sharing a note sends a link only.\n\nPeople without an account cannot open it.');
-  assert.equal(item.where, 'The share sheet on a note, at https://example.com/notes/share');
+  assert.equal(item.description, 'Sharing a note sends a link only, so people without an account cannot open it.\n\n### What would help\n\n- Share offers "PDF", which saves the note as one file.\n- The share sheet on a note, at https://example.com/notes/share');
   assert.equal(item.notes.length, 2);
   assert.deepEqual(item.notes[0], { by: 'Pat Example', at: '2026-11-19 14:05', text: 'First thought.' });
   assert.match(item.notes[1].text, /## not a heading in a fence/);
@@ -72,28 +64,28 @@ test('a note heading is the author, the time to the minute and UTC', () => {
   assert.match(parseItem(late, { id: 'x' }).problems[0].message, /note heading/);
 });
 
-test('empty sections and lists write as their headings and keys alone, and read back', () => {
-  const item = { id: 'a', title: 'A', by: 'Pat Example', created: '2026-11-19', state: 'new', about: [], change: [], happens: '', should: '', where: '', notes: [] };
+test('no description and empty lists write as the notes heading and keys alone, and read back', () => {
+  const item = { id: 'a', title: 'A', by: 'Pat Example', created: '2026-11-19', state: 'new', about: [], change: [], description: '', notes: [] };
   const text = writeItem(item);
-  assert.equal(text, '---\ntitle: A\nby: Pat Example\ncreated: 2026-11-19\nstate: new\nabout:\nchange:\n---\n\n## What happens\n\n## What should happen\n\n## Where\n\n## Notes\n');
+  assert.equal(text, '---\ntitle: A\nby: Pat Example\ncreated: 2026-11-19\nstate: new\nabout:\nchange:\n---\n\n## Notes\n');
   const back = parseItem(text, { id: 'a' });
   assert.deepEqual(back.problems, []);
   assert.deepEqual({ ...back, problems: undefined }, { ...item, problems: undefined });
 });
 
-test('a person\'s text cannot break the file: headings are escaped, fences closed', () => {
+test('a person\'s text cannot break the file: the notes heading is escaped, fences closed', () => {
   const item = {
     id: 'a', title: '"Quoted" title', by: 'Pat Example', created: '2026-11-19', state: 'new', about: [], change: [],
-    happens: '## Notes\nstill what happens', should: '```\nan open fence', where: '', notes: [{ by: 'Sam Example', at: '2026-11-19 10:00', text: '### Someone Else · 2026-11-19 11:00 UTC\nnot a note' }],
+    description: '## Steps\n\n## Notes\nstill the description\n```\nan open fence', notes: [{ by: 'Sam Example', at: '2026-11-19 10:00', text: '### Someone Else · 2026-11-19 11:00 UTC\nnot a note' }],
   };
   const text = writeItem(item);
+  assert.match(text, /^## Steps$/m);
   assert.match(text, /^\\## Notes$/m);
   assert.match(text, /^\\### Someone Else/m);
   const back = parseItem(text, { id: 'a' });
   assert.deepEqual(back.problems, []);
   assert.equal(back.title, '"Quoted" title');
-  assert.equal(back.happens, '## Notes\nstill what happens');
-  assert.equal(back.should, '```\nan open fence\n```');
+  assert.equal(back.description, '## Steps\n\n## Notes\nstill the description\n```\nan open fence\n```');
   assert.equal(back.notes.length, 1);
   assert.equal(back.notes[0].text, '### Someone Else · 2026-11-19 11:00 UTC\nnot a note');
   assert.equal(writeItem(back), text);
@@ -106,10 +98,8 @@ test('a file that breaks the format reads with its problems', () => {
     [ITEM.replace('created: 2026-11-19', 'created: 2026-02-30'), /not a date/],
     [ITEM.replace('title:', 'labels: x\ntitle:'), /unknown front matter key "labels"/],
     [ITEM.replace('  - editing/export\n', '  - Export\n'), /not a feature id/],
-    [ITEM.replace('## Where', '## Links'), /not a section/],
-    [ITEM.replace('## Where\n', '## What happens\n'), /appears twice/],
-    [ITEM.replace('## What happens', '## Where').replace('## Where\n\nThe share', '## What happens\n\nThe share'), /out of order/],
-    [ITEM.replace('\n## What happens', '# A title\n\n## What happens'), /text before/],
+    [ITEM.replace('### Sam Example', '## Links\n\n### Sam Example'), /not a note heading/],
+    [ITEM.replace('### Sam Example', '## Notes\n\n### Sam Example'), /appears twice/],
     [ITEM.replace('## Notes\n', '## Notes\n\nloose text\n'), /before the first note/],
     ['no front matter\n', /no front matter/],
   ];

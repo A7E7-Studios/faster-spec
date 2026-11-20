@@ -14,7 +14,8 @@ No npm dependencies; Node 22 or later; Git 2.29 or later (it fetches with
 ```
 node tools/backlog/backlog.mjs list [--state <state>] [--json]
 node tools/backlog/backlog.mjs show <id> [--json]
-node tools/backlog/backlog.mjs add <title> [--about <feature-id>]... [--happens <text>] [--should <text>] [--where <text>] [--json]
+node tools/backlog/backlog.mjs add <title> [--text <description>] [--about <feature-id>]... [--json]
+node tools/backlog/backlog.mjs edit <id> [--title <title>] [--text <description>] [--about <feature-id>|none]... [--json]
 node tools/backlog/backlog.mjs note <id> <text>
 node tools/backlog/backlog.mjs move <id> <new|discussing|ready|parked>
 node tools/backlog/backlog.mjs link <id> <change-id>
@@ -23,16 +24,17 @@ node tools/backlog/backlog.mjs link <id> <change-id>
 | Command | Does, and prints |
 |---|---|
 | `list` | every request, newest first: its id, the state it shows, its title, who asked and when; `--state` keeps those showing that state (`new`, `discussing`, `ready`, `parked`, `in-progress`, `to-review`, `done`) |
-| `show <id>` | one request: its fields, the request, its notes in order, the state it shows and each change it names with that change's state |
-| `add <title>` | a new request in New, by your git name, about the features `--about` names; prints its id |
-| `note <id> <text>` | appends a note by your git name at the time in UTC; text `-` reads it from stdin |
+| `show <id>` | one request: its fields, its description, its notes in order, the state it shows and each change it names with that change's state |
+| `add <title>` | a new request in New, by your git name, with the description `--text` gives, about the features `--about` names; prints its id |
+| `edit <id>` | sets the title, the description or the features, whatever they hold, one edit per option in one commit; `--about` gives the whole list, `--about none` empties it |
+| `note <id> <text>` | appends a note by your git name at the time in UTC |
 | `move <id> <state>` | sets the state people set, whatever it holds |
 | `link <id> <change-id>` | names a change the request led to |
 
-`--json` prints JSON: `list` an array of `{ id, title, by, created, state, shown, about, change }`,
-with `problems` on an item that does not read;
-`show` the item as the library reads it (below) with `shown` and `changes: [{ id, state }]`; `add`
-`{ id, commit }`. A read fetches the backlog's branch, then each repository (`git fetch origin`);
+A description or a note given as `-` is read from stdin. `--json` prints JSON: `list` an array of
+`{ id, title, by, created, state, shown, about, change }`, with `problems` on an item that does not
+read; `show` the item as the library reads it (below) with `shown` and `changes: [{ id, state }]`;
+`add` `{ id, commit }`; `edit` `{ id, commit, fields }`, the fields it changed. A read fetches the backlog's branch, then each repository (`git fetch origin`);
 when the branch cannot be fetched it reads what this clone last fetched, and says so on stderr.
 Each write sends exactly one commit; a write that changes nothing (a move to the state it holds, a
 change already named) sends none.
@@ -70,17 +72,8 @@ change:
   - export-pdf
 ---
 
-## What happens
-
-Sharing a note sends a link only.
-
-## What should happen
-
-Share offers PDF.
-
-## Where
-
-The share sheet on a note.
+Sharing a note sends a link only, so people without an account cannot open it. The share sheet
+could offer PDF.
 
 ## Notes
 
@@ -97,16 +90,17 @@ The note's text.
 | `state` | the state people set: `new`, `discussing`, `ready`, `parked` |
 | `about` | feature ids, `<domain>/<capability>`; may be empty |
 | `change` | the ids of the changes it led to; may be empty |
-| `## What happens`, `## What should happen`, `## Where` | the request, any Markdown; each may be empty |
+| the description | everything between the front matter and `## Notes`: any Markdown, its own headings too; may be empty |
 | `## Notes` | the notes in the order they arrived, each under its `###` heading |
 
 - **Ids** are the title in kebab-case, accents folded to ASCII, at most 60 characters, cut at a word;
   `-2`, `-3` when taken, and `new`, the map's address of a request being written, always is. A
   title with no letter or digit gives `request`. An id is given when the write is replayed, so a
   draft has none until it is sent.
-- **A person's text cannot break the file**: a line that would read as a section (`## `), or in a
-  note as a note heading (`### `), is written with a backslash before its `#` and read back
-  without it; a code fence left open is closed.
+- **A person's text cannot break the file**: a line of a description that would read as
+  `## Notes`, or in a note any `## ` or `### ` line, which would read as a section or a note
+  heading, is written with a backslash before its `#` and read back without it; a code fence left
+  open is closed.
 - **A file that does not read as the format** (a hand edit) reads as an item with its `problems`,
   `[{ line, message }]`: the map shows it, and every write to it is refused until it is fixed.
   Writing what was read gives the same text back.
@@ -117,9 +111,9 @@ Every write is a list of operations, replayed onto the branch's latest commit:
 
 | Operation | Does |
 |---|---|
-| `{ op: 'add', key?, title, happens?, should?, where?, about? }` | a new request in New; `key` names it for the operations sent with it |
+| `{ op: 'add', key?, title, description?, about? }` | a new request in New; `key` names it for the operations sent with it |
 | `{ op: 'note', id \| ref, text }` | appends a note; never clashes |
-| `{ op: 'edit', id \| ref, field, from?, to }` | sets `title`, `happens`, `should`, `where` or `about` |
+| `{ op: 'edit', id \| ref, field, from?, to }` | sets `title`, `description` or `about`; who asked, when, the notes and the changes are never edited |
 | `{ op: 'move', id \| ref, from?, to }` | sets the state |
 | `{ op: 'link', id \| ref, change }` | names a change, once |
 
@@ -189,10 +183,10 @@ one after the other.
 | `lib/state.mjs` | `withShownStates(items, repos)` → items with `shown` and `changes: [{ id, state }]`; `shownState(item, facts)`; `changeState(fact)`; `changeFacts(repos, ids)`; `SHOWN_STATES`; `STATE_LABELS` |
 | `lib/drafts.mjs` | `readDrafts(dir)`; `saveDraft(dir, draft, { wait? })` → promise of `{ draft, drafts }` (a `key` changes that draft); `dropDraft(dir, key, { wait? })` → promise of the drafts left (an `add` takes the drafts naming it); both reject with `code` `DRAFTS_BUSY` when the lock stays held; `submitDrafts(where, { now? })` → `{ ok, commit, sent, held, refused, drafts, unreachable?, busy?, error? }`; `draftsPath(dir)`; `lockPath(dir)`; `LOCK_WAIT`, `LOCK_STALE`, `SENDING_ELSEWHERE` |
 | `lib/ops.mjs` | `applyOps(tip, ops, { name, now })` → `{ files, results }`; `opProblem(op)`; `fieldOf(op)`, the field a move (`state`) or an edit sets; `summary(results)`; `commitMessage(name, results)` |
-| `lib/item.mjs` | `parseItem(text, { id })`; `writeItem(item)`; `newId(title, taken)`; `itemProblem(item)`; `SET_STATES`; `SECTIONS` |
+| `lib/item.mjs` | `parseItem(text, { id })`; `writeItem(item)`; `newId(title, taken)`; `itemProblem(item)`; `SET_STATES`; `NOTES` |
 
 `where` is `{ dir, branch }`, as `locateBacklog` gives it. An item is `{ id, path, title, by,
-created, state, about, change, happens, should, where, notes: [{ by, at, text }], problems }`. A
+created, state, about, change, description, notes: [{ by, at, text }], problems }`. A
 write's `results` hold one entry per operation, in order: `{ op, status, id?, before?, theirs?,
 reason? }`, `status` one of `applied`, `unchanged`, `held`, `refused`. `fetchBacklog`,
 `writeBacklog` and `submitDrafts` take `net`, the runner for git's network commands, with the

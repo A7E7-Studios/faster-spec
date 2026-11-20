@@ -5,15 +5,18 @@ import { ID } from '../../gate/lib/spec.mjs';
 import { parseItem, writeItem, newId, cleanText, cleanLine, utcDate, utcMinute, SET_STATES, FEATURE_ID } from './item.mjs';
 
 export const OPS = ['add', 'note', 'edit', 'move', 'link'];
-/** The fields an edit changes: the title, the request's three sections and the features it is about. */
-export const EDIT_FIELDS = ['title', 'happens', 'should', 'where', 'about'];
+/**
+ * The fields an edit changes: the title, the description and the features it is about. Who asked,
+ * when, the notes and the changes stay as they were written.
+ */
+export const EDIT_FIELDS = ['title', 'description', 'about'];
 
 const isText = (v) => v === undefined || typeof v === 'string';
 const isFeatures = (v) => Array.isArray(v) && v.every((a) => typeof a === 'string' && FEATURE_ID.test(a));
 
 /**
  * What is wrong with an operation's shape, or null. An operation is one of
- *   { op: 'add', key?, title, happens?, should?, where?, about?: [<feature id>] }
+ *   { op: 'add', key?, title, description?, about?: [<feature id>] }
  *   { op: 'note', id | ref, text }
  *   { op: 'edit', id | ref, field, from?, to }
  *   { op: 'move', id | ref, from?, to }
@@ -26,7 +29,7 @@ export function opProblem(op) {
   if (!OPS.includes(op.op)) return `"${op.op}" is not an operation (${OPS.join(', ')})`;
   if (op.op === 'add') {
     if (typeof op.title !== 'string' || !cleanLine(op.title)) return 'a request needs a title';
-    if (!isText(op.happens) || !isText(op.should) || !isText(op.where)) return 'what happens, what should happen and where are text';
+    if (!isText(op.description)) return 'a description is text';
     if (op.about !== undefined && !isFeatures(op.about)) return 'about lists feature ids, <domain>/<capability>';
     if (op.key !== undefined && (typeof op.key !== 'string' || !op.key)) return 'a key is a non-empty string';
     return null;
@@ -103,9 +106,7 @@ export function applyOps(tip, ops, { name, now = new Date() }) {
         state: 'new',
         about: [...new Set(op.about ?? [])],
         change: [],
-        happens: cleanText(op.happens),
-        should: cleanText(op.should),
-        where: cleanText(op.where),
+        description: cleanText(op.description),
         notes: [],
         problems: [],
       });

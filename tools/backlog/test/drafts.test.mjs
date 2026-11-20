@@ -183,7 +183,7 @@ test('a draft another map changes while a submit is out, its lock taken over, ke
     if (args[0] === 'push') {
       // The Submit's lock taken over as stale, as a Submit running past LOCK_STALE would have it.
       fs.rmSync(lockPath(dir));
-      await other.saveDraft(dir, { ...add, title: 'Dark mode everywhere', happens: 'Even at noon.' });
+      await other.saveDraft(dir, { ...add, title: 'Dark mode everywhere', description: 'Even at noon.' });
       await other.saveDraft(dir, { ...move, to: 'parked' });
       await other.saveDraft(dir, { op: 'note', ref: add.key, text: 'From the other window.' });
       // And a lock someone holds now, which the Submit must not let go of as its own.
@@ -199,7 +199,7 @@ test('a draft another map changes while a submit is out, its lock taken over, ke
   // What was sent stays sent; the change is kept on top of it.
   assert.deepEqual(readDrafts(dir).map(({ op, id: target, field, from, to, text }) => ({ op, id: target, field, from, to, text })), [
     { op: 'edit', id: 'dark-mode', field: 'title', from: 'Dark mode', to: 'Dark mode everywhere', text: undefined },
-    { op: 'edit', id: 'dark-mode', field: 'happens', from: '', to: 'Even at noon.', text: undefined },
+    { op: 'edit', id: 'dark-mode', field: 'description', from: '', to: 'Even at noon.', text: undefined },
     { op: 'move', id, field: undefined, from: 'ready', to: 'parked', text: undefined },
     { op: 'note', id: 'dark-mode', field: undefined, from: undefined, to: undefined, text: 'From the other window.' },
   ]);
@@ -207,7 +207,7 @@ test('a draft another map changes while a submit is out, its lock taken over, ke
   assert.deepEqual([again.ok, again.held, again.refused, again.drafts], [true, [], [], []]);
   assert.deepEqual(git(origin, ['ls-tree', '-r', '--name-only', 'backlog']).split('\n'), ['backlog/dark-mode.md', `backlog/${id}.md`]);
   const items = Object.fromEntries(readBacklog(at(dir)).items.map((i) => [i.id, i]));
-  assert.deepEqual([items['dark-mode'].title, items['dark-mode'].happens, items['dark-mode'].about, items['dark-mode'].notes.map((n) => n.text)], ['Dark mode everywhere', 'Even at noon.', ['editing/theme'], ['From the other window.']]);
+  assert.deepEqual([items['dark-mode'].title, items['dark-mode'].description, items['dark-mode'].about, items['dark-mode'].notes.map((n) => n.text)], ['Dark mode everywhere', 'Even at noon.', ['editing/theme'], ['From the other window.']]);
   assert.equal(items[id].state, 'parked');
 }));
 

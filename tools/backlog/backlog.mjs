@@ -1,19 +1,21 @@
 #!/usr/bin/env node
-// The backlog's command line: list, show, add, note, move and link. Each write fetches the
+// The backlog's command line: list, show, add, edit, note, move and link. Each write fetches the
 // backlog's branch, replays onto its tip and pushes one commit; `--json` prints for agents.
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { runGit } from '../gate/lib/git.mjs';
 import { readConfig, resolveRepos, fetchRepo } from '../gate/lib/repos.mjs';
-import { SET_STATES, SECTIONS } from './lib/item.mjs';
+import { SET_STATES } from './lib/item.mjs';
 import { SHOWN_STATES, STATE_LABELS, withShownStates } from './lib/state.mjs';
 import { locateBacklog, fetchBacklog, readBacklog, writeBacklog } from './lib/store.mjs';
 
 const USAGE = `usage: node tools/backlog/backlog.mjs list [--state <${SHOWN_STATES.join('|')}>] [--json]
        node tools/backlog/backlog.mjs show <id> [--json]
-       node tools/backlog/backlog.mjs add <title> [--about <feature-id>]... [--happens <text>] [--should <text>] [--where <text>] [--json]
-       node tools/backlog/backlog.mjs note <id> <text>      (text - reads it from stdin)
+       node tools/backlog/backlog.mjs add <title> [--text <description>] [--about <feature-id>]... [--json]
+       node tools/backlog/backlog.mjs edit <id> [--title <title>] [--text <description>] [--about <feature-id>|none]... [--json]
+       node tools/backlog/backlog.mjs note <id> <text>
+  a description or a note given as - is read from stdin; edit's --about sets the whole list
        node tools/backlog/backlog.mjs move <id> <${SET_STATES.join('|')}>
        node tools/backlog/backlog.mjs link <id> <change-id>
   the backlog is backlog { repo, branch } in tools/gate/config.json; by default the branch
@@ -22,14 +24,13 @@ const USAGE = `usage: node tools/backlog/backlog.mjs list [--state <${SHOWN_STAT
 const COMMANDS = {
   list: { args: 0, options: ['--state', '--json'] },
   show: { args: 1, options: ['--json'] },
-  add: { args: 1, options: ['--about', '--happens', '--should', '--where', '--json'] },
+  add: { args: 1, options: ['--about', '--text', '--json'] },
+  edit: { args: 1, options: ['--title', '--text', '--about', '--json'] },
   note: { args: 2, options: [] },
   move: { args: 2, options: [] },
   link: { args: 2, options: [] },
 };
-const VALUED = ['--state', '--about', '--happens', '--should', '--where'];
-
-/** The parsed command line: `{ cmd, args, about, json, state?, happens?, should?, where?, help }`; throws on a bad one. */
+/** The parsed command line: `{ cmd, args, about, json, state?, title?, text?, help }`; throws on a bad one. */
 export function parseArgs(argv) {
   const [cmd, ...rest] = argv;
   const o = { cmd, args: [], about: [], json: false, help: false };
@@ -57,6 +58,8 @@ export function parseArgs(argv) {
   if (o.help) return o;
   if (o.args.length !== spec.args) throw new Error(`${cmd} takes ${spec.args === 0 ? 'no argument' : `${spec.args} argument${spec.args > 1 ? 's' : ''}`}`);
   if (o.state !== undefined && !SHOWN_STATES.includes(o.state)) throw new Error(`--state is one of ${SHOWN_STATES.join(', ')}`);
+  if (cmd === 'edit' && o.title === undefined && o.text === undefined && !o.about.length) throw new Error('edit needs --title, --text or --about');
+  if (o.about.includes('none') && o.about.length > 1) throw new Error('--about none sets no feature, so it stands alone');
   return o;
 }
 
@@ -102,27 +105,38 @@ function printItem(i, json) {
   if (i.about.length) out.push(`About: ${i.about.join(', ')}`);
   if (i.changes.length) out.push(`Changes: ${i.changes.map((c) => `${c.id} (${label(c.state)})`).join(', ')}`);
   for (const p of i.problems) out.push(`Problem: line ${p.line}: ${p.message}`);
-  for (const [key, heading] of SECTIONS) out.push('', heading, i[key] || '-');
-  out.push('', 'Notes');
+  out.push('', i.description || '(no description)', '', 'Notes');
   if (!i.notes.length) out.push('-');
   for (const n of i.notes) out.push(`${n.by} · ${n.at} UTC`, n.text, '');
   console.log(out.join('\n').trimEnd());
 }
 
-/** Sends one write; prints why nothing was sent and returns null when so, else its one result. */
-async function send({ where }, op) {
-  const w = await writeBacklog(where, [op]);
+/**
+ * Sends one write of `ops`; prints why nothing was sent and returns null when so, else
+ * `{ results, commit }`. A refused operation sends nothing: every write here is one request's.
+ */
+async function sendAll({ where }, ops) {
+  const w = await writeBacklog(where, ops);
   if (!w.ok) {
     console.error(`backlog: nothing was sent: ${w.error}`);
     return null;
   }
-  const r = w.results[0];
-  if (r.status === 'refused') {
-    console.error(`backlog: ${r.reason}`);
+  const refused = w.results.find((r) => r.status === 'refused');
+  if (refused) {
+    console.error(`backlog: ${refused.reason}`);
     return null;
   }
-  return { ...r, commit: w.commit };
+  return { results: w.results, commit: w.commit };
 }
+
+/** Sends one operation: its result with the commit, or null. */
+async function send(ctx, op) {
+  const w = await sendAll(ctx, [op]);
+  return w && { ...w.results[0], commit: w.commit };
+}
+
+/** A description or a note's text: `-` reads stdin. */
+const textArg = (v) => (v === '-' ? fs.readFileSync(0, 'utf8') : v);
 
 const short = (sha) => sha.slice(0, 7);
 
@@ -155,15 +169,28 @@ export async function main(argv, { cwd = process.cwd() } = {}) {
     return 0;
   }
   if (o.cmd === 'add') {
-    const r = await send(ctx, { op: 'add', title: o.args[0], about: o.about, happens: o.happens, should: o.should, where: o.where });
+    const r = await send(ctx, { op: 'add', title: o.args[0], about: o.about, description: textArg(o.text) });
     if (!r) return 1;
     console.log(o.json ? JSON.stringify({ id: r.id, commit: r.commit }) : r.id);
     return 0;
   }
   const [id, value] = o.args;
+  if (o.cmd === 'edit') {
+    // Every field given is one edit of one write; with no `from`, each sets its field whatever it holds.
+    const ops = [
+      ...(o.title !== undefined ? [{ op: 'edit', id, field: 'title', to: o.title }] : []),
+      ...(o.text !== undefined ? [{ op: 'edit', id, field: 'description', to: textArg(o.text) }] : []),
+      ...(o.about.length ? [{ op: 'edit', id, field: 'about', to: o.about.filter((a) => a !== 'none') }] : []),
+    ];
+    const w = await sendAll(ctx, ops);
+    if (!w) return 1;
+    const fields = w.results.filter((r) => r.status === 'applied').map((r) => r.op.field);
+    if (o.json) console.log(JSON.stringify({ id, commit: w.commit, fields }));
+    else console.log(fields.length ? `${id}: ${fields.join(', ')} edited (${short(w.commit)})` : `${id} holds that already; nothing sent`);
+    return 0;
+  }
   if (o.cmd === 'note') {
-    const text = value === '-' ? fs.readFileSync(0, 'utf8') : value;
-    const r = await send(ctx, { op: 'note', id, text });
+    const r = await send(ctx, { op: 'note', id, text: textArg(value) });
     if (!r) return 1;
     console.log(`${id}: note sent (${short(r.commit)})`);
     return 0;

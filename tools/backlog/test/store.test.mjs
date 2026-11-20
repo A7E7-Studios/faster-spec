@@ -13,9 +13,7 @@ const REQUEST = {
   op: 'add',
   title: 'Export a note as PDF',
   about: ['editing/export'],
-  happens: 'Sharing a note sends a link only.',
-  should: 'Share offers PDF.',
-  where: 'The share sheet on a note.',
+  description: 'Sharing a note sends a link only.\n\nThe share sheet could offer PDF.',
 };
 const at = (dir) => ({ dir, branch: 'backlog' });
 const item = (dir, id, ref = 'origin/backlog') => parseItem(show(dir, ref, `backlog/${id}.md`), { id });
@@ -127,7 +125,7 @@ test('a write leaves main and every checkout untouched', () => withTmp(async (tm
   const id = add.results[0].id;
   for (const ops of [
     [{ op: 'note', id, text: 'A note.' }],
-    [{ op: 'edit', id, field: 'where', from: 'The share sheet on a note.', to: 'The share sheet.' }],
+    [{ op: 'edit', id, field: 'description', from: REQUEST.description, to: 'The share sheet could offer PDF.' }],
     [{ op: 'move', id, from: 'new', to: 'ready' }],
     [{ op: 'link', id, change: 'export-pdf' }],
   ]) {
@@ -158,23 +156,15 @@ about:
 change:
 ---
 
-## What happens
-
 Sharing a note sends a link only.
 
-## What should happen
-
-Share offers PDF.
-
-## Where
-
-The share sheet on a note.
+The share sheet could offer PDF.
 
 ## Notes
 `);
   const i = item(dir, 'export-a-note-as-pdf');
   assert.deepEqual(i.problems, []);
-  assert.deepEqual([i.title, i.by, i.created, i.state, i.about], ['Export a note as PDF', 'Pat Example', '2026-11-19', 'new', ['editing/export']]);
+  assert.deepEqual([i.title, i.by, i.created, i.state, i.about, i.description], ['Export a note as PDF', 'Pat Example', '2026-11-19', 'new', ['editing/export'], REQUEST.description]);
 }));
 
 test('a note is appended with its author and time', () => withTmp(async (tmp) => {
