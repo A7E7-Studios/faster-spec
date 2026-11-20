@@ -43,9 +43,9 @@ The self-check on main runs once, before round 1, and skips checks 1 (correct), 
 
 ## Review
 
-At a desk: read ship steps 3.4, 5.3, 5.4 and 6.3, the spec skill's facts step, and the proposal and
-tasks templates. After CueReview's next sync, compare the rounds of its next few pull requests with the
-three these took.
+At a desk: read ship steps 3.4, 5.3, 5.4 and 6.3, the spec skill's facts step, and the proposal
+and tasks templates. After CueReview's next sync, compare the rounds of its next few pull requests
+with the three these took.
 
 ## Settled questions
 
