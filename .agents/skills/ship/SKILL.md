@@ -1,6 +1,6 @@
 ---
 name: ship
-description: Build an approved change end to end and merge it - worktree, sub-agents per independent task, existing code reused before new code is written, a test per scenario, the suites AGENTS.md names, docs, the review reset, the formality gate, a self-check, a pull request, review rounds by fresh sub-agents until one finds no blocker or major, every finding fixed or answered, the branch brought up to date with main, then a squash merge. Use when the owner says to build, implement, ship or merge a specified change, a refactor, tooling or docs change that needs no change folder, or a results branch from triage.
+description: Build an approved change end to end and merge it - worktree, sub-agents per independent task, existing code reused before new code is written, a test per scenario, the suites AGENTS.md names, docs, the review reset, the formality gate, a self-check of the whole change, a pull request, review rounds by fresh sub-agents until one finds no blocker or major, every finding fixed or answered and the fixes self-checked, the branch brought up to date with main, then a squash merge. Use when the owner says to build, implement, ship or merge a specified change, a refactor, tooling or docs change that needs no change folder, or a results branch from triage.
 ---
 
 # Ship a change
@@ -57,8 +57,8 @@ independent review are clean. Formats: `specs/README.md`, `changes/README.md`.
    on. A red suite: rerun it alone once. Still red: run the same test on `origin/main`. Red there
    too, it is pre-existing: record main's result in `## Tests`; it does not block. Green there, it
    blocks: fix it.
-4. **Self-check.** Before round 1, run the review checklist's checks 3 and 5–14 on your branch
-   (12 and 14 on the pull request body §4 writes), and fix what they find.
+4. **Self-check.** Before round 1, run every check of the review checklist on your branch (12 and
+   14 on the pull request body §4 writes), and fix what they find.
 
 ## 4. Pull request
 
@@ -88,7 +88,9 @@ A change with a side in the other repository: open both pull requests, each link
 2. Every finding, a follow-up included: **fix** it, or **answer** it with a reason that cites the
    code, a scenario or a rule. An answer is for a finding that is wrong; work you would rather skip
    is no reason.
-3. Commit, gate, rerun the suites the fixes touch, push, and record the round in `## Review`:
+3. Commit, gate, rerun the suites the fixes touch, and **self-check the fixes**: every check of
+   the review checklist on `git diff <head last reviewed>..HEAD`, as its *Round 2 and later*
+   reviews them; fix what they find. Then push, and record the round in `## Review`:
    `R1 F2 [minor] <finding> → fixed`, or `→ answered: <reason>`. Name no commit there:
    `## Tests` names the head, once.
 4. Review again with a fresh reviewer, round by round, while the last round returns

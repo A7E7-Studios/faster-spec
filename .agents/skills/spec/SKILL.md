@@ -20,7 +20,9 @@ folders, and which pull requests need one).
   (`git ls-tree -d --name-only origin/main changes/`), branches (`git ls-remote --heads origin`) and
   open pull requests (`gh pr list`). The change id is free on main and as a branch; a change that
   triage opened keeps the id triage gave it.
-- **The code** the request touches, and the rules AGENTS.md sets for it.
+- **The code** the request touches, and the rules AGENTS.md sets for it. List every code path each
+  requirement covers: each caller of what it changes, each entry point that reaches the behaviour.
+  The proposal's `## What changes` names them, and the tasks give each its own task and test.
 - **The other repository** AGENTS.md names: does the request need its side too?
 - **The kind of change**, by `changes/README.md`'s table:
   - no folder needed (a refactor, tooling only, docs only): hand it to **ship** and stop.

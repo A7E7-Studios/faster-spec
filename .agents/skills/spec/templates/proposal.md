@@ -18,7 +18,7 @@ sentences.>
 ## What changes
 
 - <One observable change per line. The spec edits carry the detail; name the scenario each one
-  becomes.>
+  becomes, and every code path it covers.>
 
 ## Review
 
