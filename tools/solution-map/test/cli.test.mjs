@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { resolveRepos } from '../lib/sources.mjs';
+import { resolveRepos } from '../../gate/lib/repos.mjs';
 import { parseArgs, DEFAULT_PORT } from '../solution-map.mjs';
 
 test('reads the repositories from the config or the command line', () => {

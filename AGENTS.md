@@ -29,6 +29,7 @@ cd tools/overview && npm test
 cd tools/kit && npm test
 cd tools/setup-agents && npm test
 cd tools/solution-map && npm test
+cd tools/backlog && npm test
 node tools/gate/gate.mjs --local
 ```
 
@@ -49,7 +50,7 @@ The workflow is the one the kit ships: [specs/README.md](specs/README.md),
 |---|---|
 | Where the owner reviews | at a desk: a tool's output at a computer, a gate run on GitHub |
 | A build | a commit of this repository: `build <short sha>`, its commit that sha |
-| Looks | only the Solution map draws a page: its spec's board, `specs/overview/solution-map/looks/`, drawn from the page's own views; the other specs have no `## Looks`, and the kit has no `design` block |
+| Looks | only the Solution map draws a page: the boards of its own spec and of its launcher's, whose banner the map's page draws (`specs/overview/solution-map/looks/`, `specs/overview/map-launcher/looks/`), drawn from the page's own views; the other specs have no `## Looks`, and the kit has no `design` block |
 | The other repository | none; a project that carries the kit is no side of a kit change |
 
 - **Every behaviour change carries a change folder** and edits the living spec in the same pull

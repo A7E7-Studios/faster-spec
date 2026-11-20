@@ -14,6 +14,8 @@ sentences.>
 
 - Feedback, when a review found it: one line per remark, each with the owner's words, its time
   (<m:ss>), the review session's id and the feature it concerns. Drop the list otherwise.
+- The request, when it came from the backlog (`backlog:<request-id>`): who asked and when, then
+  the request and each note with its author and time, quoted word for word. Drop it otherwise.
 
 ## What changes
 

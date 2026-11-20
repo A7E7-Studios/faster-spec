@@ -1,19 +1,21 @@
 // The page's views: pure functions from the view model and the page's state to HTML strings.
-// The page (app.mjs) and the tests both import this module; it touches no DOM.
+// The page (app.mjs) and the tests both import this module; it touches no DOM. The backlog's own
+// views are in backlog.mjs.
+import { esc, md, ICON, banner } from './html.mjs';
+import { backlogOn, backlogBody, backlogBanners, featureRequests, suggestButton, tray, waitingRequests } from './backlog.mjs';
 
-/** @typedef {{ tab: 'waiting'|'explore'|'search', group: 'domain'|'system', sel: string|null, q: string }} Ui */
+export { esc, md };
 
-const ICON = {
-  unreviewed: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.6" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="8" cy="8" r="3" fill="currentColor"/></svg>',
-  approved: '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7.5" fill="currentColor"/><path d="M4.8 8.3l2.2 2.2 4.2-4.6" stroke="var(--sheet)" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-  'changes-requested': '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 .8l7.2 13.4H.8z" fill="currentColor"/><path d="M8 5.6v4" stroke="var(--sheet)" stroke-width="1.8" stroke-linecap="round"/><circle cx="8" cy="12" r="1" fill="var(--sheet)"/></svg>',
-};
+/**
+ * @typedef {{ tab: 'waiting'|'explore'|'search'|'backlog', group: 'domain'|'system', sel: string|null, q: string,
+ *   req?: string|null, add?: { about: string[] }|null, closed?: boolean }} Ui
+ * `req` is the request open in its dialog and `add` the create form, over whichever view `tab` is;
+ * `closed` shows Done and Parked on the board.
+ */
+
 const WORD = { unreviewed: 'Unreviewed', approved: 'Approved', 'changes-requested': 'Changes requested' };
 const WORST = ['changes-requested', 'unreviewed', 'approved'];
 
-export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-/** Inline Markdown a spec keeps (`code`, **bold**, *emphasis*), escaped. */
-export const md = (s) => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*]+)\*/g, '$1<i>$2</i>');
 const stt = (s) => `<span class="stt ${s}">${ICON[s]}${WORD[s]}</span>`;
 const ic = (s) => `<span class="ic ${s}" title="${WORD[s]}">${ICON[s]}</span>`;
 const repoChip = (r) => `<span class="repo">${esc(r)}</span>`;
@@ -30,12 +32,19 @@ const pr = (n) => n ? `#${esc(n)}` : '';
 /**
  * The page's state from an address. A feature id is `<domain>/<capability>`, so it reads as two
  * path segments: `/waiting/<id>`, `/explore/<id>`, `/explore/by-system/<system>/<id>`,
- * `/search/<id>?q=`.
+ * `/search/<id>?q=`. The backlog's: `/backlog`, a request `/backlog/<id>`, and the create form
+ * `/backlog/new?about=<feature>`, each over the board.
  */
 export function parseLocation(pathname, search = '') {
   const parts = pathname.split('/').filter(Boolean).map(decodeURIComponent);
-  const q = new URLSearchParams(search).get('q') || '';
+  const params = new URLSearchParams(search);
+  const q = params.get('q') || '';
   const id = (from) => parts.slice(from).join('/') || null;
+  if (parts[0] === 'backlog') {
+    const at = { tab: 'backlog', group: 'domain', sel: null, q: '' };
+    if (parts[1] === 'new' && parts.length === 2) return { ...at, add: { about: params.getAll('about').filter(Boolean) } };
+    return parts[1] ? { ...at, req: id(1) } : at;
+  }
   if (parts[0] === 'search') return { tab: q ? 'search' : 'waiting', group: 'domain', sel: id(1), q };
   if (parts[0] === 'explore') {
     if (parts[1] === 'by-system') return { tab: 'explore', group: 'system', sel: id(3), q: '' };
@@ -44,10 +53,16 @@ export function parseLocation(pathname, search = '') {
   return { tab: 'waiting', group: 'domain', sel: parts[0] === 'waiting' ? id(1) : null, q: '' };
 }
 
-/** The address of a state; `parseLocation(pathFor(ui))` gives the state back. */
+/**
+ * The address of a state; `parseLocation(pathFor(ui))` gives the state back. A dialog's address
+ * names the dialog, whichever view is under it, and opens it over the board.
+ */
 export function pathFor(ui, vm) {
   const f = ui.sel && vm?.features[ui.sel];
   const enc = (s) => String(s).split('/').map(encodeURIComponent).join('/');
+  if (ui.add) return `/backlog/new${(ui.add.about ?? []).map((a, i) => `${i ? '&' : '?'}about=${enc(a)}`).join('')}`;
+  if (ui.req) return `/backlog/${encodeURIComponent(ui.req)}`;
+  if (ui.tab === 'backlog') return '/backlog';
   if (ui.tab === 'search') return `/search${f ? '/' + enc(ui.sel) : ''}?q=${encodeURIComponent(ui.q)}`;
   if (ui.tab === 'explore') {
     if (ui.group === 'system') return f ? `/explore/by-system/${enc(f.systems[0]?.id || 'none')}/${enc(ui.sel)}` : '/explore/by-system';
@@ -100,11 +115,27 @@ function topBar(vm, ui, st) {
     + `<button class="s-btn icon" data-act="theme" title="Light or dark">◐</button></header>`;
 }
 
+/**
+ * What the map-update banner says: a newer map is on main, then how the restart goes (`st.restart`).
+ * Restart waits while Submit sends (`st.submitting`).
+ */
+function restartLine(st) {
+  const r = st.restart;
+  const offer = `<button class="s-btn" data-act="restart"${st.submitting ? ' disabled title="Submit is sending your drafts"' : ''}>Restart to update</button>`;
+  if (r?.phase === 'asking' || r?.phase === 'restarting') return ['Restarting the map… The page reloads when it is back.', ''];
+  if (r?.phase === 'late') return ['The map didn’t come back within 30 seconds. The page keeps trying; if it stays away, start the map again from its shortcut.', ''];
+  if (r?.phase === 'error') return [`The map couldn’t restart: <span class="mono">${esc(r.error)}</span>`, offer];
+  return ['A newer map is on main.', offer];
+}
+
 /** One line per banner: what is missing, what still shows, what to do. */
-export function banners(vm) {
+export function banners(vm, st = {}) {
   return vm.banners.map((b) => {
     let text, act = '', tone = '';
-    if (b.kind === 'stale') {
+    if (b.kind === 'map-update') {
+      [text, act] = restartLine(st);
+      if (st.restart?.phase === 'late' || st.restart?.phase === 'error') tone = 'req';
+    } else if (b.kind === 'stale') {
       text = `Couldn’t fetch <b>${esc(b.name)}</b>. It shows its main as last fetched, ${when(b.fetchedAt)}${b.commit ? ` (<span class="mono">${short(b.commit)}</span>)` : ''}.`;
       act = '<button class="s-btn" data-act="refresh">Try again</button>';
     } else if (b.kind === 'missing') {
@@ -125,7 +156,7 @@ export function banners(vm) {
       tone = 'req';
       text = `The overview couldn’t be built: <span class="mono">${esc(b.message)}</span>`;
     } else return '';
-    return `<div class="banner ${tone}" role="status"><span class="bt">${text}</span>${act}</div>`;
+    return banner(text, act, tone);
   }).join('');
 }
 
@@ -136,9 +167,14 @@ function filters(vm, ui) {
     + `<span class="fchip">${ic('approved')}<b>${t.approved}</b> approved</span><span class="s-sep"></span>${cov([t.tested, t.scenarios], 'scenarios tested')}</div>`;
 }
 
-function tabs(vm, ui, found) {
-  const tab = (id, label, n) => `<button class="s-tab ${ui.tab === id ? 'on' : ''}" data-tab="${id}">${label} <span class="n">${n}</span></button>`;
-  return `<nav class="s-tabs">${tab('waiting', 'Waiting for you', vm.waiting.length)}${tab('explore', 'Explore', vm.totals.features)}${ui.q ? tab('search', `Results for “${esc(ui.q)}”`, found.length) : ''}</nav>`;
+/** The New requests waiting for the owner beside the features: none without a backlog. */
+const newRequests = (st) => (backlogOn(st.backlog) ? st.backlog.waiting : []);
+
+function tabs(vm, ui, found, st) {
+  const tab = (id, label, n) => `<button class="s-tab ${ui.tab === id ? 'on' : ''}" data-tab="${id}"${ui.tab === id ? ' aria-current="page"' : ''}>${label} <span class="n">${n}</span></button>`;
+  const bk = st.backlog;
+  const backlog = backlogOn(bk) || ui.tab === 'backlog' ? tab('backlog', 'Backlog', backlogOn(bk) ? bk.totals.open : 0) : '';
+  return `<nav class="s-tabs">${tab('waiting', 'Waiting for you', vm.waiting.length + newRequests(st).length)}${tab('explore', 'Explore', vm.totals.features)}${backlog}${ui.q ? tab('search', `Results for “${esc(ui.q)}”`, found.length) : ''}</nav>`;
 }
 
 function looksBlock(f, inReview) {
@@ -198,25 +234,26 @@ function codeBlock(f) {
 
 function reviewBtn(id) { return `<button class="s-btn primary" data-review="${esc(id)}" title="Opens CueReview to record your review">▶ Start review</button>`; }
 
-/** A feature waiting for the owner. */
-export function reviewBody(vm, id, ui) {
+/** A feature waiting for the owner. `st.backlog` adds Suggest a change and its open requests. */
+export function reviewBody(vm, id, ui, st = {}) {
   const f = vm.features[id];
   return `<div class="d-head"><div class="d-title"><div class="row"><h2 class="s-h1">${esc(f.title)}</h2>${stt(f.review)}</div><div class="s-meta">${meta(f)}</div></div>`
-    + `<div class="s-actions">${reviewBtn(id)}${ui.tab === 'waiting' ? '<span class="s-faint"><kbd>j</kbd> <kbd>k</kbd></span>' : ''}</div></div>`
+    + `<div class="s-actions">${suggestButton(st.backlog, id)}${reviewBtn(id)}${ui.tab === 'waiting' ? '<span class="s-faint"><kbd>j</kbd> <kbd>k</kbd></span>' : ''}</div></div>`
     + (ui.started === id ? reviewStarted(vm, id) : '')
     + problemsBox(f)
-    + `<p class="s-sum">${md(f.summary)}</p><h3 class="s-h2">Looks</h3>${looksBlock(f, true)}`
+    + `<p class="s-sum">${md(f.summary)}</p>${featureRequests(st.backlog, id)}<h3 class="s-h2">Looks</h3>${looksBlock(f, true)}`
     + `<div class="a-two">${reviewNote(f)}<div>${sinceBox(f)}</div></div>`;
 }
 
 /** Any feature: an approved one shows what it does, a waiting one its review. */
-export function featurePage(vm, id, ui) {
+export function featurePage(vm, id, ui, st = {}) {
   const f = vm.features[id];
-  if (f.review !== 'approved') return reviewBody(vm, id, ui) + behaviour(f) + codeBlock(f);
+  if (f.review !== 'approved') return reviewBody(vm, id, ui, st) + behaviour(f) + codeBlock(f);
+  const suggest = suggestButton(st.backlog, id);
   return `<div class="d-head"><div class="d-title"><div class="row"><h2 class="s-h1">${esc(f.title)}</h2>${stt(f.review)}</div>`
-    + `<div class="s-meta">${meta(f)}${f.reviewed?.date ? `<span>Approved ${date(f.reviewed.date)}${f.reviewed.pr ? ' in ' + pr(f.reviewed.pr) : ''}</span>` : ''}</div></div></div>`
+    + `<div class="s-meta">${meta(f)}${f.reviewed?.date ? `<span>Approved ${date(f.reviewed.date)}${f.reviewed.pr ? ' in ' + pr(f.reviewed.pr) : ''}</span>` : ''}</div></div>${suggest ? `<div class="s-actions">${suggest}</div>` : ''}</div>`
     + problemsBox(f)
-    + `<h3 class="s-h2">Summary</h3><p class="s-sum">${md(f.summary)}</p><h3 class="s-h2">Looks</h3>${looksBlock(f, false)}`
+    + `<h3 class="s-h2">Summary</h3><p class="s-sum">${md(f.summary)}</p>${featureRequests(st.backlog, id)}<h3 class="s-h2">Looks</h3>${looksBlock(f, false)}`
     + behaviour(f) + codeBlock(f);
 }
 
@@ -233,21 +270,26 @@ function emptyProject(vm) {
     + (vm.systems.length ? '<button class="s-btn primary" data-group="system">See the systems</button>' : '') + '</div>';
 }
 
-function zeroBody(vm) {
+/** Every feature approved: what is worth a look next. `requests` waits too, so nothing waiting is said only without one. */
+function zeroBody(vm, requests = 0) {
   const t = vm.totals;
   const untested = Object.values(vm.features).flatMap((f) => f.requirements.flatMap((r) => r.scenarios.filter((s) => !s.tested).map((s) => ({ f, s }))));
   const SHOWN = 8;
   const items = untested.slice(0, SHOWN).map(({ f, s }) => `<li><button class="s-link plain" data-open="${esc(f.id)}">${esc(s.name)}</button> <span class="s-faint">${esc(f.title)}</span></li>`).join('');
   const more = untested.length > SHOWN ? `<p class="s-faint">and ${untested.length - SHOWN} more, each marked untested in its feature’s Behaviour.</p>` : '';
-  return `<div class="zero"><span class="zic">${ICON.approved}</span><h2 class="s-h1">Nothing waits for you</h2><p>All ${t.features} features are approved.</p>`
+  const head = requests ? `No feature waits for your review</h2><p>All ${t.features} features are approved. ${requests === 1 ? 'One new request waits' : `${requests} new requests wait`} in the list.</p>`
+    : `Nothing waits for you</h2><p>All ${t.features} features are approved.</p>`;
+  return `<div class="zero"><span class="zic">${ICON.approved}</span><h2 class="s-h1">${head}`
     + (untested.length ? `<div class="box"><div class="bh">Next worth a look: scenarios without a test</div><div>${t.scenarios - t.tested} of ${t.scenarios} scenarios have no test yet. They don’t need your verdict, but a regression there would go unnoticed.</div><ul class="untested">${items}</ul>${more}</div>` : '<p>Every scenario has a test.</p>')
     + '</div>';
 }
 
-function waitingTab(vm, ui) {
-  if (!vm.totals.features) return `<div class="a-ld"><aside class="a-list"><div class="a-none">No features yet.</div></aside><section class="a-detail">${emptyProject(vm)}</section></div>`;
-  if (!vm.waiting.length) return `<div class="a-ld"><aside class="a-list"><div class="a-none">Nothing waits. A feature shows up here when a change to it lands on main.</div></aside><section class="a-detail">${zeroBody(vm)}</section></div>`;
-  return `<div class="a-ld"><aside class="a-list"><div class="s-sect"><span>Newest change first</span><span>${vm.waiting.length}</span></div>${vm.waiting.map((k) => itemLine(vm, k, ui)).join('')}</aside><section class="a-detail">${reviewBody(vm, ui.sel, ui)}</section></div>`;
+function waitingTab(vm, ui, st) {
+  const reqs = newRequests(st);
+  const asked = reqs.length ? `<div class="s-sect"><span>New requests</span><span>${reqs.length}</span></div>${waitingRequests(st.backlog)}` : '';
+  if (!vm.totals.features) return `<div class="a-ld"><aside class="a-list">${asked}<div class="a-none">No features yet.</div></aside><section class="a-detail">${emptyProject(vm)}</section></div>`;
+  if (!vm.waiting.length) return `<div class="a-ld"><aside class="a-list">${asked}<div class="a-none">${reqs.length ? 'No feature waits.' : 'Nothing waits.'} A feature shows up here when a change to it lands on main.</div></aside><section class="a-detail">${zeroBody(vm, reqs.length)}</section></div>`;
+  return `<div class="a-ld"><aside class="a-list">${asked}<div class="s-sect"><span>${reqs.length ? 'Features' : 'Newest change first'}</span><span>${vm.waiting.length}</span></div>${vm.waiting.map((k) => itemLine(vm, k, ui)).join('')}</aside><section class="a-detail">${reviewBody(vm, ui.sel, ui, st)}</section></div>`;
 }
 
 function capBtn(vm, id, ui) {
@@ -255,7 +297,7 @@ function capBtn(vm, id, ui) {
   return `<button class="a-cap ${ui.sel === id ? 'sel' : ''}" data-sel="${esc(id)}">${ic(f.review)}<span class="nm">${esc(f.title)}</span>${f.problems.length ? `<span class="ic changes-requested" title="Format problems">${ICON['changes-requested']}</span>` : ''}${f.waiting ? '<span class="wbadge">waiting</span>' : ''}<span class="cnt">${f.tested[0]}/${f.tested[1]} tested</span></button>`;
 }
 
-function exploreTab(vm, ui) {
+function exploreTab(vm, ui, st) {
   const toggle = `<div class="a-grp"><span class="lbl">Group by</span><span class="seg"><button data-group="domain" aria-pressed="${ui.group === 'domain'}">Domain</button><button data-group="system" aria-pressed="${ui.group === 'system'}">System</button></span></div>`;
   let list;
   if (ui.group === 'system') {
@@ -270,7 +312,7 @@ function exploreTab(vm, ui) {
     }).join('') || '<div class="a-none">No features yet.</div>';
   }
   const noSystem = `<div class="zero"><h2 class="s-h1">No feature ships in a system yet</h2><p>${vm.systems.length ? 'The systems’ paths cover none of the features’ code' : 'The project declares no systems in <span class="mono">specs/systems.json</span>'}, so there is nothing to group by system.</p><button class="s-btn primary" data-group="domain">Group by domain</button></div>`;
-  const detail = ui.sel && vm.features[ui.sel] ? featurePage(vm, ui.sel, ui) : vm.totals.features ? noSystem : emptyProject(vm);
+  const detail = ui.sel && vm.features[ui.sel] ? featurePage(vm, ui.sel, ui, st) : vm.totals.features ? noSystem : emptyProject(vm);
   return `<div class="a-ld"><aside class="a-list">${toggle}${list}</aside><section class="a-detail">${detail}</section></div>`;
 }
 
@@ -281,20 +323,21 @@ const markQ = (s, q) => {
   return esc((from ? '…' : '') + s.slice(from, i)) + '<mark>' + esc(s.slice(i, i + q.length)) + '</mark>' + esc(s.slice(i + q.length));
 };
 
-function searchTab(vm, ui, found) {
+function searchTab(vm, ui, found, st) {
   const q = ui.q.trim();
   if (!found.length) return `<div class="a-ld"><aside class="a-list"><div class="a-none">No feature matches “${esc(q)}” in its title, summary, requirements, scenarios or systems.</div></aside><section class="a-detail"></section></div>`;
   const items = found.map(([k, where, text]) => `<button class="a-res ${ui.sel === k ? 'sel' : ''}" data-sel="${esc(k)}"><span class="t">${ic(vm.features[k].review)}${where === 'Title' ? markQ(vm.features[k].title, q) : esc(vm.features[k].title)}<span class="s-faint">${esc(vm.features[k].domainTitle)}</span></span>${where === 'Title' ? '' : `<span class="x"><span class="s-faint">${where}: </span>${markQ(text, q)}</span>`}</button>`).join('');
-  return `<div class="a-ld"><aside class="a-list"><div class="s-sect"><span>Features</span><span>${found.length}</span></div>${items}</aside><section class="a-detail">${featurePage(vm, ui.sel, ui)}</section></div>`;
+  return `<div class="a-ld"><aside class="a-list"><div class="s-sect"><span>Features</span><span>${found.length}</span></div>${items}</aside><section class="a-detail">${featurePage(vm, ui.sel, ui, st)}</section></div>`;
 }
 
 /**
  * Settles the selection for a state: the selected feature if it is in view, else the first one.
- * Returns a new state.
+ * The board selects no feature. Returns a new state.
  */
 export function settle(vm, ui) {
   const u = { ...ui };
   if (u.tab === 'search' && !u.q.trim()) u.tab = 'waiting';
+  if (u.tab === 'backlog') return u;
   const pool = u.tab === 'waiting' ? vm.waiting
     : u.tab === 'search' ? searchFeatures(vm, u.q).map((x) => x[0])
     : u.group === 'system' ? vm.systems.flatMap((s) => s.features) : vm.byDomain.flatMap((d) => d.features);
@@ -302,10 +345,16 @@ export function settle(vm, ui) {
   return u;
 }
 
-/** The whole page for a view model and a state. `st` holds `{ refreshing }`. */
+/**
+ * The whole page for a view model and a state, a dialog aside (backlog.mjs `dialogView`). `st`
+ * holds `{ refreshing, backlog, submitting, submitBanner, draftsOpen, restart }`: `backlog` is the
+ * backlog's view model (lib/backlog-view.mjs), null until read.
+ */
 export function renderPage(vm, ui, st = {}) {
   const u = settle(vm, ui);
   const found = u.q ? searchFeatures(vm, u.q) : [];
-  const body = u.tab === 'explore' ? exploreTab(vm, u) : u.tab === 'search' ? searchTab(vm, u, found) : waitingTab(vm, u);
-  return topBar(vm, u, st) + banners(vm) + filters(vm, u) + tabs(vm, u, found) + body;
+  const body = u.tab === 'backlog' ? backlogBody(st.backlog, u)
+    : u.tab === 'explore' ? exploreTab(vm, u, st) : u.tab === 'search' ? searchTab(vm, u, found, st) : waitingTab(vm, u, st);
+  return topBar(vm, u, st) + banners(vm, st) + backlogBanners(st.backlog, st) + (u.tab === 'backlog' ? '' : filters(vm, u))
+    + tabs(vm, u, found, st) + body + tray(st.backlog, st, 'page');
 }

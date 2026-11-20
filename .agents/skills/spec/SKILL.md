@@ -1,6 +1,6 @@
 ---
 name: spec
-description: Turn a request for a new feature, a change in behaviour or a bug to fix into settled requirements - look up the facts, ask the owner rounds of numbered questions with options and a recommended answer until nothing is assumed, then write changes/<id>/proposal.md and the living-spec edits (Summary, requirements, scenarios and the tests that prove them) on a branch in its own worktree. Use when the owner asks for a feature, a new capability, a fix, or a change to how something behaves, looks or sounds, and when triage hands over the owner's feedback. Not for a refactor, a tooling-only or a docs-only change, which goes straight to ship.
+description: Turn a request for a new feature, a change in behaviour or a bug to fix into settled requirements - look up the facts, ask the owner rounds of numbered questions with options and a recommended answer until nothing is assumed, then write changes/<id>/proposal.md and the living-spec edits (Summary, requirements, scenarios and the tests that prove them) on a branch in its own worktree. Use when the owner asks for a feature, a new capability, a fix, or a change to how something behaves, looks or sounds, when triage hands over the owner's feedback, and on a request from the backlog (backlog:<request-id>). Not for a refactor, a tooling-only or a docs-only change, which goes straight to ship.
 ---
 
 # Spec a change
@@ -13,13 +13,18 @@ folders, and which pull requests need one).
 
 `git fetch origin`, then look up, before asking anything:
 
+- **The request**, on `backlog:<request-id>`:
+  `node tools/backlog/backlog.mjs show <request-id> --json`. Its request and notes are the
+  requester's words, its `about` the features it concerns, its `changes` parallel work. No such
+  request (exit 1): ask the owner for the id; `list` shows every request.
 - **Capabilities.** `specs/domains.json`, `specs/systems.json` and the specs near the request; the
   whole map: `node tools/overview/overview.mjs --repo <id>=. --summary`. Reuse a capability before
   creating one; a new one gets a kebab-case id under the domain that fits.
 - **Parallel work** on the same capabilities: change folders on main
   (`git ls-tree -d --name-only origin/main changes/`), branches (`git ls-remote --heads origin`) and
   open pull requests (`gh pr list`). The change id is free on main and as a branch; a change that
-  triage opened keeps the id triage gave it.
+  triage opened keeps the id triage gave it, and one from the backlog takes the request's id when
+  that is free.
 - **The code** the request touches, and the rules AGENTS.md sets for it.
 - **The other repository** AGENTS.md names: does the request need its side too?
 - **The kind of change**, by `changes/README.md`'s table:
@@ -80,7 +85,8 @@ a line into the last bullet.
 2. **`changes/<id>/proposal.md`** from `templates/proposal.md`: every question of the rounds under
    Settled questions, every decision you took without asking under Calls for the owner, and
    `## Review` saying what the owner looks at and where. A change triage handed over keeps each
-   remark of the owner's in Why as text, as triage wrote it.
+   remark of the owner's in Why as text, as triage wrote it; one from the backlog quotes in Why the
+   request and each note, word for word, with who wrote it and when.
 3. **Spec edits** in `specs/<domain>/<capability>/spec.md`; a new capability starts from
    `templates/spec.md`. Keep to `specs/README.md` exactly: the gate refuses a front matter key
    other than `title`, `review` and `code`, a `##` section other than Summary, Looks and
@@ -108,6 +114,11 @@ a line into the last bullet.
 5. **Commit** in AGENTS.md's commit style (for example `docs(specs): specify <id>`) and push the
    branch. Open no pull request. The gate's path checks fail on this branch until ship creates the
    `code:` and `test:` paths; that is expected.
+6. **The request**, for a change from the backlog:
+   `node tools/backlog/backlog.mjs link <request-id> <id>`, then
+   `node tools/backlog/backlog.mjs note <request-id> "Specified as the change <id>."`. Move nothing:
+   the state it shows follows the change. A write that exits 1 sent nothing and says why on
+   stderr; tell the owner.
 
 ## 4. Hand over
 

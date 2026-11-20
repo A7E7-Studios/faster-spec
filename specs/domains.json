@@ -23,5 +23,10 @@
     "id": "agents",
     "title": "Agent skills and setup",
     "purpose": "The skills agents run every change with, and the setup that gives each checkout's agents the same skills."
+  },
+  {
+    "id": "requests",
+    "title": "Requests",
+    "purpose": "What people ask for before it becomes a change: the backlog, the discussion on each request, and what became of it."
   }
 ]

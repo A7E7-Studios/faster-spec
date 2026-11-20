@@ -1,7 +1,8 @@
-// Git access for the gate and the overview. Every read of a revision goes through git objects,
-// never the working tree: in CI the working tree is main's checkout and the PR head is data, and
-// the overview reads a repository at a ref whatever its checkout holds.
-import { spawnSync } from 'node:child_process';
+// Git access for the kit's tools. Every read of a revision goes through git objects, never the
+// working tree: in CI the working tree is main's checkout and the PR head is data, and the overview
+// reads a repository at a ref whatever its checkout holds. `gitAsync` runs git without waiting, for
+// the map and the backlog, which fetch and push while they serve.
+import { execFile, spawnSync } from 'node:child_process';
 import path from 'node:path';
 
 const MAX_BUFFER = 1 << 30;
@@ -30,6 +31,20 @@ export function runGit(cwd, args, { input, raw = false, allowFail = false, env }
     throw new Error(`git ${args.join(' ')} failed (exit ${r.status}): ${String(r.stderr ?? '').trim()}`);
   }
   return r.stdout;
+}
+
+/** Runs git in a folder without waiting; resolves `{ ok, out, err }` (`out` a Buffer), never rejects. */
+export function gitAsync(dir, args, { timeout = 20000 } = {}) {
+  return new Promise((resolve) => {
+    execFile('git', ['-C', dir, ...args], { timeout, windowsHide: true, maxBuffer: 64 * 1024 * 1024, encoding: 'buffer' }, (e, out, err) => {
+      resolve({ ok: !e, out, err: String(err || (e && e.message) || '') });
+    });
+  });
+}
+
+/** The last line of git's output, trimmed: what a failure says. `fallback` when there is none. */
+export function lastLine(s, fallback = '') {
+  return String(s ?? '').trim().split('\n').pop().trim() || fallback;
 }
 
 /**
