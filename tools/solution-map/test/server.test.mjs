@@ -385,7 +385,7 @@ test('submit sends every draft as one commit', () => withTmp(async (tmp) => {
   const id = (await writeBacklog(at(sam), [{ op: 'add', title: 'Sync notes offline' }])).results[0].id;
   const s = await serveBacklog(pat);
   try {
-    const add = (await write(s, '/api/drafts', { save: { op: 'add', title: 'Dark mode', happens: 'The app is white at night.', should: 'It follows the system.', where: 'Every screen.', about: ['editing/theme'] } })).draft;
+    const add = (await write(s, '/api/drafts', { save: { op: 'add', title: 'Dark mode', description: 'The app is white at night; it could follow the system.', about: ['editing/theme'] } })).draft;
     await write(s, '/api/drafts', { save: { op: 'note', ref: add.key, text: 'For night shifts.' } });
     await write(s, '/api/drafts', { save: { op: 'move', ref: add.key, to: 'ready' } });
     const drafted = await write(s, '/api/drafts', { save: { op: 'note', id, text: 'Offline matters most.' } });
@@ -402,7 +402,7 @@ test('submit sends every draft as one commit', () => withTmp(async (tmp) => {
     const b = await backlogOf(s);
     assert.deepEqual([b.drafts, b.totals.unsent, b.status], [[], 0, 'current']);
     const dark = b.requests['dark-mode'];
-    assert.deepEqual([dark.draft, dark.by, dark.state, dark.label, dark.happens], [false, 'Pat Example', 'ready', 'Ready', 'The app is white at night.']);
+    assert.deepEqual([dark.draft, dark.by, dark.state, dark.label, dark.description], [false, 'Pat Example', 'ready', 'Ready', 'The app is white at night; it could follow the system.']);
     assert.deepEqual(dark.notes.map((n) => [n.by, n.text, n.draft]), [['Pat Example', 'For night shifts.', false]]);
     assert.deepEqual(b.requests[id].notes.map((n) => n.text), ['Offline matters most.']);
     assert.deepEqual(readDrafts(pat), []);
@@ -626,7 +626,7 @@ test('a write from another page is refused', () => withTmp(async (tmp) => {
       assert.equal(await status(route, { 'x-solution-map': '1', 'content-type': 'application/x-www-form-urlencoded' }, 'save=1'), 415, route);
     }
     // Too big, or not JSON.
-    const big = JSON.stringify({ save: { op: 'add', title: 'Dark mode', happens: 'x'.repeat(MAX_BODY) } });
+    const big = JSON.stringify({ save: { op: 'add', title: 'Dark mode', description: 'x'.repeat(MAX_BODY) } });
     assert.equal(await status('/api/drafts', WRITE, big), 413);
     assert.equal(await status('/api/drafts', WRITE, '{"save":'), 400);
     assert.equal(await status('/api/drafts', WRITE, '[]'), 400);

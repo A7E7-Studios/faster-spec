@@ -1,9 +1,52 @@
 // The small pieces both view modules use: escaping, the inline Markdown a spec or a request keeps,
-// and the icons. Pure; touches no DOM.
+// a request's description as blocks, and the icons. Pure; touches no DOM.
 
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 /** Inline Markdown a spec keeps (`code`, **bold**, *emphasis*), escaped. */
 export const md = (s) => esc(s).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*]+)\*/g, '$1<i>$2</i>');
+
+const FENCE = /^ {0,3}(`{3,}|~{3,})/;
+const HEADING = /^ {0,3}#{1,6}[ \t]+(.*?)[ \t#]*$/;
+const ITEM = /^ {0,3}([-*+]|\d{1,9}[.)])[ \t]+(.*)$/;
+
+/**
+ * A request's description as the blocks its Markdown makes, escaped: paragraphs (a line break kept
+ * as one), lists, a heading as a bold line, a code fence as preformatted text; inline Markdown as
+ * `md` reads it. A heading stays a line of the text, never a heading of the page.
+ */
+export function mdBlocks(s) {
+  const out = [];
+  let para = [];
+  let list = null;
+  let code = null;
+  const endPara = () => { if (para.length) out.push(`<p>${para.map((l) => md(l.trim())).join('<br>')}</p>`); para = []; };
+  const endList = () => { if (list) out.push(`<${list.tag}>${list.items.map((i) => `<li>${md(i)}</li>`).join('')}</${list.tag}>`); list = null; };
+  for (const line of String(s ?? '').replace(/\r\n?/g, '\n').split('\n')) {
+    if (code) {
+      const f = FENCE.exec(line);
+      if (f && f[1][0] === code.fence[0] && f[1].length >= code.fence.length && !line.trim().slice(f[1].length).trim()) {
+        out.push(`<pre>${esc(code.lines.join('\n'))}</pre>`);
+        code = null;
+      } else code.lines.push(line);
+      continue;
+    }
+    const f = FENCE.exec(line);
+    const h = !f && HEADING.exec(line);
+    const li = !f && !h && ITEM.exec(line);
+    if (f || h || li || !line.trim()) endPara();
+    if (f || h || !line.trim() || (li && list && list.tag !== (/\d/.test(li[1]) ? 'ol' : 'ul'))) endList();
+    if (f) code = { fence: f[1], lines: [] };
+    else if (h) out.push(`<p class="mh">${md(h[1])}</p>`);
+    else if (li) (list ??= { tag: /\d/.test(li[1]) ? 'ol' : 'ul', items: [] }).items.push(li[2].trim());
+    else if (!line.trim()) continue;
+    else if (list) list.items[list.items.length - 1] += ` ${line.trim()}`;
+    else para.push(line);
+  }
+  if (code) out.push(`<pre>${esc(code.lines.join('\n'))}</pre>`);
+  endPara();
+  endList();
+  return out.join('');
+}
 
 const svg = (body) => `<svg viewBox="0 0 16 16" aria-hidden="true">${body}</svg>`;
 const RING = '<circle cx="8" cy="8" r="6.6" fill="none" stroke="currentColor" stroke-width="1.8"/>';

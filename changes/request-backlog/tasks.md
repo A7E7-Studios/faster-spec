@@ -50,11 +50,11 @@ nearest the code it changes.
 - [x] 6.2 `lib/ops.mjs`: `add` takes `description`; `edit` sets `title`, `description` or `about` only; test: tools/backlog/test/ops.test.mjs::an edit of who asked, when, a note or a change is refused
 - [x] 6.3 `backlog.mjs`: `add --text`, `edit <id> --title --text --about`, `show` prints the description; test: tools/backlog/test/cli.test.mjs::each write command sends one commit
 - [x] 6.4 `lib/backlog-view.mjs`: `description` in place of the three fields; test: tools/solution-map/test/backlog.test.mjs::an edit made in the dialog is a draft of that field
-- [ ] 6.5 The page: the create form's Description with its hint; the title, description and features edited in place, each a draft; test: tools/solution-map/test/view.test.mjs::an edited field shows its draft value in the request dialog
-- [ ] 6.6 Nothing edits who asked, when, notes or changes; test: tools/solution-map/test/view.test.mjs::who asked, when, notes and changes have no edit control
-- [ ] 6.7 READMEs of `tools/backlog/` and `tools/solution-map/`; compare the page with the boards; test: node tools/gate/gate.mjs --local
+- [x] 6.5 The page: the create form's Description with its hint; the title, description and features edited in place, each a draft; test: tools/solution-map/test/view.test.mjs::an edited field shows its draft value in the request dialog
+- [x] 6.6 Nothing edits who asked, when, notes or changes; test: tools/solution-map/test/view.test.mjs::who asked, when, notes and changes have no edit control
+- [x] 6.7 READMEs of `tools/backlog/` and `tools/solution-map/`; compare the page with the boards; test: node tools/gate/gate.mjs --local
 
 ## 7. The quality gate (after 1–6)
 
-- [ ] 7.1 Every suite in AGENTS.md's Quality gate, with `tools/backlog`; test: cd tools/backlog && npm test
-- [ ] 7.2 The formality gate; test: node tools/gate/gate.mjs --local
+- [x] 7.1 Every suite in AGENTS.md's Quality gate, with `tools/backlog`; test: cd tools/backlog && npm test
+- [x] 7.2 The formality gate; test: node tools/gate/gate.mjs --local

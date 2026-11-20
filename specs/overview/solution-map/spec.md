@@ -29,6 +29,7 @@ request, and whenever you want to see what the product does.
 - looks/backlog.html#request-narrow — The dialog on a narrow screen
 - looks/backlog.html#request-new — A new request from Suggest a change
 - looks/backlog.html#feature-requests — A feature with its open requests
+- looks/backlog-drafts.html#request-edit — A request edited in place, its changes waiting as drafts
 - looks/backlog-drafts.html#drafts-unsent — The unsent drafts and Submit
 - looks/backlog-drafts.html#submit-clash — A draft held after Submit, both values shown
 - looks/backlog-drafts.html#submit-unreachable — Submit could not reach the backlog

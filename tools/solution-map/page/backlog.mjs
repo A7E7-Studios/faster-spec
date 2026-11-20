@@ -1,8 +1,9 @@
 // The backlog's views: pure functions from the backlog's view model (lib/backlog-view.mjs), the
-// map's view model and the page's state to HTML strings: the board, a request's dialog, the create
-// form, the unsent line and its drafts, the backlog's banners, a feature's requests and the New
-// requests that wait. view.mjs puts them in the page; app.mjs wires their events. No DOM here.
-import { esc, md, ICON, banner } from './html.mjs';
+// map's view model and the page's state to HTML strings: the board, a request's dialog with its
+// fields edited in place, the create form, the unsent line and its drafts, the backlog's banners, a
+// feature's requests and the New requests that wait. view.mjs puts them in the page; app.mjs wires
+// their events. No DOM here.
+import { esc, md, mdBlocks, ICON, banner } from './html.mjs';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /** A date the backlog writes, `YYYY-MM-DD` or `YYYY-MM-DD HH:MM` in UTC, as `12 Nov`. */
@@ -12,9 +13,10 @@ export function day(s) {
 }
 const minute = (s) => /\d{2}:\d{2}$/.exec(String(s ?? ''))?.[0] ?? null;
 
-/** The request's fields a person writes, with the words the page labels them by. */
-const FIELDS = [['happens', 'What happens'], ['should', 'What should happen'], ['where', 'Where']];
-const FIELD_WORD = { title: 'Title', about: 'Features', state: 'State', ...Object.fromEntries(FIELDS) };
+/** The words the page names a request's fields by. */
+const FIELD_WORD = { title: 'Title', description: 'Description', about: 'Features', state: 'State' };
+/** What the empty description asks for: what helps, never a form to fill. */
+export const DESCRIPTION_HINT = 'What you’d like, and why. For a problem: what happens, what you expected, and where.';
 const KIND = { add: 'New request', note: 'Note', move: 'Move', edit: 'Edit', link: 'Link' };
 
 const DTAG = '<span class="dtag">Draft</span>';
@@ -135,18 +137,62 @@ function problems(r) {
     + '<div class="s-faint">Nothing is sent to it until its file is fixed.</div></div>';
 }
 
+const featureLink = (f) => (f.exists ? `<a class="s-link" href="${esc(featurePath(f.id))}" data-open="${esc(f.id)}">${esc(f.title)}</a>` : `<span>${esc(f.title)}</span>`);
+
+/** Cancel and Done under a field opened in place; Done takes Ctrl or Cmd and Enter in the description. */
+const editActions = (field) => `<div class="ea"><button type="button" class="s-btn sm" data-edit-cancel="${field}">Cancel</button>`
+  + `<button class="s-btn sm primary"${field === 'description' ? ' aria-keyshortcuts="Control+Enter" title="Done (Ctrl+Enter)"' : ''}>Done</button></div>`;
+
+/** The title: a heading that opens for editing when clicked, or the field open, the heading kept for the dialog's name. */
+function titleBlock(r, can, open) {
+  const tag = r.drafted.title ? DTAG : '';
+  if (open) {
+    return `<h2 class="s-h1 vh" id="dlg-t" tabindex="-1">${esc(r.title)}</h2><form class="eo et" data-form="edit" data-field="title" data-id="${esc(r.id)}">`
+      + `<label class="vh" for="edit-title">Title</label><input id="edit-title" name="value" required value="${esc(r.title)}">${editActions('title')}</form>`;
+  }
+  // "Edit the title" describes the button, so the dialog, named by its heading, is named by the title alone.
+  const head = can ? `<button class="ed" data-edit="title" aria-describedby="dlg-te">${esc(r.title)}</button>` : esc(r.title);
+  return `<h2 class="s-h1" id="dlg-t" tabindex="-1">${head}${tag}</h2>${can ? '<span class="vh" id="dlg-te">Edit the title</span>' : ''}`;
+}
+
+/** The description: its Markdown as blocks, opened for editing by a click or its Edit button, or the field open. */
+function descriptionBlock(r, can, open) {
+  if (open) {
+    return `<form class="eo" data-form="edit" data-field="description" data-id="${esc(r.id)}"><label class="vh" for="edit-description">Description</label>`
+      + `<textarea id="edit-description" name="value" placeholder="${esc(DESCRIPTION_HINT)}">${esc(r.description)}</textarea>${editActions('description')}</form>`;
+  }
+  const text = r.description ? mdBlocks(r.description) : '';
+  if (!can) return text ? `<div class="ds">${text}</div>` : '';
+  const tag = r.drafted.description ? `<p>${DTAG}</p>` : '';
+  return `<div class="ed ds${r.drafted.description ? ' dft' : ''}" data-edit="description"><button class="s-btn sm eb" data-edit="description">Edit the description</button>`
+    + `${tag}${text || '<p class="s-faint">Add a description</p>'}</div>`;
+}
+
+/**
+ * The features a sent request names: chips that link to each, with Remove and Add when it can be
+ * edited, each change a draft; a feature the person added is outlined as one.
+ */
+function featureChips(vm, r, can) {
+  if (!can) return r.about.map((f) => `<dd>${featureLink(f)}</dd>`).join('');
+  const before = new Set(r.sent.about ?? r.about.map((f) => f.id));
+  const chips = r.about.map((f) => `<span class="tg${before.has(f.id) ? '' : ' dft'}">${featureLink(f)}<button type="button" data-about-drop="${esc(f.id)}" aria-label="Remove ${esc(f.title)}">×</button></span>`).join('');
+  return `<dd>${chips}${featureSelect(vm, r.about.map((f) => f.id), 'data-about-add')}</dd>`;
+}
+
 function requestDialog(vm, bk, r, st) {
-  const fields = FIELDS.filter(([k]) => r[k]).map(([k, l]) => `<dt>${l}</dt><dd class="pre">${md(r[k])}</dd>`).join('');
-  const features = r.about.map((f) => `<dd>${f.exists ? `<a class="s-link" href="${esc(featurePath(f.id))}" data-open="${esc(f.id)}">${esc(f.title)}</a>` : `<span>${esc(f.title)}</span>`}</dd>`).join('');
+  const can = !r.problems.length;
+  const open = st.editing?.req === r.id ? st.editing.field : null;
+  const features = featureChips(vm, r, can);
   const changes = r.changes.map((c) => `<dd><span class="mono">${esc(c.id)}</span>${c.draft ? DTAG : stateChip(c.state, c.label)}</dd>`).join('');
-  const details = (features ? `<dt>Features</dt>${features}` : '') + (changes ? `<dt>Changes</dt>${changes}` : '');
+  const details = (features ? `<dt>Features${r.drafted.about ? ` ${DTAG}` : ''}</dt>${features}` : '') + (changes ? `<dt>Changes</dt>${changes}` : '');
   const notes = r.notes.map(note).join('');
-  const composer = r.problems.length ? ''
-    : `<form class="cmp" data-form="note" data-id="${esc(r.id)}"><textarea id="note-text" name="text" aria-label="Add a note" placeholder="Add a note" required></textarea><button class="s-btn primary">Add note</button></form>`;
+  const composer = can
+    ? `<form class="cmp" data-form="note" data-id="${esc(r.id)}"><textarea id="note-text" name="text" aria-label="Add a note" placeholder="Add a note" required></textarea><button class="s-btn primary">Add note</button></form>`
+    : '';
   return CLOSE + '<div class="dg">'
-    + `<div class="g-t"><h2 class="s-h1" id="dlg-t" tabindex="-1">${esc(r.title)}</h2><span class="s-faint">${esc(r.by)} · ${day(r.created)}</span></div>`
+    + `<div class="g-t">${titleBlock(r, can, open === 'title')}<span class="s-faint">${esc(r.by)} · ${day(r.created)}</span></div>`
     + `<div class="g-s"><dl class="dd"><dt>State</dt><dd>${stateChip(r.shown, r.label)}${moveButton(r, 'dlg')}</dd></dl>${notices(vm, bk, r)}${details ? `<dl class="dd">${details}</dl>` : ''}</div>`
-    + `<div class="g-r">${problems(r)}${fields ? `<dl class="rq">${fields}</dl>` : ''}</div>`
+    + `<div class="g-r">${problems(r)}${descriptionBlock(r, can, open === 'description')}</div>`
     + `<div class="g-a">${notes ? `<h3 class="s-h2">Notes</h3>${notes}` : ''}</div>`
     + `<div class="g-c">${composer}</div></div>` + tray(bk, st, 'dlg');
 }
@@ -157,22 +203,20 @@ export function aboutChip(vm, id) {
   return `<span class="tg">${esc(title)}<button type="button" data-unabout="${esc(id)}" aria-label="Remove ${esc(title)}">×</button></span>`;
 }
 
-function featureSelect(vm, about) {
+function featureSelect(vm, about, attr = 'data-addabout') {
   const groups = (vm.byDomain ?? []).map((d) => {
     const opts = d.features.filter((f) => !about.includes(f)).map((f) => `<option value="${esc(f)}">${esc(vm.features[f].title)}</option>`).join('');
     return opts ? `<optgroup label="${esc(d.title)}">${opts}</optgroup>` : '';
   }).join('');
-  return groups ? `<select class="s-btn sm" data-addabout aria-label="Add a feature"><option value="">+ Add</option>${groups}</select>` : '';
+  return groups ? `<select class="s-btn sm" ${attr} aria-label="Add a feature"><option value="">+ Add</option>${groups}</select>` : '';
 }
 
 /** The create form, empty or naming its features; with a draft's `key`, that unsent request to change. */
-function createForm(vm, { key = null, title = '', happens = '', should = '', where = '', about = [] }) {
+function createForm(vm, { key = null, title = '', description = '', about = [] }) {
   return CLOSE + `<form data-form="add"${key ? ` data-key="${esc(key)}"` : ''}><div class="fm">`
     + `<div class="t-row"><h2 class="s-h1" id="dlg-t" tabindex="-1">New request</h2>${key ? DTAG : ''}</div>`
     + `<label class="fl">Title<input name="title" required value="${esc(title)}"></label>`
-    + `<label class="fl">What happens<textarea name="happens" placeholder="What you see now">${esc(happens)}</textarea></label>`
-    + `<label class="fl">What should happen<textarea name="should" placeholder="What you expect instead">${esc(should)}</textarea></label>`
-    + `<label class="fl">Where<input name="where" placeholder="The screen, device or step" value="${esc(where)}"></label>`
+    + `<label class="fl">Description<textarea name="description" class="desc-in" placeholder="${esc(DESCRIPTION_HINT)}">${esc(description)}</textarea></label>`
     + `<div class="fl" role="group" aria-labelledby="fl-about"><span id="fl-about">Features</span><div class="tgs">${about.map((id) => aboutChip(vm, id)).join('')}${featureSelect(vm, about)}</div></div>`
     + '</div><div class="ft"><button type="button" class="s-btn" data-act="close">Cancel</button><button class="s-btn primary">Save draft</button></div></form>';
 }
@@ -181,7 +225,8 @@ function createForm(vm, { key = null, title = '', happens = '', should = '', whe
  * The dialog a state opens, or null: `{ key, cls, title, html }`. `key` names the dialog, so the
  * page keeps what was typed while the same one is drawn again. `ui.add` is the create form
  * (`{ about }`, the features already named); `ui.req` a request, an unsent one in the create form
- * to change it. `st.form`, `{ key, about }`, holds the features picked since that dialog opened.
+ * to change it. `st.form`, `{ key, about }`, holds the features picked since that dialog opened;
+ * `st.editing`, `{ req, field }`, the field of a sent request open for editing.
  */
 export function dialogView(vm, ui, st = {}) {
   const bk = st.backlog;

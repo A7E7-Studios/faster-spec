@@ -246,6 +246,24 @@ dialog.dlg .tray { position: sticky; bottom: 0; }
 .tgs { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-weight: 400; }
 .tg { display: inline-flex; align-items: center; gap: 2px; height: 28px; padding: 0 2px 0 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-text); font-weight: 700; }
 .tg button { width: 24px; height: 24px; border: 0; border-radius: 50%; background: none; color: inherit; cursor: pointer; }
+.tg a { color: inherit; } .tg.dft { outline-offset: 1px; }
+/* A feature picker reads + Add however long the features' titles; its list opens as wide as they need. */
+select[data-addabout], select[data-about-add] { width: 7em; }
+.fl textarea.desc-in { min-height: 110px; }
+/* A sent request's fields, edited where they show: a tint on hover or focus, nothing in view else. */
+.vh, .eb:not(:focus) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.ed { display: inline-block; max-width: 100%; margin: 0 -8px; padding: 2px 8px; border: 0; border-radius: 7px; background: none; color: inherit; font: inherit; text-align: left; cursor: text; }
+.ed:hover, .ed:focus-within { background: var(--pill); }
+.ds { position: relative; display: block; width: calc(100% + 16px); max-width: calc(70ch + 16px); margin-top: 10px; padding: 6px 8px; }
+.ds p, .ds ul, .ds ol, .ds pre { margin: 0 0 8px; } .ds ul, .ds ol { padding-left: 20px; } .ds > :last-child { margin-bottom: 0; }
+.ds .mh { font-weight: 800; } .ds pre { white-space: pre-wrap; font-family: var(--mono); font-size: 12px; background: var(--panel); padding: 8px 10px; border-radius: 6px; }
+.eb { top: 6px; right: 6px; } .eb:focus { position: absolute; }
+.eo { display: grid; gap: 8px; margin-top: 10px; max-width: 70ch; }
+.eo input, .eo textarea { font: inherit; color: var(--text); border: 1px solid var(--edge-strong); border-radius: 7px; padding: 8px 10px; background: var(--sheet); }
+.eo textarea { min-height: 150px; resize: vertical; }
+.eo.et { margin: 0; max-width: none; } .eo.et input { font-size: 22px; font-weight: 800; line-height: 1.25; padding: 4px 8px; }
+.ea { display: flex; justify-content: flex-end; gap: 8px; }
+h2 .dtag { vertical-align: middle; margin-left: 10px; } .dd dt .dtag { text-transform: none; letter-spacing: 0; margin-left: 6px; }
 select.s-btn { appearance: auto; }
 .ft { display: flex; gap: 8px; justify-content: flex-end; padding: 10px 16px; border-top: 1px solid var(--divider); }
 @container (max-width: 720px) {

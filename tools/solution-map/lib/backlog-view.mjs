@@ -29,13 +29,12 @@ function fromItem(item) {
     created: item.created || null,
     state: item.state,
     shown: item.shown ?? null,
-    happens: item.happens,
-    should: item.should,
-    where: item.where,
+    description: item.description ?? '',
     about: [...(item.about ?? [])],
     changes: (item.changes ?? []).map((c) => ({ id: c.id, state: c.state, label: label(c.state), draft: false })),
     notes: (item.notes ?? []).map((n) => ({ by: n.by, at: n.at, text: n.text, draft: false, key: null })),
     drafted: {},
+    sent: {},
     held: [],
     refused: [],
     unsent: 0,
@@ -54,13 +53,12 @@ function fromAdd(d, me) {
     created: null,
     state: 'new',
     shown: 'new',
-    happens: d.happens ?? '',
-    should: d.should ?? '',
-    where: d.where ?? '',
+    description: d.description ?? '',
     about: [...(d.about ?? [])],
     changes: [],
     notes: [],
     drafted: {},
+    sent: {},
     held: [],
     refused: d.refused ? [{ key: d.key, op: 'add', reason: d.refused }] : [],
     unsent: 1,
@@ -74,7 +72,8 @@ function fromAdd(d, me) {
  * with its drafts applied, and a row per draft for the list of what is unsent.
  *
  * A drafted note is appended after the sent ones (`draft: true`, `at: null`); a drafted edit or
- * move shows its value and names its draft in `drafted[field]`; a held one leaves the field with
+ * move shows its value, names its draft in `drafted[field]` and keeps the value it replaced, the
+ * branch's, in `sent[field]`; a held one leaves the field with
  * the other person's value and is listed in `held` as `{ key, field, theirs, yours, by }`; a
  * refused one changes nothing and is listed in `refused`. A request's `shown` is its changes'
  * state when it names one, else the state it is set to; `null` when the file cannot be read.
@@ -103,8 +102,10 @@ export function applyDrafts(items, drafts, { me = null, heldBy = {} } = {}) {
       if (!r.changes.some((c) => c.id === d.change)) r.changes.push({ id: d.change, state: null, label: null, draft: true });
     } else if (d.held) r.held.push({ key: d.key, field: fieldOf(d), theirs: d.held.theirs, yours: d.to, by: heldBy[d.key] ?? null });
     else {
-      r[fieldOf(d)] = d.to;
-      r.drafted[fieldOf(d)] = d.key;
+      const field = fieldOf(d);
+      if (!(field in r.sent)) r.sent[field] = r[field];
+      r[field] = d.to;
+      r.drafted[field] = d.key;
     }
   }
   for (const r of requests.values()) {

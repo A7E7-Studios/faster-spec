@@ -17,8 +17,11 @@ const root = document.getElementById('app');
 const dlg = document.getElementById('dlg');
 const here = () => location.pathname + location.search;
 let vm = null;
-/** The page's state beside the address (see renderPage), and the features picked in an open form. */
-const st = { refreshing: false, backlog: null, submitting: false, submitBanner: null, draftsOpen: null, restart: null, form: null };
+/**
+ * The page's state beside the address (see renderPage), the features picked in an open form, and
+ * the field of a sent request open for editing (`{ req, field }`).
+ */
+const st = { refreshing: false, backlog: null, submitting: false, submitBanner: null, draftsOpen: null, restart: null, form: null, editing: null };
 // A history entry holds the whole state, the view under a dialog too, so back, forward and a
 // reload show what the address showed; an address opened from elsewhere is read as it says.
 let ui = history.state?.path === here() ? history.state.ui : parseLocation(location.pathname, location.search);
@@ -67,6 +70,7 @@ let toastNext = null; // what to say once the dialog has closed
 
 /** Draws the dialog the state names, or closes it; `opened` when it has just opened. */
 function syncDialog() {
+  if (st.editing && st.editing.req !== ui.req) st.editing = null;
   const d = dialogView(vm, ui, st);
   if (!d) {
     if (dlg.open) dlg.close();
@@ -286,6 +290,46 @@ function menuKeys(e) {
   } else if (e.key === 'Tab') closeMenu(false);
 }
 
+/* ---------- a sent request's fields, edited in place ---------- */
+
+const editKey = (r, field) => r.held.find((h) => h.field === field)?.key ?? r.drafted?.[field];
+const sameText = (a, b) => String(a ?? '').replace(/\r\n?/g, '\n').trim() === String(b ?? '').replace(/\r\n?/g, '\n').trim();
+const sameSet = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
+
+/** Opens the title or the description of the request open in the dialog, the caret at its end. */
+function startEdit(field) {
+  const r = st.backlog?.requests[ui.req];
+  if (!r || r.draft || r.problems.length) return;
+  st.editing = { req: r.id, field };
+  render({ focus: `#edit-${field}` });
+  const el = dlg.querySelector(`#edit-${field}`);
+  el?.setSelectionRange?.(el.value.length, el.value.length);
+}
+
+/** Closes the field open, what was typed in it dropped, focus back on what opens it. */
+function closeEdit(field) {
+  st.editing = null;
+  render({ focus: [`button[data-edit="${field}"]`, '#dlg-t'] });
+}
+
+/**
+ * Keeps a change of a sent request's field as a draft: one draft per field, changed again by its
+ * key; a change back to the branch's value drops that draft instead. Resolves whether it was kept.
+ */
+async function saveField(r, field, to, { focus = null } = {}) {
+  const key = editKey(r, field);
+  const back = field === 'about' ? r.sent.about && sameSet(to, r.sent.about) : field in r.sent && sameText(to, r.sent[field]);
+  if (key && back) return !!(await changeDrafts({ drop: key }, { focus }));
+  return !!(await changeDrafts({ save: { op: 'edit', id: r.id, field, to, ...(key ? { key } : {}) } }, { focus }));
+}
+
+/** Sets the features of the request open in the dialog. */
+function saveAbout(ids, focus) {
+  const r = st.backlog?.requests[ui.req];
+  if (r && !r.draft) saveField(r, 'about', ids, { focus });
+}
+const aboutOf = (r) => r.about.map((a) => a.id);
+
 /* ---------- the features a request being written names ---------- */
 
 const picked = () => [...dlg.querySelectorAll('[data-unabout]')].map((b) => b.dataset.unabout);
@@ -350,6 +394,11 @@ document.addEventListener('click', (e) => {
   else if ((x = el('[data-held-drop]'))) changeDrafts({ drop: x.dataset.heldDrop }, { focus: 'button[data-mv]' });
   else if ((x = el('[data-held-apply]'))) changeDrafts({ apply: x.dataset.heldApply }, { focus: 'button[data-mv]' });
   else if ((x = el('[data-unabout]'))) pick(picked().filter((a) => a !== x.dataset.unabout), ['[data-unabout]', 'select[data-addabout]']);
+  else if ((x = el('[data-about-drop]'))) {
+    const r = st.backlog?.requests[ui.req];
+    if (r) saveAbout(aboutOf(r).filter((a) => a !== x.dataset.aboutDrop), ['[data-about-drop]', 'select[data-about-add]']);
+  } else if ((x = el('[data-edit-cancel]'))) closeEdit(x.dataset.editCancel);
+  else if ((x = el('[data-edit]'))) startEdit(x.dataset.edit);
   else if ((x = el('[data-suggest]'))) openDialog({ add: { about: [x.dataset.suggest] } }, x);
   else if ((x = el('[data-req]'))) {
     if (!plain && x.tagName === 'A') return;
@@ -384,10 +433,23 @@ document.addEventListener('click', (e) => {
 
 document.addEventListener('submit', async (e) => {
   const f = e.target;
-  if (f.dataset.form !== 'note' && f.dataset.form !== 'add') return;
+  if (f.dataset.form !== 'note' && f.dataset.form !== 'add' && f.dataset.form !== 'edit') return;
   e.preventDefault();
   const v = (name) => f.elements[name]?.value.trim() ?? '';
   const button = f.querySelector('.s-btn.primary');
+  if (f.dataset.form === 'edit') {
+    const r = st.backlog?.requests[f.dataset.id];
+    const field = f.dataset.field;
+    if (!r) return;
+    const to = field === 'title' ? v('value') : f.elements.value.value.replace(/\r\n?/g, '\n').trimEnd();
+    if (field === 'title' && !to) { f.elements.value.value = ''; f.reportValidity(); return; }
+    // Nothing changed: the field closes and no draft is kept.
+    if (sameText(to, r[field])) { closeEdit(field); return; }
+    button.disabled = true;
+    if (await saveField(r, field, to)) closeEdit(field);
+    else button.disabled = false;
+    return;
+  }
   if (f.dataset.form === 'note') {
     const r = st.backlog?.requests[f.dataset.id];
     if (!r || !v('text')) return;
@@ -398,7 +460,7 @@ document.addEventListener('submit', async (e) => {
   }
   if (!v('title')) { f.elements.title.value = ''; f.reportValidity(); return; }
   button.disabled = true;
-  const save = { op: 'add', title: v('title'), happens: v('happens'), should: v('should'), where: v('where'), about: picked(), ...(f.dataset.key ? { key: f.dataset.key } : {}) };
+  const save = { op: 'add', title: v('title'), description: v('description'), about: picked(), ...(f.dataset.key ? { key: f.dataset.key } : {}) };
   const res = await changeDrafts({ save });
   if (!res) { button.disabled = false; return; }
   toastNext = f.dataset.key ? 'Your draft request is saved.' : 'Saved as a draft. Submit sends it.';
@@ -408,6 +470,9 @@ document.addEventListener('submit', async (e) => {
 document.addEventListener('change', (e) => {
   const s = e.target.closest?.('select[data-addabout]');
   if (s?.value) pick([...picked(), s.value], 'select[data-addabout]');
+  const a = e.target.closest?.('select[data-about-add]');
+  const r = a?.value && st.backlog?.requests[ui.req];
+  if (r) saveAbout([...aboutOf(r), a.value], 'select[data-about-add]');
 });
 
 root.addEventListener('input', (e) => {
@@ -458,6 +523,11 @@ dlg.addEventListener('cancel', (e) => {
 document.addEventListener('keydown', (e) => {
   if (!vm) return;
   if (menu) { if (e.key === 'Escape') swallow(); menuKeys(e); return; }
+  // A field open in place: Escape closes it and keeps the dialog; Ctrl or Cmd and Enter is Done.
+  if (st.editing && dlg.open) {
+    if (e.key === 'Escape') { e.preventDefault(); swallow(); closeEdit(st.editing.field); return; }
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && e.target.closest?.('form[data-form="edit"]')) { e.preventDefault(); e.target.form.requestSubmit(); return; }
+  }
   if (e.key === 'Escape' && st.draftsOpen) {
     e.preventDefault();
     swallow();

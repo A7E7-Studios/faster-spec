@@ -21,9 +21,7 @@ function item(id, o = {}) {
     state,
     about: o.about ?? [],
     change: changes.map((c) => c.id),
-    happens: o.happens ?? '',
-    should: '',
-    where: '',
+    description: o.description ?? '',
     notes: o.notes ?? [],
     problems: o.problems ?? [],
     shown: o.shown ?? state,
@@ -94,17 +92,15 @@ test('items show by state, done and parked behind a filter', () => {
 test('a request added on the page is a draft in new', () => {
   const add = draft('d-0a1b2c3d4e5f', 'add', {
     title: 'Export a whole notebook as one file',
-    happens: 'Each note exports on its own.',
-    should: 'A notebook exports as one file.',
-    where: 'The export menu.',
+    description: 'Each note exports on its own; a notebook could export as one file.',
     about: ['editing/export'],
   });
   const items = [item('export-a-note-as-pdf', { created: '2026-11-16', about: ['editing/export'] })];
   const vm = backlogView({ items, drafts: [add], me: 'asmith', features: FEATURES });
   const r = vm.requests[add.key];
   assert.deepEqual(
-    [r.draft, r.key, r.shown, r.label, r.state, r.by, r.created, r.title, r.happens, r.should, r.where, r.address],
-    [true, add.key, 'new', 'New', 'new', 'asmith', null, 'Export a whole notebook as one file', 'Each note exports on its own.', 'A notebook exports as one file.', 'The export menu.', '/backlog/d-0a1b2c3d4e5f'],
+    [r.draft, r.key, r.shown, r.label, r.state, r.by, r.created, r.title, r.description, r.address],
+    [true, add.key, 'new', 'New', 'new', 'asmith', null, 'Export a whole notebook as one file', 'Each note exports on its own; a notebook could export as one file.', '/backlog/d-0a1b2c3d4e5f'],
   );
   assert.deepEqual(r.about, [{ id: 'editing/export', title: 'Export', exists: true }]);
   // In New, before the requests that were sent, and on the list of what is unsent.
@@ -112,6 +108,23 @@ test('a request added on the page is a draft in new', () => {
   assert.deepEqual(vm.drafts, [{ key: add.key, op: 'add', request: add.key, title: add.title, held: null, refused: null, missing: false, savedAt: add.savedAt }]);
   assert.deepEqual(vm.totals, { open: 1, closed: 0, unsent: 1 });
   assert.deepEqual(vm.byFeature['editing/export'], [add.key, 'export-a-note-as-pdf']);
+});
+
+test('an edit made in the dialog is a draft of that field', () => {
+  const items = [item('export-a-note-as-pdf', { title: 'Export a note as PDF', description: 'Only a link.', about: ['editing/export'] })];
+  const drafts = [
+    draft('d-t', 'edit', { id: 'export-a-note-as-pdf', field: 'title', from: 'Export a note as PDF', to: 'Export notes as PDF' }),
+    draft('d-d', 'edit', { id: 'export-a-note-as-pdf', field: 'description', from: 'Only a link.', to: 'Only a link.\n\n## Steps\n\nShare a note.' }),
+    draft('d-a', 'edit', { id: 'export-a-note-as-pdf', field: 'about', from: ['editing/export'], to: ['editing/export', 'sharing/links'] }),
+  ];
+  const vm = backlogView({ items, drafts, me: 'asmith', features: FEATURES });
+  const r = vm.requests['export-a-note-as-pdf'];
+  assert.deepEqual([r.draft, r.title, r.description, r.unsent], [false, 'Export notes as PDF', 'Only a link.\n\n## Steps\n\nShare a note.', 3]);
+  assert.deepEqual(r.about, [{ id: 'editing/export', title: 'Export', exists: true }, { id: 'sharing/links', title: 'Share links', exists: true }]);
+  assert.deepEqual(r.drafted, { title: 'd-t', description: 'd-d', about: 'd-a' });
+  assert.deepEqual(vm.drafts.map((d) => [d.key, d.op, d.request]), [['d-t', 'edit', 'export-a-note-as-pdf'], ['d-d', 'edit', 'export-a-note-as-pdf'], ['d-a', 'edit', 'export-a-note-as-pdf']]);
+  // The feature it now names lists it already, before anyone submits.
+  assert.deepEqual(vm.byFeature['sharing/links'], ['export-a-note-as-pdf']);
 });
 
 test('a feature lists the requests about it that are not done', () => {

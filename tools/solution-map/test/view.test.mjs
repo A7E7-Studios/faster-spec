@@ -5,6 +5,7 @@ import { adapt } from '../lib/adapt.mjs';
 import { backlogView } from '../lib/backlog-view.mjs';
 import { renderPage, parseLocation, pathFor, searchFeatures, featurePage, settle } from '../page/view.mjs';
 import { dialogView, moveMenu } from '../page/backlog.mjs';
+import { mdBlocks } from '../page/html.mjs';
 import { item, draft, ITEMS, sampleBacklog } from './fixtures/backlog.mjs';
 
 const sample = () => JSON.parse(fs.readFileSync(new URL('./fixtures/overview-v3.json', import.meta.url), 'utf8'));
@@ -183,21 +184,19 @@ test('an item shows its notes, its features and its changes', () => {
   const d = dialogView(vm, ui({ tab: 'backlog', req: 'show-the-offline-banner-sooner' }), { backlog: bk });
   assert.equal(d.cls, 'dlg');
   const h = d.html;
-  // The title takes focus; who asked and when sit under it.
-  assert.match(h, /<h2 class="s-h1" id="dlg-t" tabindex="-1">Show the offline banner sooner<\/h2><span class="s-faint">jdoe · 11 Nov<\/span>/);
+  // The title takes focus, and opens for editing; who asked and when sit under it.
+  assert.match(h, /<h2 class="s-h1" id="dlg-t" tabindex="-1"><button class="ed" data-edit="title" aria-describedby="dlg-te">Show the offline banner sooner<\/button><\/h2><span class="vh" id="dlg-te">Edit the title<\/span><span class="s-faint">jdoe · 11 Nov<\/span>/);
   assert.match(h, /<button class="s-btn icon sm x" data-act="close" aria-label="Close">×<\/button>/);
-  // The request.
-  assert.match(h, /<dt>What happens<\/dt><dd class="pre">The offline banner shows five seconds after the connection drops; people keep typing and think their edits are lost\.<\/dd>/);
-  assert.match(h, /<dt>What should happen<\/dt><dd class="pre">The banner shows within a second or two, and says the edits are kept\.<\/dd>/);
-  assert.match(h, /<dt>Where<\/dt><dd class="pre">Any open note, when the network drops\.<\/dd>/);
+  // The request: its description as its Markdown's blocks, opened for editing by a click or its button.
+  assert.match(h, /<div class="ed ds" data-edit="description"><button class="s-btn sm eb" data-edit="description">Edit the description<\/button><p>The offline banner shows five seconds after the connection drops, so people keep typing and think their edits are lost\.<\/p><p>It should show within a second or two and say the edits are kept\. Seen on:<\/p><ul><li>any open note, when the network drops<\/li><li>the note list while it syncs<\/li><\/ul><\/div>/);
   // Its notes in the order they came, each with who wrote it and the day, the time in its tooltip;
   // the person's unsent note last, marked Draft.
   const order = ['Five seconds was a guess', 'Two customers mentioned it', 'Started change <code>offline-banner-delay</code> from this request', 'Could the banner also say how many edits'].map((t) => h.indexOf(t));
   assert.ok(order.every((i, n) => i > 0 && (n === 0 || i > order[n - 1])), `notes in order: ${order}`);
   assert.match(h, /<div class="note"><b>asmith<\/b> <span class="s-faint" title="12 Nov, 10:04 UTC">12 Nov<\/span><p class="pre">Five seconds was a guess/);
   assert.match(h, /<div class="note dft"><b>asmith<\/b> <span class="dtag">Draft<\/span><p class="pre">Could the banner also say how many edits are waiting to send\?<\/p><\/div>/);
-  // The features it names, each a link to the feature.
-  assert.match(h, /<dt>Features<\/dt><dd><a class="s-link" href="\/explore\/editing\/offline-edits" data-open="editing\/offline-edits">Offline edits<\/a><\/dd>/);
+  // The features it names, each a link to the feature, with Remove and Add.
+  assert.match(h, /<dt>Features<\/dt><dd><span class="tg"><a class="s-link" href="\/explore\/editing\/offline-edits" data-open="editing\/offline-edits">Offline edits<\/a><button type="button" data-about-drop="editing\/offline-edits" aria-label="Remove Offline edits">×<\/button><\/span><select class="s-btn sm" data-about-add aria-label="Add a feature"><option value="">\+ Add<\/option>/);
   // The changes it led to, each with that change's state; the request shows what its change shows.
   assert.match(h, /<dt>Changes<\/dt><dd><span class="mono">offline-banner-delay<\/span><span class="rst to-review"><svg[^>]*>.*?<\/svg>To review<\/span><\/dd>/);
   assert.match(h, /<dt>State<\/dt><dd><span class="rst to-review"><svg[^>]*>.*?<\/svg>To review<\/span><button class="s-btn sm" data-mv="show-the-offline-banner-sooner" aria-haspopup="menu" aria-expanded="false" aria-label="Move to another state">Move ▾<\/button>/);
@@ -207,11 +206,65 @@ test('an item shows its notes, its features and its changes', () => {
   // A feature no longer on main shows by its id, as plain text; a request with no changes lists none.
   const other = backlogView({ items: [item('dark-mode', { title: 'Dark mode', about: ['editing/gone'] })], features: vm.features });
   const o = dialogView(vm, ui({ tab: 'backlog', req: 'dark-mode' }), { backlog: other }).html;
-  assert.match(o, /<dt>Features<\/dt><dd><span>editing\/gone<\/span><\/dd>/);
-  assert.doesNotMatch(o, /<dt>Changes<\/dt>|<h3 class="s-h2">Notes<\/h3>|<dt>What happens<\/dt>/);
+  assert.match(o, /<dt>Features<\/dt><dd><span class="tg"><span>editing\/gone<\/span><button type="button" data-about-drop="editing\/gone" aria-label="Remove editing\/gone">×<\/button><\/span>/);
+  assert.doesNotMatch(o, /<dt>Changes<\/dt>|<h3 class="s-h2">Notes<\/h3>/);
+  // No description yet: the place to add one.
+  assert.match(o, /<div class="ed ds" data-edit="description"><button class="s-btn sm eb" data-edit="description">Edit the description<\/button><p class="s-faint">Add a description<\/p><\/div>/);
   // A change linked by a draft shows as a draft until it is sent.
   const linked = backlogView({ items: [item('dark-mode', { title: 'Dark mode' })], drafts: [draft('d-l', 'link', { id: 'dark-mode', change: 'dark-theme' })], features: vm.features });
   assert.match(dialogView(vm, ui({ tab: 'backlog', req: 'dark-mode' }), { backlog: linked }).html, /<dt>Changes<\/dt><dd><span class="mono">dark-theme<\/span><span class="dtag">Draft<\/span><\/dd>/);
+});
+
+test('an edited field shows its draft value in the request dialog', () => {
+  const vm = adapt(sample());
+  const id = 'show-the-offline-banner-sooner';
+  const drafts = [
+    draft('d-t', 'edit', { id, field: 'title', from: 'Show the offline banner sooner', to: 'Show the offline banner within two seconds' }),
+    draft('d-d', 'edit', { id, field: 'description', from: 'x', to: 'Within **two seconds**.' }),
+    draft('d-a', 'edit', { id, field: 'about', from: ['editing/offline-edits'], to: ['editing/offline-edits', 'sharing/share-links'] }),
+  ];
+  const bk = backlogView({ items: ITEMS, drafts, features: vm.features, me: 'asmith' });
+  const h = dialogView(vm, ui({ tab: 'backlog', req: id }), { backlog: bk }).html;
+  // Each field shows what the person wrote, marked as a draft; the feature they added is outlined.
+  assert.match(h, /<button class="ed" data-edit="title" aria-describedby="dlg-te">Show the offline banner within two seconds<\/button><span class="dtag">Draft<\/span><\/h2>/);
+  assert.match(h, /<div class="ed ds dft" data-edit="description"><button class="s-btn sm eb" data-edit="description">Edit the description<\/button><p><span class="dtag">Draft<\/span><\/p><p>Within <b>two seconds<\/b>\.<\/p><\/div>/);
+  assert.match(h, /<dt>Features <span class="dtag">Draft<\/span><\/dt><dd><span class="tg"><a [^>]*>Offline edits<\/a>.*?<\/span><span class="tg dft"><a class="s-link" href="\/explore\/sharing\/share-links" data-open="sharing\/share-links">Share links<\/a><button type="button" data-about-drop="sharing\/share-links" aria-label="Remove Share links">×<\/button><\/span>/);
+  // The unsent line counts them.
+  assert.match(h, /aria-expanded="false">3 unsent<\/button>/);
+  // The description open: its Markdown in a field, with Cancel and Done; the title keeps the dialog's name.
+  const d = dialogView(vm, ui({ tab: 'backlog', req: id }), { backlog: bk, editing: { req: id, field: 'description' } }).html;
+  assert.match(d, /<form class="eo" data-form="edit" data-field="description" data-id="show-the-offline-banner-sooner"><label class="vh" for="edit-description">Description<\/label><textarea id="edit-description" name="value" placeholder="What you’d like, and why\. For a problem: what happens, what you expected, and where\.">Within \*\*two seconds\*\*\.<\/textarea><div class="ea"><button type="button" class="s-btn sm" data-edit-cancel="description">Cancel<\/button><button class="s-btn sm primary" aria-keyshortcuts="Control\+Enter" title="Done \(Ctrl\+Enter\)">Done<\/button><\/div><\/form>/);
+  assert.doesNotMatch(d, /data-edit="description"/);
+  const t = dialogView(vm, ui({ tab: 'backlog', req: id }), { backlog: bk, editing: { req: id, field: 'title' } }).html;
+  assert.match(t, /<h2 class="s-h1 vh" id="dlg-t" tabindex="-1">Show the offline banner within two seconds<\/h2><form class="eo et" data-form="edit" data-field="title" data-id="show-the-offline-banner-sooner"><label class="vh" for="edit-title">Title<\/label><input id="edit-title" name="value" required value="Show the offline banner within two seconds">/);
+  // A field open for another request opens nothing here.
+  assert.doesNotMatch(dialogView(vm, ui({ tab: 'backlog', req: id }), { backlog: bk, editing: { req: 'other', field: 'title' } }).html, /data-form="edit"/);
+});
+
+test('who asked, when, notes and changes have no edit control', () => {
+  const vm = adapt(sample());
+  const bk = sampleBacklog(vm);
+  const h = dialogView(vm, ui({ tab: 'backlog', req: 'show-the-offline-banner-sooner' }), { backlog: bk }).html;
+  // Only the title and the description open for editing, and the features take Remove and Add.
+  assert.deepEqual([...new Set([...h.matchAll(/data-edit="([a-z]+)"/g)].map((m) => m[1]))], ['title', 'description']);
+  assert.match(h, /<span class="s-faint">jdoe · 11 Nov<\/span><\/div>/);
+  for (const n of h.match(/<div class="note[^"]*">.*?<\/div>/g)) assert.doesNotMatch(n, /<button|<input|<textarea|data-edit/);
+  assert.match(h, /<dt>Changes<\/dt><dd><span class="mono">offline-banner-delay<\/span><span class="rst to-review">/);
+  assert.doesNotMatch(h.slice(h.indexOf('<dt>Changes</dt>'), h.indexOf('</dl>', h.indexOf('<dt>Changes</dt>'))), /<button|data-edit|data-about/);
+  // A request whose file does not read is shown, with nothing to edit it by.
+  const broken = backlogView({ items: [item('broken', { title: 'Broken', description: 'Text.', about: ['editing/offline-edits'], problems: [{ line: 3, message: 'bad' }] })], features: vm.features });
+  const b = dialogView(vm, ui({ tab: 'backlog', req: 'broken' }), { backlog: broken }).html;
+  assert.doesNotMatch(b, /data-edit|data-about-drop|data-about-add|data-form="note"/);
+  assert.match(b, /<div class="ds"><p>Text\.<\/p><\/div>/);
+});
+
+test('a description shows as the blocks its Markdown makes, escaped', () => {
+  assert.equal(mdBlocks('One **bold**\nline two\n\n## Steps\n\n1. open\n2. share\n- a\n- b\n  more'),
+    '<p>One <b>bold</b><br>line two</p><p class="mh">Steps</p><ol><li>open</li><li>share</li></ol><ul><li>a</li><li>b more</li></ul>');
+  assert.equal(mdBlocks('```\n<b>x</b>\n## not a heading\n```\nafter'), '<pre>&lt;b&gt;x&lt;/b&gt;\n## not a heading</pre><p>after</p>');
+  assert.equal(mdBlocks('```\nleft open'), '<pre>left open</pre>');
+  assert.equal(mdBlocks('<img src=x onerror="alert(1)">'), '<p>&lt;img src=x onerror=&quot;alert(1)&quot;&gt;</p>');
+  assert.equal(mdBlocks(''), '');
 });
 
 test('an empty backlog says how to add the first request', () => {
@@ -254,9 +307,9 @@ test('suggest a change starts a request naming the feature', () => {
   assert.match(d.html, /<h2 class="s-h1" id="dlg-t" tabindex="-1">New request<\/h2>/);
   assert.match(d.html, /<span class="tg">Import report<button type="button" data-unabout="importing\/import-report" aria-label="Remove Import report">×<\/button><\/span>/);
   assert.match(d.html, /<label class="fl">Title<input name="title" required value=""><\/label>/);
-  assert.match(d.html, /<label class="fl">What happens<textarea name="happens"/);
-  assert.match(d.html, /<label class="fl">What should happen<textarea name="should" placeholder="What you expect instead"><\/textarea><\/label>/);
-  assert.match(d.html, /<label class="fl">Where<input name="where" placeholder="The screen, device or step" value=""><\/label>/);
+  // One description, free text: a hint of what helps, no field to fill.
+  assert.match(d.html, /<label class="fl">Description<textarea name="description" class="desc-in" placeholder="What you’d like, and why\. For a problem: what happens, what you expected, and where\."><\/textarea><\/label>/);
+  assert.doesNotMatch(d.html, /What happens|What should happen|name="where"/);
   assert.match(d.html, /<button type="button" class="s-btn" data-act="close">Cancel<\/button><button class="s-btn primary">Save draft<\/button>/);
   // More features can be added; the one named is not offered twice.
   assert.match(d.html, /<select class="s-btn sm" data-addabout aria-label="Add a feature"><option value="">\+ Add<\/option><optgroup label="Editing"><option value="editing\/offline-edits">Offline edits<\/option>/);
@@ -375,7 +428,7 @@ test('a held draft shows both values, to apply again or drop', () => {
   const items = ITEMS.map((i) => (i.id === 'undo-after-closing-a-note' ? { ...i, state: 'parked', shown: 'parked' } : i));
   const drafts = [
     draft('d-held', 'move', { id: 'undo-after-closing-a-note', from: 'discussing', to: 'ready', held: { theirs: 'parked' } }),
-    draft('d-text', 'edit', { id: 'pen-colour-presets', field: 'happens', from: '', to: 'Mine <b>now</b>', held: { theirs: 'Theirs' } }),
+    draft('d-text', 'edit', { id: 'pen-colour-presets', field: 'description', from: '', to: 'Mine <b>now</b>', held: { theirs: 'Theirs' } }),
   ];
   const bk = backlogView({ items, drafts, features: vm.features, me: 'asmith', heldBy: { 'd-held': 'tbrown', 'd-text': null } });
   const h = dialogView(vm, ui({ tab: 'backlog', req: 'undo-after-closing-a-note' }), { backlog: bk }).html;
@@ -384,7 +437,7 @@ test('a held draft shows both values, to apply again or drop', () => {
   assert.match(h, /<div class="cl" role="status"><p><span class="ic changes-requested" title="Changed meanwhile">.*?<\/span><span>Changed meanwhile by tbrown: <b>Parked<\/b>\. Yours: <b>Ready<\/b>\.<\/span><\/p><div class="s-actions"><button class="s-btn sm" data-held-drop="d-held">Drop mine<\/button><button class="s-btn sm" data-held-apply="d-held">Apply mine again<\/button><\/div><\/div>/);
   // A written field shows both texts, escaped.
   const t = dialogView(vm, ui({ tab: 'backlog', req: 'pen-colour-presets' }), { backlog: bk }).html;
-  assert.match(t, /<span>What happens changed meanwhile\.<\/span><\/p><div class="cv"><span class="s-faint">Theirs<\/span><div class="pre">Theirs<\/div><span class="s-faint">Yours<\/span><div class="pre">Mine &lt;b&gt;now&lt;\/b&gt;<\/div><\/div>/);
+  assert.match(t, /<span>Description changed meanwhile\.<\/span><\/p><div class="cv"><span class="s-faint">Theirs<\/span><div class="pre">Theirs<\/div><span class="s-faint">Yours<\/span><div class="pre">Mine &lt;b&gt;now&lt;\/b&gt;<\/div><\/div>/);
   // The card and the list of drafts say so too.
   const board = renderPage(vm, ui({ tab: 'backlog', closed: true }), { backlog: bk, draftsOpen: 'page' });
   assert.match(board, /data-req="undo-after-closing-a-note">Undo after closing a note<\/button><span class="s-faint"><span class="ic changes-requested" title="Changed meanwhile">/);
@@ -427,7 +480,7 @@ test('a newer map offers restart to update, and says how the restart goes', () =
 test('what people write is escaped wherever the page shows it', () => {
   const vm = adapt(sample());
   const evil = '<img src=x onerror="alert(1)">';
-  const items = [item('x', { title: evil, by: evil, happens: evil, about: ['editing/offline-edits'], notes: [{ by: evil, at: '2026-11-12 10:04', text: evil }] })];
+  const items = [item('x', { title: evil, by: evil, description: evil, about: ['editing/offline-edits'], notes: [{ by: evil, at: '2026-11-12 10:04', text: evil }] })];
   const bk = backlogView({ items, drafts: [draft('d-x', 'note', { id: 'x', text: evil })], features: vm.features, me: evil });
   const pages = [
     renderPage(vm, ui(), { backlog: bk, draftsOpen: 'page' }),

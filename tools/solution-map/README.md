@@ -114,7 +114,7 @@ shown state), this clone's drafts and the map's features; the page receives the 
 | `status`, `error` | `current`, `absent`, `unreachable`, or `unavailable` (no backlog), and why |
 | `branch`, `repo`, `me` | the backlog's branch and repository id; this clone's git name, who the drafts are by |
 | `states` | `[{ id, label, set, closed }]` in the board's order; `set` for the four a person moves to, `closed` for Done and Parked |
-| `requests` | by id, an unsent one by its draft's `key`: `{ id, key, draft, title, by, created, state, shown, label, happens, should, where, about: [{ id, title, exists }], changes: [{ id, state, label, draft }], notes: [{ by, at, text, draft, key }], drafted: { <field>: <key> }, held: [{ key, field, theirs, yours, by }], refused: [{ key, op, reason }], unsent, problems, address, savedAt }` |
+| `requests` | by id, an unsent one by its draft's `key`: `{ id, key, draft, title, by, created, state, shown, label, description, about: [{ id, title, exists }], changes: [{ id, state, label, draft }], notes: [{ by, at, text, draft, key }], drafted: { <field>: <key> }, sent: { <field>: <the branch's value> }, held: [{ key, field, theirs, yours, by }], refused: [{ key, op, reason }], unsent, problems, address, savedAt }` |
 | `board` | `open`: New, Discussing, Ready, In progress, To review; `closed`: Done and Parked, shown once their filter is on; each `{ state, label, requests: [id] }`, unsent first, then newest first; `unreadable`: requests whose file gives no state |
 | `waiting` | the requests in New that were sent, newest first |
 | `byFeature` | per feature id, the requests about it that are not Done |
@@ -123,7 +123,8 @@ shown state), this clone's drafts and the map's features; the page receives the 
 | `banners` | `backlog-stale`, `backlog-off`, `backlog-branch`, `backlog-format`, `backlog-drafts`, `submit-unreachable { drafts, error }`, `submit-failed { error }` |
 
 What a person sees is the branch with their drafts on it: a drafted note comes after the sent
-ones (`at` null), a drafted edit or move shows its value and names its draft in `drafted`, and a
+ones (`at` null), a drafted edit or move shows its value, names its draft in `drafted` and keeps the
+branch's value in `sent`, and a
 held one leaves the other person's value with both in `held`, `by` the git name of the commit that
 set theirs. `held`'s `theirs` and `yours` are the field's values: a state id, feature ids, or text.
 
@@ -216,7 +217,7 @@ when the backlog lives in another of those repositories ([Config](#config)).
 | `lib/backlog-view.mjs` | the backlog and the drafts to the backlog's view model |
 | `lib/review.mjs` | Start review: where CueReview is, and opening it detached |
 | `lib/server.mjs` | the HTTP server: the page at its views' addresses (`/`, `/waiting/…`, `/explore/…`, `/search/…`, `/backlog/…`) and the routes above |
-| `page/` | the page: `index.html`, `style.css`, `html.mjs` (escaping, inline Markdown, icons, the banner line), `view.mjs` (pure HTML from the view models), `backlog.mjs` (the backlog's views: the board, the Move menu, the request dialog, the create form, the unsent line, its banners) and `app.mjs` (events, the address, the dialog; the only module that touches the DOM) |
+| `page/` | the page: `index.html`, `style.css`, `html.mjs` (escaping, inline Markdown, a description's blocks, icons, the banner line), `view.mjs` (pure HTML from the view models), `backlog.mjs` (the backlog's views: the board, the Move menu, the request dialog, the create form, the unsent line, its banners) and `app.mjs` (events, the address, the dialog; the only module that touches the DOM) |
 
 - **Addresses**: `/waiting/<feature>`, `/explore/<feature>`, `/explore/by-system/<system>/<feature>`,
   `/search/<feature>?q=<text>`; a feature id is `<domain>/<capability>`. `/backlog` is the board,
@@ -224,6 +225,13 @@ when the backlog lives in another of those repositories ([Config](#config)).
   `/backlog/new?about=<feature>` the create form with that feature named (`about` may repeat; New
   request gives `/backlog/new`). A dialog's address keeps the view under it in the history entry, so
   back, forward and reload show both again.
+- **Editing in place**: a sent request's title and description open where they show (a click, or
+  the button keyboard focus reveals): the title an input, the description its Markdown in a text
+  area, with Cancel and Done. Enter in the title or Ctrl/Cmd+Enter in the description is Done, which
+  saves one `edit` draft of that field, changed again by its key, or drops that draft when the value
+  is the branch's again; Escape closes the field and keeps the dialog. A feature chip's × and the
+  + Add picker save an `about` edit the same way. Who asked, when, the notes and the changes have
+  no control; a request whose file does not read has none at all.
 - **Drafts and Submit** go through `POST /api/drafts` and `/api/submit`; a failed Submit's banner
   stays until a Submit goes through. A draft changed while Submit sends gets the server's refusal
   as a toast, and what was typed stays in its form. The `map-update` banner's Restart to update,
