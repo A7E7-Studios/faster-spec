@@ -9,14 +9,19 @@ capabilities:
 ## Why
 
 Two pull requests built with the ship skill in CueReview took three review rounds each, and the
-first had a fourth running. They were built on a kit from before rounds ended on severity, so most
-of their 17 findings, the minors and nits, would now be follow-ups. What still fails a round is
-what the builder's self-check does not reach. That self-check runs once, before round 1, and skips
-checklist checks 1 (correct), 2 (reused) and 4 (tested). The first pull request's round-1 blocker
-was check 1: its requirement said every final transcription, and the build changed one of the four
-code paths that make one. Its round-3 major came from a round-2 fix: a limit changed in the code
-while the requirement still stated the old one. Its last finding was a new branch without a test,
-check 4.
+first had a fourth running. They were built on a kit from before rounds ended on severity, so 14 of
+their 17 findings, the minors and nits, would now be follow-ups. Three would still fail a round,
+all in the first pull request:
+
+- **Round 1, blocker**: its requirement said every final transcription, and the build changed one
+  of the four code paths that make one (checklist check 1, correct).
+- **Round 1, major**: suites AGENTS.md names for the area were neither run nor named (check 12).
+  The self-check on main already runs this check.
+- **Round 3, major**: a round-2 fix changed a limit in the code while the requirement still stated
+  the old one.
+
+The self-check on main runs once, before round 1, and skips checks 1 (correct), 2 (reused) and 4
+(tested). Its last finding, a new branch without a test, was check 4.
 
 ## What changes
 
@@ -24,18 +29,22 @@ check 4.
   self-check runs before round 1".
 - **The fixes are self-checked**: after each round's fixes, the builder runs every check on the
   fixes' diff as the checklist's *Round 2 and later* reviews them, and fixes what they find before
-  the next round or the merge: ship step 5.3; step 6.3 lets the final head carry what the
-  self-check of a passing round's follow-ups fixed. Scenario: "The self-check of a fix finds the
-  requirement it left stale".
-- **The spec lists each code path a requirement covers**: the spec skill's facts step lists them,
-  the proposal template's `## What changes` names them, and the tasks template gives each its own
-  task and test. Scenario: "A requirement about every save covers each save".
+  the next round or the merge, then gates and reruns the suites they touch: ship step 5.3. What it
+  fixes counts among the round's fixes: a code fix among a passing round's follow-ups still gets
+  step 5.4's further round, and step 6.3 lets the final head carry the rest. The self-check before
+  round 1 commits its fixes and reruns the gate and suites the same way. Scenario: "The self-check
+  of a fix finds the requirement it left stale".
+- **The spec lists each code path a requirement covers**: the spec skill's facts step lists the
+  paths each outcome reaches, the proposal template's `## What changes` names them, and the tasks
+  template gives each its own task, with a test wherever automation reaches it, else a line under
+  the pull request's `## Not verified`. Scenario: "A requirement about every save covers each
+  save".
 - The ship skill's description and README.md's line on the skills say the same.
 
 ## Review
 
-At a desk: read ship steps 3.4 and 5.3, the spec skill's facts step, and the proposal and tasks
-templates. After CueReview's next sync, compare the rounds of its next few pull requests with the
+At a desk: read ship steps 3.4, 5.3, 5.4 and 6.3, the spec skill's facts step, and the proposal and
+tasks templates. After CueReview's next sync, compare the rounds of its next few pull requests with the
 three these took.
 
 ## Settled questions
@@ -63,9 +72,10 @@ three these took.
   `agents/review-rounds`; moving it costs one spec edit.
 - **The tasks template holds the rule** for a task per path; design and ship write `tasks.md` from
   it, so neither skill restates it. Alternative: a line in design's step 2.3 as well.
-- **The self-check of the fixes also runs on a passing round's follow-ups**, before the merge,
-  where no further round reviews them. Alternative: only before a further round; a follow-up fix
-  would then reach the merge unchecked.
+- **The self-check of the fixes also runs on a passing round's follow-ups**, before the merge. What
+  it fixes counts among those follow-ups' fixes, so a code fix gets one more round and a wording fix
+  does not. Alternative: only before a further round; a follow-up fix would then reach the merge
+  unchecked.
 
 ## Out of scope
 

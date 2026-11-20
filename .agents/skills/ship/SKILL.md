@@ -58,7 +58,8 @@ independent review are clean. Formats: `specs/README.md`, `changes/README.md`.
    too, it is pre-existing: record main's result in `## Tests`; it does not block. Green there, it
    blocks: fix it.
 4. **Self-check.** Before round 1, run every check of the review checklist on your branch (12 and
-   14 on the pull request body §4 writes), and fix what they find.
+   14 on the pull request body §4 writes), and fix what they find; commit the fixes, then rerun the
+   gate and the suites they touch.
 
 ## 4. Pull request
 
@@ -88,15 +89,17 @@ A change with a side in the other repository: open both pull requests, each link
 2. Every finding, a follow-up included: **fix** it, or **answer** it with a reason that cites the
    code, a scenario or a rule. An answer is for a finding that is wrong; work you would rather skip
    is no reason.
-3. Commit, gate, rerun the suites the fixes touch, and **self-check the fixes**: every check of
-   the review checklist on `git diff <head last reviewed>..HEAD`, as its *Round 2 and later*
-   reviews them; fix what they find. Then push, and record the round in `## Review`:
+3. Commit, and **self-check the fixes**: every check of the review checklist on
+   `git diff <head last reviewed>..HEAD`, as its *Round 2 and later* reviews them; fix and commit
+   what they find. Then gate, rerun the suites the fixes touch, push, and record the round in
+   `## Review`:
    `R1 F2 [minor] <finding> → fixed`, or `→ answered: <reason>`. Name no commit there:
    `## Tests` names the head, once.
 4. Review again with a fresh reviewer, round by round, while the last round returns
    `Verdict: fail` (a `blocker` or `major` open). A round that passes ends the review: fix or
-   answer its follow-ups without another round, with one exception. When those fixes changed code
-   (more than docs, comments or wording), one more round reviews them. Passing, it ends the review
+   answer its follow-ups without another round, with one exception. When those fixes, what their
+   self-check fixed included, changed code (more than docs, comments or wording), one more round
+   reviews them. Passing, it ends the review
    the same way, its own follow-ups fixed or answered without a further round; failing, the rounds
    go on, up to step 5's stop.
 5. A `blocker` or `major` still open after round 3: stop, list each open finding for the owner, do

@@ -33,8 +33,8 @@ ones, while blockers and majors are what a further round is for.
 
 ### Requirement: A round with no blocker or major ends the review
 When a round finds no `blocker` or `major`, the ship skill SHALL fix or answer that round's
-follow-ups without another round, and only when those fixes changed code (more than docs, comments
-or wording) have one more round review them, because a further whole round for wording costs more
+follow-ups without another round, and only when those fixes, what their self-check fixed included,
+changed code (more than docs, comments or wording) have one more round review them, because a further whole round for wording costs more
 than it finds, while a code fix can still break something.
 
 #### Scenario: Wording follow-ups are fixed without another round
