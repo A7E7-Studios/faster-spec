@@ -6,7 +6,7 @@ them under `## Not verified`.
 
 ## 1. The skills and their templates
 
-- [x] 1.1 Ship: the self-check runs every check of the review checklist before round 1 (step 3.4) and on each round's fixes (step 5.3), and the description says so; test: node tools/gate/gate.mjs --local
+- [x] 1.1 Ship: the self-check runs every check of the review checklist before round 1 (step 3.4) and on each round's fixes (step 5.3), the final head may carry what it fixed after the last round (step 6.3), and the description says so; test: node tools/gate/gate.mjs --local
 - [x] 1.2 Spec: the facts step lists every code path each requirement covers; the proposal template's `## What changes` names them; test: node tools/gate/gate.mjs --local
 - [x] 1.3 The tasks template: a task and a test for each code path the proposal names; test: node tools/gate/gate.mjs --local
 - [x] 1.4 The specs `agents/review-rounds` and `agents/requirement-paths`, and this change folder; test: node tools/gate/gate.mjs --local

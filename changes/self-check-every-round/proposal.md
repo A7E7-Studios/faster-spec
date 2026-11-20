@@ -24,7 +24,8 @@ check 4.
   self-check runs before round 1".
 - **The fixes are self-checked**: after each round's fixes, the builder runs every check on the
   fixes' diff as the checklist's *Round 2 and later* reviews them, and fixes what they find before
-  the next round or the merge: ship step 5.3. Scenario: "The self-check of a fix finds the
+  the next round or the merge: ship step 5.3; step 6.3 lets the final head carry what the
+  self-check of a passing round's follow-ups fixed. Scenario: "The self-check of a fix finds the
   requirement it left stale".
 - **The spec lists each code path a requirement covers**: the spec skill's facts step lists them,
   the proposal template's `## What changes` names them, and the tasks template gives each its own

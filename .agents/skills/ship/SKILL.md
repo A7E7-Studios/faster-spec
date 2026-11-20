@@ -109,7 +109,8 @@ A change with a side in the other repository: open both pull requests, each link
 2. **Lands.** Every feature the change names is `review: unreviewed` and every task is ticked (a
    triage results branch keeps the `review` values triage wrote). Commit and push.
 3. **Reviewed head.** The final head may differ from the last reviewed head only by a clean merge
-   of `origin/main`, the commit of step 2, and commits fixing the last round's follow-ups (§5.4).
+   of `origin/main`, the commit of step 2, and commits fixing the last round's follow-ups and what
+   their self-check found (§5.3–5.4).
    Anything else gets a review round (§5).
 4. **Final checks.** Update the pull request body to the final state, then
    `node tools/gate/gate.mjs --local --pr <n>` passes, or fails only on `protected`. The suites are
