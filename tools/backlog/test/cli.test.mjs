@@ -41,6 +41,10 @@ test('each write command sends one commit', () => withTmp(async (tmp) => {
   const edited = parseItem(show(origin, 'backlog', `backlog/${id}.md`), { id });
   assert.deepEqual([edited.title, edited.description, edited.about], ['Export notes as PDF', 'Sharing sends a link only.\n\n## Steps\n\nShare a note.', ['editing/export', 'sharing/links']]);
   expectOne(['edit', id, '--about', 'none'], 'Pat Example: 1 edit');
+  // One field refused refuses the edit: nothing is sent, the other fields included.
+  const half = cli(dir, ['edit', id, '--text', 'Sent only with the rest.', '--about', 'Export']);
+  assert.deepEqual([half.code, half.err.trim()], [1, 'backlog: nothing was sent: about lists feature ids, <domain>/<capability>']);
+  assert.equal(commits(origin, 'backlog').length, sent.length);
   const move = expectOne(['move', id, 'ready'], 'Pat Example: 1 move');
   assert.equal(move.commit.body, `move ${id}: new -> ready`);
   const link = expectOne(['link', id, 'export-pdf'], 'Pat Example: 1 link');

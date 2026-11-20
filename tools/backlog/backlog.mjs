@@ -9,15 +9,16 @@ import { readConfig, resolveRepos, fetchRepo } from '../gate/lib/repos.mjs';
 import { SET_STATES } from './lib/item.mjs';
 import { SHOWN_STATES, STATE_LABELS, withShownStates } from './lib/state.mjs';
 import { locateBacklog, fetchBacklog, readBacklog, writeBacklog } from './lib/store.mjs';
+import { opProblem } from './lib/ops.mjs';
 
 const USAGE = `usage: node tools/backlog/backlog.mjs list [--state <${SHOWN_STATES.join('|')}>] [--json]
        node tools/backlog/backlog.mjs show <id> [--json]
        node tools/backlog/backlog.mjs add <title> [--text <description>] [--about <feature-id>]... [--json]
        node tools/backlog/backlog.mjs edit <id> [--title <title>] [--text <description>] [--about <feature-id>|none]... [--json]
        node tools/backlog/backlog.mjs note <id> <text>
-  a description or a note given as - is read from stdin; edit's --about sets the whole list
        node tools/backlog/backlog.mjs move <id> <${SET_STATES.join('|')}>
        node tools/backlog/backlog.mjs link <id> <change-id>
+  a description or a note given as - is read from stdin; edit's --about sets the whole list
   the backlog is backlog { repo, branch } in tools/gate/config.json; by default the branch
   "backlog" of the repository this runs in`;
 
@@ -112,10 +113,17 @@ function printItem(i, json) {
 }
 
 /**
- * Sends one write of `ops`; prints why nothing was sent and returns null when so, else
- * `{ results, commit }`. A refused operation sends nothing: every write here is one request's.
+ * Sends one write of `ops`, all or none: an operation whose shape is wrong is refused before
+ * anything is sent. Prints why nothing was sent and returns null when so, else `{ results, commit }`.
+ * Every write here is one request's, so an operation the replay refuses (no such request, a file
+ * that does not read) refuses them all.
  */
 async function sendAll({ where }, ops) {
+  const bad = ops.map(opProblem).find(Boolean);
+  if (bad) {
+    console.error(`backlog: nothing was sent: ${bad}`);
+    return null;
+  }
   const w = await writeBacklog(where, ops);
   if (!w.ok) {
     console.error(`backlog: nothing was sent: ${w.error}`);

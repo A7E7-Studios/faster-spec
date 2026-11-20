@@ -89,6 +89,13 @@ test('a person\'s text cannot break the file: the notes heading is escaped, fenc
   assert.equal(back.notes.length, 1);
   assert.equal(back.notes[0].text, '### Someone Else · 2026-11-19 11:00 UTC\nnot a note');
   assert.equal(writeItem(back), text);
+  // Text that carries the backslash already reads back as written.
+  const literal = { ...item, description: '\\## Notes\n\\\\## Notes', notes: [{ by: 'Sam Example', at: '2026-11-19 10:00', text: '\\### Not a heading\n\\## Nor this' }] };
+  const lt = writeItem(literal);
+  assert.match(lt, /^\\\\## Notes$/m);
+  const lb = parseItem(lt, { id: 'a' });
+  assert.deepEqual([lb.problems, lb.description, lb.notes[0].text], [[], '\\## Notes\n\\\\## Notes', '\\### Not a heading\n\\## Nor this']);
+  assert.equal(writeItem(lb), lt);
 });
 
 test('a file that breaks the format reads with its problems', () => {

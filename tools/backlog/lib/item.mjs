@@ -53,14 +53,15 @@ export function cleanLine(s) {
   return String(s ?? '').replace(/\s+/g, ' ').trim();
 }
 
-// A line of a person's text that would end it is kept with a backslash before its `#`: in the
+// A line of a person's text that would end it is kept with a backslash before it: in the
 // description a line reading `## Notes`, in a note any `## ` or `### ` line, which would read as a
-// section or a note heading. Markdown shows the same line, and the file keeps its shape. Every other
-// heading of a description stays as it is. An unclosed code fence is closed, so it cannot swallow
-// what follows.
+// section or a note heading. Such a line that starts with backslashes already gets one more, so
+// reading takes exactly one away and gives back what was written. Markdown shows the same line, and
+// the file keeps its shape. Every other heading of a description stays as it is. An unclosed code
+// fence is closed, so it cannot swallow what follows.
 const ESCAPE = {
-  description: [/^( {0,3})(##)(?=[ \t]+Notes[ \t]*$)/, /^( {0,3})\\(##)(?=[ \t]+Notes[ \t]*$)/],
-  notes: [/^( {0,3})(#{2,3})(?=[ \t]|$)/, /^( {0,3})\\(#{2,3})(?=[ \t]|$)/],
+  description: [/^( {0,3})(\\*##)(?=[ \t]+Notes[ \t]*$)/, /^( {0,3})\\(\\*##)(?=[ \t]+Notes[ \t]*$)/],
+  notes: [/^( {0,3})(\\*#{2,3})(?=[ \t]|$)/, /^( {0,3})\\(\\*#{2,3})(?=[ \t]|$)/],
 };
 
 function escapeText(text, { notes = false } = {}) {

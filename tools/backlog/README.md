@@ -99,8 +99,8 @@ The note's text.
   draft has none until it is sent.
 - **A person's text cannot break the file**: a line of a description that would read as
   `## Notes`, or in a note any `## ` or `### ` line, which would read as a section or a note
-  heading, is written with a backslash before its `#` and read back without it; a code fence left
-  open is closed.
+  heading, is written with one more backslash before it and read back with one fewer, so text that
+  already starts with one comes back as written; a code fence left open is closed.
 - **A file that does not read as the format** (a hand edit) reads as an item with its `problems`,
   `[{ line, message }]`: the map shows it, and every write to it is refused until it is fixed.
   Writing what was read gives the same text back.
