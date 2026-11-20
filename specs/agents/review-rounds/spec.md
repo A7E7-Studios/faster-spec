@@ -12,9 +12,9 @@ code:
 Before an agent merges a change, fresh reviewers read it in rounds. Only a blocker or a major
 finding sends the change into another round; a minor finding or a nit is fixed or answered on the
 way to the merge, and its fix gets one more round only when it changes code. After the first round
-a reviewer checks the fixes, not the whole change again, and the builder checks its own work before
-the first round. The review ends once no blocker or major is left and no follow-up fix that changes
-code is still unreviewed.
+a reviewer checks the fixes, not the whole change again. The builder runs the reviewer's checks
+first: on the whole change before the first round, and on each round's fixes. The review ends once
+no blocker or major is left and no follow-up fix that changes code is still unreviewed.
 
 ## Requirements
 
@@ -33,9 +33,10 @@ ones, while blockers and majors are what a further round is for.
 
 ### Requirement: A round with no blocker or major ends the review
 When a round finds no `blocker` or `major`, the ship skill SHALL fix or answer that round's
-follow-ups without another round, and only when those fixes changed code (more than docs, comments
-or wording) have one more round review them, because a further whole round for wording costs more
-than it finds, while a code fix can still break something.
+follow-ups without another round, and only when those fixes, what their self-check fixed included,
+changed code (more than docs, comments or wording) have one more round review them, because a
+further whole round for wording costs more than it finds, while a code fix can still break
+something.
 
 #### Scenario: Wording follow-ups are fixed without another round
 - **WHEN** round 2 passes with two `nit`s about a README's wording
@@ -67,15 +68,22 @@ accepted.
   was
 - **THEN** round 2 raises the stale README line
 
-### Requirement: The builder checks its own work before round 1
-Before the first round, the ship skill SHALL run the checklist's checks of repository rules, specs,
-docs and process on its own branch and its pull request body, and fix what they find, because a
-mechanical finding in round 1 costs a whole round.
+### Requirement: The builder checks the change and each round's fixes
+The ship skill SHALL run every check of the review checklist on its own branch and its pull request
+body before the first round, and on each round's fixes as a later round reviews them, fixing what
+they find, because a finding the builder could see costs a whole round when a reviewer finds it,
+and a fix often leaves the spec, docs or tests that describe its code stale.
 
 #### Scenario: The self-check runs before round 1
 - **WHEN** the lead has committed the build and the gate passes
-- **THEN** it runs the checklist's checks 3 and 5–14 and fixes what they find before it asks for
+- **THEN** it runs every check of the review checklist and fixes what they find before it asks for
   round 1
+
+#### Scenario: The self-check of a fix finds the requirement it left stale
+- **GIVEN** a round's fix that changes a limit a requirement states
+- **WHEN** the lead self-checks that round's fixes
+- **THEN** it finds the requirement still stating the old limit and corrects it before the next
+  round or the merge
 
 ### Requirement: The pull request names no commit a fix makes stale
 The ship skill SHALL record a fixed finding as `→ fixed`, naming no commit, and name the head the
