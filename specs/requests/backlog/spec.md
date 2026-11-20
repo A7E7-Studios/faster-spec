@@ -11,9 +11,10 @@ code:
 
 ## Summary
 
-The place where requests wait before they become a change: what someone wants, the discussion
-about it, and what became of it. Anyone who can push to the repository adds a request, writes notes
-on it and moves it from New to Discussing, Ready or Parked; once an agent turns it into a change,
+The place where requests wait before they become a change: a bug to fix or something new, in the
+asker's own words, the discussion about it, and what became of it. Anyone who can push to the
+repository adds a request, changes its title, description and features as it is discussed, writes
+notes on it and moves it from New to Discussing, Ready or Parked; once an agent turns it into a change,
 the request shows whether that change is in progress, waiting for review or done. Each request is
 one file on a branch of its own, so the whole story reads in one place, and main, its pull requests
 and its gate never see the discussion. You meet it when you raise a request, discuss one, or hand
@@ -44,14 +45,15 @@ discussion change daily and must not crowd main, its pull requests or its gate.
 
 ### Requirement: An item is one file holding its request and its notes
 The backlog SHALL keep each item as one Markdown file, `backlog/<id>.md`: its title, who asked,
-when, its state, the features it is about and the changes it led to, then what happens, what should
-happen and where, then its notes in the order they arrived, each with its author and time, because
-a person or an agent reads one file for the whole story.
+when, its state, the features it is about and the changes it led to, then its description, then its
+notes in the order they arrived, each with its author and time, because a person or an agent reads
+one file for the whole story. The description is free Markdown in the asker's words, with no fields
+it must fill and no kind of request, because a bug and an idea both belong in the backlog.
 
 #### Scenario: A new item holds the request
 - **WHEN** a person adds an item
 - **THEN** `backlog/<id>.md` holds its title, the person's git name, the date, the state New, the
-  features named, and what happens, what should happen and where
+  features named, and the description as the person wrote it
 - **PROOF** test: tools/backlog/test/store.test.mjs::a new item is one file holding the request, state new
 
 #### Scenario: A note is appended with its author and time
@@ -63,6 +65,21 @@ a person or an agent reads one file for the whole story.
 - **WHEN** an item is written
 - **THEN** that item's file is the only file the commit changes, and it holds text and links only
 - **PROOF** test: tools/backlog/test/store.test.mjs::a write changes only the item's own file
+
+### Requirement: A request is changed as it is discussed
+Anyone who can push to the branch SHALL be able to change a request's title, description and the
+features it is about, while who asked, when and its notes stay as they were written, because a
+request is sharpened as people discuss it, and the notes keep the discussion as it was said.
+
+#### Scenario: An edit changes the title, the description or the features
+- **WHEN** a person edits a request's title, description or features
+- **THEN** the item holds the new value, and the rest of its file is as it was
+- **PROOF** test: tools/backlog/test/ops.test.mjs::an edit changes the title, the description or the features and nothing else
+
+#### Scenario: Who asked, when and the notes are not edited
+- **WHEN** a write would edit who asked, when, a note or the changes an item names
+- **THEN** that write is refused, and the item is as it was
+- **PROOF** test: tools/backlog/test/ops.test.mjs::an edit of who asked, when, a note or a change is refused
 
 ### Requirement: Every write lands on the latest backlog
 When the backlog is written, it SHALL fetch the branch, apply the write to the branch's latest
@@ -108,18 +125,18 @@ change's folders on main, because what became of a request follows from what lan
 - **PROOF** test: tools/backlog/test/state.test.mjs::an item's changes decide its shown state
 
 ### Requirement: One command line reads and writes the backlog
-The backlog SHALL offer `node tools/backlog/backlog.mjs` with `list`, `show`, `add`, `note`,
-`move` and `link`, each write sent at once as one commit, and `--json` for agents, because agents
-and scripts use the backlog without the page.
+The backlog SHALL offer `node tools/backlog/backlog.mjs` with `list`, `show`, `add`, `edit`,
+`note`, `move` and `link`, each write sent at once as one commit, and `--json` for agents, because
+agents and scripts use the backlog without the page.
 
 #### Scenario: Each write command sends one commit
-- **WHEN** `add`, `note`, `move` or `link` runs
+- **WHEN** `add`, `edit`, `note`, `move` or `link` runs
 - **THEN** exactly one commit reaches the branch, naming the person and what it did
 - **PROOF** test: tools/backlog/test/cli.test.mjs::each write command sends one commit
 
 #### Scenario: Show prints an item with its notes and its state
 - **WHEN** `show <id> --json` runs
-- **THEN** the item's fields, its request, its notes in order and the state it shows print
+- **THEN** the item's fields, its description, its notes in order and the state it shows print
 - **PROOF** test: tools/backlog/test/cli.test.mjs::show prints the item, its notes and its shown state
 
 #### Scenario: List filters by state

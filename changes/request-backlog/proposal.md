@@ -23,17 +23,21 @@ the map for people who are not developers.
   history shared with main, or another repository and branch the config names (The first item
   creates the branch; A project names another repository and branch; Main and every checkout stay
   untouched).
-- A request is one file, `backlog/<id>.md`: the request, then its notes appended in order (A new
+- A request is one file, `backlog/<id>.md`: its title, the features it is about and a free
+  description in the asker's words, a bug or an idea alike, then its notes appended in order (A new
   item holds the request; A note is appended with its author and time; A write changes only the
   item's own file).
+- Anyone who can push changes a request's title, description and features as it is discussed; who
+  asked, when and the notes stay as written (An edit changes the title, the description or the
+  features; Who asked, when and the notes are not edited).
 - Every write fetches, applies itself to the latest commit as an operation and pushes, so writes
   made at once never lose a note, and a field changed meanwhile is held, not overwritten (Two notes
   sent at once both arrive; A field changed meanwhile is held, not overwritten).
 - People set New, Discussing, Ready and Parked; once a request names a change, its state follows
   that change's folders on main: In progress, To review, Done (A person moves an item; An item's
   changes decide what it shows).
-- `node tools/backlog/backlog.mjs` lists, shows, adds, notes, moves and links, one commit per
-  write (Each write command sends one commit; Show prints an item with its notes and its state;
+- `node tools/backlog/backlog.mjs` lists, shows, adds, edits, notes, moves and links, one commit
+  per write (Each write command sends one commit; Show prints an item with its notes and its state;
   List filters by state).
 - spec takes `backlog:<id>` and links the change back; triage lists New requests (A request
   becomes a change; New requests wait beside the features).
@@ -41,7 +45,8 @@ the map for people who are not developers.
   feature and Suggest a change (Items show by state; An item shows what became of it; A person adds
   a request; The backlog's branch does not exist yet; New requests wait beside the features; A
   feature lists its open requests; Suggest a change starts a request about the feature; Refresh
-  shows what others sent to the backlog).
+  shows what others sent to the backlog). A request's dialog edits its title, description and
+  features in place (A person edits a request in place; What was written stays as written).
 - What people write on the map waits as drafts until Submit, which sends one commit (Every view
   shows what is unsent; Drafts survive a restart; Submit sends every draft as one commit; A
   clashing draft stays unsent with both values; Submit without the network keeps the drafts; Only
@@ -53,7 +58,8 @@ the map for people who are not developers.
 
 At a desk, with two clones of a sample project (a notes app and its backend). From each clone add
 a request, write notes on the same one, move one to Ready, submit both at once, and make a clash on
-one field. Open a feature, see its requests and Suggest a change. Run spec on `backlog:<id>` and
+one field. Raise one bug and one idea, edit a sent request's title, description and features in
+its dialog, and submit. Open a feature, see its requests and Suggest a change. Run spec on `backlog:<id>` and
 watch the request show In progress; land the change, then remove its folder, and watch To review
 and Done. Under a second computer account with no checkout, run setup, open the shortcut, push a
 map change to main and press Restart to update. Judge the views against the board design draws.
@@ -97,6 +103,22 @@ map change to main and press Restart to update. Judge the views against the boar
   every one that does. Rejected: setup clones only the backlog's repository.
 - **Q16 Setup command**: `setup.mjs --print-command` prints one command per system for a project's
   README or a message. Rejected: steps in the README.
+- **Q17 Request**: a title, one free description in Markdown and the features it is about; no kind
+  of request and no field the asker must fill; the empty description hints what helps. The owner,
+  on the built change: "It is now basically a bug reporting tool with What happens, what should
+  happen, etc. But that is not the intention. It should be a proper backlog containing bugs and
+  features. I don't think we need to categorize requests but I would likely not force them into
+  that specific format." Rejected: what happens, what should happen and where as fields; a link
+  that inserts a problem outline.
+- **Q18 Editing**: in place, as task tools edit an item where it shows: the title and the
+  description turn editable when clicked, the features are chips with Remove and Add; each change
+  is a draft until Submit; the state keeps Move. The owner: "when clicking on a request, I can only
+  add comments. I should probably be able to modify anything of the request." Rejected: an Edit
+  button that turns the dialog into the create form.
+- **Q19 Notes**: a note stays as it was written; a correction is a new note. Rejected: an author
+  edits their own notes.
+- **Q20 Order**: each column newest first. Rejected: a rank people set by dragging, now.
+- **Q21 Summary**: the owner confirmed the amended requirements.
 
 ## Calls for the owner
 
@@ -111,10 +133,10 @@ map change to main and press Restart to update. Judge the views against the boar
   change id when it is free. Opaque numbers instead would read worse in a file list.
 - **Notes** carry the author's git name and the time in UTC. A GitHub account name instead would
   need the network to read it.
-- **Editing and removing**: the backlog and the map's drafts take an edit of a request's text from
-  anyone who can push, and git history keeps the old text, but no view offers one: the boards draw
-  no edit control and the command line has no `edit`. Nothing is deleted; Parked takes its place. A
-  delete would need its own rule for the history.
+- **Removing**: nothing is deleted; Parked takes its place. A delete would need its own rule for
+  the history.
+- **Who asked, when and the changes** are not edited, on the map or the command line: they are
+  facts, and the changes are set by spec. A wrong link is fixed on the branch with plain git.
 - **Done and Parked stay** in the tree, shown behind a filter. Removing them would make the branch
   forget who asked.
 - **Search** stays on features; requests are found on the Backlog view.
@@ -136,4 +158,5 @@ map change to main and press Restart to update. Judge the views against the boar
 - An intake skill that picks up Ready requests on its own.
 - Uploaded files on requests: links only, since git history is permanent.
 - Deleting requests, and a Ready that only some people may set.
+- A rank people set on a column (Q20), and editing a note once sent (Q19).
 - Editing the backlog's branch by hand with plain git: it works, but nothing guards it.

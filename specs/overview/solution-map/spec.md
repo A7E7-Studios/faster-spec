@@ -131,9 +131,10 @@ by what it does and by what ships.
 - **PROOF** test: tools/solution-map/test/view.test.mjs::an approved feature folds its behaviour away
 
 ### Requirement: The backlog has a view of its own
-The Solution map SHALL show the backlog's items grouped by the state each shows, Done and Parked
-only behind a filter, and open an item with its request, its notes, the features it names and the
-changes it led to, because people follow a request from its first note to the feature it became.
+The Solution map SHALL show the backlog's items grouped by the state each shows, newest first,
+Done and Parked only behind a filter, and open an item with its description, its notes, the
+features it names and the changes it led to, because people follow a request from its first note
+to the feature it became.
 
 #### Scenario: Items show by state
 - **WHEN** a person opens Backlog
@@ -143,13 +144,12 @@ changes it led to, because people follow a request from its first note to the fe
 
 #### Scenario: An item shows what became of it
 - **WHEN** a person opens an item
-- **THEN** its request, its notes in order, the features it names and each change it led to, with
-  that change's state, show
+- **THEN** its description, its notes in order, the features it names and each change it led to,
+  with that change's state, show
 - **PROOF** test: tools/solution-map/test/view.test.mjs::an item shows its notes, its features and its changes
 
 #### Scenario: A person adds a request
-- **WHEN** a person fills in a title, what happens, what should happen and where, picks the
-  features it is about, and saves
+- **WHEN** a person fills in a title and a description, picks the features it is about, and saves
 - **THEN** the request shows as a draft in New
 - **PROOF** test: tools/solution-map/test/backlog.test.mjs::a request added on the page is a draft in new
 
@@ -158,6 +158,25 @@ changes it led to, because people follow a request from its first note to the fe
 - **WHEN** a person opens Backlog
 - **THEN** it says there are no requests yet and how to add the first
 - **PROOF** test: tools/solution-map/test/view.test.mjs::an empty backlog says how to add the first request
+
+### Requirement: A request is changed where it is read
+When a person opens a sent request, the Solution map SHALL let them change its title, its
+description and the features it is about in place, each change a draft until Submit, while who
+asked, when, its notes and its changes stay as they are, because people sharpen a request as they
+discuss it, the way task tools edit an item where it shows.
+
+#### Scenario: A person edits a request in place
+- **WHEN** a person changes the title, the description or the features of a sent request in its
+  dialog
+- **THEN** the request shows the new value marked as a draft, and the change is among the unsent
+  drafts
+- **PROOF** test: tools/solution-map/test/backlog.test.mjs::an edit made in the dialog is a draft of that field
+- **PROOF** test: tools/solution-map/test/view.test.mjs::an edited field shows its draft value in the request dialog
+
+#### Scenario: What was written stays as written
+- **WHEN** a person opens a sent request
+- **THEN** who asked, when, the notes and the changes show as text, with nothing to edit them by
+- **PROOF** test: tools/solution-map/test/view.test.mjs::who asked, when, notes and changes have no edit control
 
 ### Requirement: A feature shows the requests about it
 The Solution map SHALL list on each feature the requests that name it and are not Done, and offer
