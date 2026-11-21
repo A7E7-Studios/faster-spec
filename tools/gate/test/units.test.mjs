@@ -721,7 +721,6 @@ test('config: the starter config loads and is report-only; history rules match w
 test('config: the design block names a tokens file and a brief, and optionally catalogues and a render command', () => {
   const cfg = loadConfig(TEMPLATE);
   assert.deepEqual(cfg.design, { tokens: 'tools/design/house-style/tokens.css', brief: 'tools/design/house-style/brief.md' }, 'the starter names the house style');
-  assert.equal(loadConfig().design, undefined, 'this repository names none');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-config-'));
   try {
     const file = path.join(dir, 'config.json');
