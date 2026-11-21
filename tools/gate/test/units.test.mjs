@@ -728,6 +728,7 @@ test('config: the design block names a tokens file and a brief, and optionally c
       fs.writeFileSync(file, JSON.stringify({ ...cfg, design }));
       return loadConfig(file);
     };
+    assert.equal(load(undefined).design, undefined, 'the block is optional');
     const full = { tokens: 'design/tokens.css', brief: 'design/brief.md', catalogues: [{ name: 'icons', open: 'https://example.invalid/icons/{entry}' }], render: 'npm run render' };
     assert.deepEqual(load(full).design, full);
     for (const [design, want] of [
