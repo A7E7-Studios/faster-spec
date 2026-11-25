@@ -23,7 +23,7 @@ no dependencies; a project takes them as a vendored copy pinned by a lock.
 | **The gate**, `tools/gate/` | a deterministic check of form on every pull request: spec and change formats, the review reset, no images, living docs free of history, byte budgets, links, the nearest README, the PR description, the design contract, the kit copy, and the protected paths only the owner merges. [Its README](tools/gate/README.md) |
 | **The overview**, `tools/overview/` | one JSON index (and a plain-text summary) of every feature, its systems, scenarios and tests, review state, the change folders and the components, across repositories. [Its README](tools/overview/README.md) |
 | **The Solution map**, `tools/solution-map/` | a local web page over the overview, on 127.0.0.1: what waits for the owner's review, every feature by domain or by system with its Looks and tests, and Start review, which opens CueReview to record the review. [Its README](tools/solution-map/README.md) |
-| **The house style**, `tools/design/` | a starter design system: tokens and a style brief the design skill works from. [Its README](tools/design/README.md) |
+| **The house style and profiles**, `tools/design/` | a starter design system (tokens and a style brief the design skill works from), and a profile per kind of application: the standards its interface is built to (every state of a component, transitions, any size) and the checks ship writes as tests. The kit ships the web profile. [Its README](tools/design/README.md) |
 
 What stays each project's own: its `AGENTS.md` (the rules, the build route, the suites, the commit
 style), its `tools/gate/config.json` (the protected paths, the vendored folders, the component

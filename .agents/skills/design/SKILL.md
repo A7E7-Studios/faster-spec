@@ -15,8 +15,10 @@ request. What each file holds is in its template (`templates/`).
   (`git diff origin/main...HEAD -- specs/`). No change folder yet: run **spec** first.
 - The design system: the `design` block of `tools/gate/config.json`. `tokens` is a CSS file of
   custom properties, `brief` the style brief (principles and reference products), `catalogues` the
-  component catalogues and how to open an entry, `render` a command that renders the running app.
-  Only `tokens` and `brief` are always there.
+  component catalogues and how to open an entry, `render` a command that renders the running app,
+  `profiles` the profile of each kind of application the project builds: the standards its
+  interface keeps (among them the list of states a component has) and the checks that prove them
+  on the build. Only `tokens` and `brief` are always there.
 - From AGENTS.md: the component library, how to render the running app, where the owner reviews,
   and the material it marks restricted, which never appears on a board or a page.
 
@@ -58,10 +60,14 @@ Skip to step 2 when nothing seen or heard changes.
    round. A mix is a new direction: draw it on the page, critique it and show it again.
 7. **The pick.** A board per feature, `specs/<domain>/<capability>/looks/<name>.html` (a second
    only when one outgrows its 30720 bytes), self-contained as the page is, holding every state the
-   scenarios name as a `<section id="<screen>-<state>">`. The spec's `## Looks` names each section
+   scenarios name as a `<section id="<screen>-<state>">`. With a profile, it also holds each new
+   component in every state of the profile's list that applies (one `<section
+   id="<component>-states">` may show them side by side), and a screen whose layout changes with
+   its width at the profile's narrowest width too. The spec's `## Looks` names each section
    the owner should see, `- looks/<name>.html#<id> — <caption>`, and where the built feature can be
    seen, `- page: <path or URL> — <caption>`. `look.md` from `templates/look.md` records the pick,
-   the directions rejected, the critique and the accessibility results in words. `looks.html` is
+   the directions rejected, each new component's states, the critique and the accessibility
+   results in words. `looks.html` is
    committed with `look.md`, and goes when triage deletes the change folder: the directions not
    picked stay only there. No image file is ever committed.
 
