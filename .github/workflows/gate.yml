@@ -33,9 +33,10 @@ jobs:
   gate:
     name: gate
     if: github.event.pull_request.draft == false
-    # The repository's or organisation's variable CI_LINUX names a self-hosted runner label to run
-    # on (an organisation that runs its CI on its own machines); unset, GitHub's ubuntu-latest. The
-    # job runs only main's code and reads the pull request as data, so it is safe on a shared runner.
+    # The repository's or organisation's variable CI_LINUX names one self-hosted runner label or
+    # scale set to run on (an organisation that runs its CI on its own machines); unset, GitHub's
+    # ubuntu-latest. The job executes nothing from the pull request, which it reads as data; the
+    # runner itself must still be one nothing else can tamper with: use ephemeral runners.
     runs-on: ${{ vars.CI_LINUX || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:

@@ -14,8 +14,11 @@ node tools/gate/gate.mjs --local [--pr <n>]                          # this bran
 node tools/gate/gate.mjs --base <rev> --head <rev> [--pr <n>]        # CI (.github/workflows/gate.yml)
 ```
 
-In CI the job runs on GitHub's `ubuntu-latest`, or on the self-hosted runner label the repository's
-or organisation's Actions variable `CI_LINUX` names.
+In CI the job runs on GitHub's `ubuntu-latest`, or on the one self-hosted runner label or scale set
+the repository's or organisation's Actions variable `CI_LINUX` names (a comma list is one label).
+When no runner with that label is online, the job queues, the check stays pending, and GitHub
+cancels it after 24 hours. It executes nothing from the pull request; use ephemeral runners, so no
+earlier job can have changed the tools it runs with.
 
 | Option | Does |
 |---|---|
