@@ -42,7 +42,7 @@ application having its UI standards and a headset application its drive-through 
   `tasks.md`.
 - **Ship builds to the profile and tests it**: the Standards kept, each Check that applies a test
   in the project's suites, one that cannot apply named under `## Not verified`; then each built
-  screen compared with its board section. Scenarios: "What the web profile's checks prove", "A
+  screen compared with its board section and what differs fixed. Scenarios: "What the web profile's checks prove", "A
   check that cannot apply is named with its reason", "A project without a profile builds as
   before", "A build that differs from its board is fixed or explained". Path:
   `.agents/skills/ship/SKILL.md` step 2.

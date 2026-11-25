@@ -40,7 +40,7 @@ is built on nothing and a build checked against a missing profile is not checked
 | `design.profiles` | The config |
 |---|---|
 | not a list, or an empty one | is refused |
-| a folder, or a path outside the repository | is refused |
+| a path ending in `/`, or a path outside the repository | is refused |
 | the same file twice | is refused |
 - **PROOF** test: tools/gate/test/units.test.mjs::config: the design block names a tokens file and a brief, and optionally catalogues, a render command and profiles
 

@@ -46,11 +46,15 @@ owner otherwise finds it in review.
 | Check | A test proves |
 |---|---|
 | States | each new or changed component rendered in every state that applies |
-| Sizes | no overflow and no clipped or overlapping text at each width |
-| Transitions | each animated change takes its motion from the tokens |
+| Sizes | no overflow, no clipped or overlapping text and no target too small at each width |
+| Text at 200 % | the same with the text size doubled |
+| Touch | each control acts on a tap as on a click |
+| Transitions | each animated change takes its motion from the tokens and ends in the state the board shows; nothing but progress animates at rest |
 | Reduced motion | nothing takes time when reduced motion is on |
 | Keyboard | each control reached, focused and operated |
+| Accessibility scan | no violation on each new or changed screen, in each theme |
 | Tokens | no raw value where a token exists |
+| The board | each section of the feature's board reached in the build |
 
 #### Scenario: A check that cannot apply is named with its reason
 - **WHEN** a change adds nothing animated
@@ -62,9 +66,10 @@ owner otherwise finds it in review.
 - **THEN** it adds no profile check and the review asks for none
 
 ### Requirement: The build is compared with its board before the review
-When the build of a change that alters something seen is done, the ship skill SHALL render each
-screen the board draws and compare it with its board section, state by state, because a
-difference found before the review costs one fix and one found by the owner costs a change.
+When the build of a change that alters something seen is done in a project that names a profile,
+the ship skill SHALL render each screen the board draws and compare it with its board section,
+state by state, because a difference found before the review costs one fix and one found by the
+owner costs a change.
 
 #### Scenario: A build that differs from its board is fixed or explained
 - **WHEN** a built screen differs from its board section

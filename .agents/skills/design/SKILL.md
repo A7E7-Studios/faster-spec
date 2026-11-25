@@ -63,13 +63,14 @@ Skip to step 2 when nothing seen or heard changes.
    scenarios name as a `<section id="<screen>-<state>">`. With a profile, it also holds each new
    component in every state of the profile's list that applies (one `<section
    id="<component>-states">` may show them side by side), and a screen whose layout changes with
-   its width at the profile's narrowest width too. The spec's `## Looks` names each section
+   its width at the profile's narrowest width too; run step 4's accessibility list on what
+   this adds, and name the added sections to the owner. The spec's `## Looks` names each section
    the owner should see, `- looks/<name>.html#<id> — <caption>`, and where the built feature can be
    seen, `- page: <path or URL> — <caption>`. `look.md` from `templates/look.md` records the pick,
    the directions rejected, each new component's states, the critique and the accessibility
-   results in words. `looks.html` is
-   committed with `look.md`, and goes when triage deletes the change folder: the directions not
-   picked stay only there. No image file is ever committed.
+   results, those of the added states among them, in words. `looks.html` is committed with
+   `look.md`, and goes when triage deletes the change folder: the directions not picked stay only
+   there. No image file is ever committed.
 
 ## 2. Technical design
 

@@ -41,9 +41,9 @@ independent review are clean. Formats: `specs/README.md`, `changes/README.md`.
   every state that applies, its transitions, any size. Write each of its Checks that applies as a
   test, a task each, and run them with the suites; one that cannot apply goes under
   `## Not verified` with its reason. Then render each screen the board draws (`design.render`, or
-  AGENTS.md's route) and compare it with its board section, state by state: fix what differs, or
-  say how it differs in the pull request. The checks are scripts that assert on the build; never
-  hand a sub-agent pictures to judge in their place.
+  AGENTS.md's route) and compare it with its board section, state by state, and fix what differs.
+  The checks are scripts that assert on the build; never hand a sub-agent pictures to judge in
+  their place.
 - **Specs match the code.** When the code cannot meet a scenario as written, stop and ask the
   owner; never weaken a scenario silently. The ruling goes into the spec and `proposal.md`.
 - **Docs, in the same commits.** The README nearest each changed code path states what the code

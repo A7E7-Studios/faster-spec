@@ -67,9 +67,9 @@ reason), and the head you last reviewed.
    anywhere. A build that differs from the board is explained in the pull request. Where the
    project names profiles and the diff changes something seen: each new or changed component has
    every state of the profile's list that applies, built, and rendered by a test; each of the
-   profile's Checks that applies is a test `## Tests` lists, and each that does not is under
-   `## Not verified` with its reason; the styles the diff adds hold no raw value where a token
-   exists.
+   profile's Checks that applies is a test (its task in `tasks.md` names it, and a suite under
+   `## Tests` runs it), and each that does not is under `## Not verified` with its reason; the
+   styles the diff adds hold no raw value where a token exists.
 9. **READMEs are current.** Each README nearest a changed code path describes the code at head.
 10. **Living docs state what IS.** Added lines in specs, READMEs, `ARCHITECTURE.md` and AGENTS.md
     describe the present. Flag narration ("previously", "now replaced", "we changed"), roadmap

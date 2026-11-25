@@ -36,6 +36,8 @@ something seen; a project names it in its config's `design.profiles`
    device. The page never scrolls sideways, text wraps and is never clipped or laid over other
    content, and every target keeps its minimum size. Pointer and touch both work.
 6. **Accessible.** The design skill's accessibility list holds in the build, in each theme.
+7. **As the board draws it.** Every screen and state the feature's board holds exists in the
+   build.
 
 ## Checks
 
@@ -43,17 +45,21 @@ Each check is an automated test in the project's suites, run in a browser engine
 through Playwright), and a task of the change. One that cannot apply to a change is named, with
 the reason, in the pull request's `## Not verified`.
 
-| Check | Passes when |
-|---|---|
-| States | each new or changed component is rendered in every state of the list that applies, on a catalogue page or a test page, and each state differs from the default in a style, a label or an element |
-| Sizes | each new or changed screen, at 320, 768 and 1280 px wide and at the widths the project adds, has no horizontal overflow and no text clipped or laid over another element |
-| Text at 200 % | the Sizes check holds with the text size doubled |
-| Transitions | each animated change of state takes its duration and easing from the motion tokens and ends in the state the board shows |
-| Reduced motion | with reduced motion on, no transition or animation takes time |
-| Keyboard | each control is reached with Tab in reading order, shows its focus, and acts on Enter or Space |
-| Accessibility scan | an automated scan (for example axe) reports no violation on each new or changed screen, in each theme |
-| Tokens | the styles the change adds hold no raw colour, size or duration where a token exists |
-| The board | each section of the feature's board is reached in the build by a test |
+| Check | Standard | Passes when |
+|---|---|---|
+| States | 3 | each new or changed component is rendered in every state of the list that applies, on a catalogue page or a test page, and each state differs from the default in a style, a label or an element |
+| Sizes | 5 | each new or changed screen, at 320, 768 and 1280 px wide and at the widths the project adds, has no horizontal overflow, no text clipped or laid over another element, and no target under its minimum size |
+| Text at 200 % | 5, 6 | the Sizes check holds with the text size doubled |
+| Touch | 5 | with touch emulated, each control acts on a tap as it does on a click |
+| Transitions | 4 | each animated change of state takes its duration and easing from the motion tokens and ends in the state the board shows; on a screen at rest, nothing but a progress indicator is animating |
+| Reduced motion | 4 | with reduced motion on, no transition or animation takes time |
+| Keyboard | 6 | each control is reached with Tab in reading order, shows its focus, and acts on Enter or Space |
+| Accessibility scan | 6 | an automated scan (for example axe) reports no violation on each new or changed screen, in each theme |
+| Tokens | 2 | the styles the change adds hold no raw colour, size, spacing, radius, shadow, duration or easing where a token exists |
+| The board | 7 | each section of the feature's board is reached in the build by a test |
+
+Standard 1 has no check of its own: whether a control belongs in the library is for the review,
+whose check on reuse reads the diff for a second version of what the library has.
 
 The checks are scripts: they assert on the page, they do not ask an agent to judge a picture. A
 screenshot a check takes is for the comparison with the board and for the pull request; it is
