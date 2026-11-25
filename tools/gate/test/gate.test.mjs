@@ -416,7 +416,7 @@ test('changes: a board added, edited or deleted is a change to its spec\'s text,
 
 // --- design ----------------------------------------------------------------------------------
 
-test('design: skipped without a design block; with the starter\'s, its tokens file and brief are present at head', (t) => {
+test('design: skipped without a design block; with the starter\'s, its tokens file, brief and profile are present at head', (t) => {
   const { design } = templateConfig();
   const r = setup(t);
   r.branch('x').write({ 'README.md': '# Root\n\nFine.\n' });
@@ -424,15 +424,20 @@ test('design: skipped without a design block; with the starter\'s, its tokens fi
   let rep = gate(r);
   assert.deepEqual([check(rep, 'design').status, check(rep, 'design').summary], ['skip', 'no design block in config.json']);
   rep = gate(r, { config: testConfig({ design }) });
-  assert.equal(failText(rep, 'design'), [`${design.tokens}: design.tokens: no file ${design.tokens} at head`, `${design.brief}: design.brief: no file ${design.brief} at head`].join('\n'));
-  r.write({ [design.tokens]: ':root { --accent: #2a6; }\n', [design.brief]: '# Brief\n\nCalm and plain.\n', 'tools/design/README.md': '# Design\n\nThe house style.\n' });
+  const [profile] = design.profiles;
+  assert.equal(failText(rep, 'design'), [`${design.tokens}: design.tokens: no file ${design.tokens} at head`, `${design.brief}: design.brief: no file ${design.brief} at head`, `${profile}: design.profiles[0]: no file ${profile} at head`].join('\n'));
+  r.write({ [design.tokens]: ':root { --accent: #2a6; }\n', [design.brief]: '# Brief\n\nCalm and plain.\n', [profile]: '# Web profile\n\n## Standards\n\n## Checks\n', 'tools/design/README.md': '# Design\n\nThe house style.\n' });
   r.commit('feat: the house style');
   rep = gate(r, { config: testConfig({ design: { ...design, catalogues: [{ name: 'icons', open: 'https://example.invalid/icons/{entry}' }] } }) });
   assert.equal(check(rep, 'design').status, 'pass', failText(rep, 'design'));
-  assert.equal(check(rep, 'design').summary, `tokens ${design.tokens}, brief ${design.brief}, 1 catalogue(s)`);
-  r.write({ [design.brief]: null });
-  r.commit('chore: drop the brief');
-  assert.match(failText(gate(r, { config: testConfig({ design }) }), 'design'), /design\.brief: no file tools\/design\/house-style\/brief\.md at head/);
+  assert.equal(check(rep, 'design').summary, `tokens ${design.tokens}, brief ${design.brief}, 1 catalogue(s), 1 profile(s)`);
+  const { profiles, ...plain } = design;
+  assert.equal(check(gate(r, { config: testConfig({ design: plain }) }), 'design').summary, `tokens ${design.tokens}, brief ${design.brief}, 0 catalogue(s)`, 'a design block without profiles names none');
+  r.write({ [design.brief]: null, [profile]: null });
+  r.commit('chore: drop the brief and the profile');
+  const dropped = failText(gate(r, { config: testConfig({ design }) }), 'design');
+  assert.match(dropped, /design\.brief: no file tools\/design\/house-style\/brief\.md at head/);
+  assert.match(dropped, /design\.profiles\[0\]: no file tools\/design\/profiles\/web\.md at head/);
 });
 
 // --- history ---------------------------------------------------------------------------------

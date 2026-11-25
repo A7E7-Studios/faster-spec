@@ -42,11 +42,11 @@ const RENAMED = [
   ['excludeModules', 'excludeComponents'],
 ];
 
-/** What is wrong with config.json `design`: { tokens, brief, catalogues?, render? }. */
+/** What is wrong with config.json `design`: { tokens, brief, catalogues?, render?, profiles? }. */
 export function designProblems(d) {
-  if (!d || typeof d !== 'object' || Array.isArray(d)) return ['"design" is { "tokens", "brief", "catalogues"?, "render"? }'];
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return ['"design" is { "tokens", "brief", "catalogues"?, "render"?, "profiles"? }'];
   const out = [];
-  for (const k of Object.keys(d)) if (!['tokens', 'brief', 'catalogues', 'render'].includes(k)) out.push(`unknown key "design.${k}" (one of tokens, brief, catalogues, render)`);
+  for (const k of Object.keys(d)) if (!['tokens', 'brief', 'catalogues', 'render', 'profiles'].includes(k)) out.push(`unknown key "design.${k}" (one of tokens, brief, catalogues, render, profiles)`);
   for (const k of ['tokens', 'brief']) {
     const bad = pathProblem(d[k]);
     if (typeof d[k] !== 'string' || bad || d[k].endsWith('/')) out.push(`"design.${k}" is a repository path to a file${typeof d[k] === 'string' && bad ? `: ${bad}` : ''}`);
@@ -65,6 +65,18 @@ export function designProblems(d) {
     }
   }
   if (d.render !== undefined && (typeof d.render !== 'string' || !d.render.trim())) out.push('"design.render" is a command, a non-empty string');
+  if (d.profiles !== undefined) {
+    if (!Array.isArray(d.profiles) || d.profiles.length === 0) out.push('"design.profiles" is a list of one or more repository paths to files');
+    else {
+      const seen = new Set();
+      d.profiles.forEach((p, i) => {
+        const bad = pathProblem(p);
+        if (typeof p !== 'string' || bad || p.endsWith('/')) out.push(`"design.profiles" entry ${i} is a repository path to a file${typeof p === 'string' && bad ? `: ${bad}` : ''}`);
+        else if (seen.has(p)) out.push(`"design.profiles": "${p}" appears twice`);
+        else seen.add(p);
+      });
+    }
+  }
   return out;
 }
 

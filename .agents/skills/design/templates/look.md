@@ -25,6 +25,15 @@ on `looks.html` until the change folder is deleted.
 - **From the catalogues:** <component>, <component>.
 - **New:** <component>: <what it is, and why no catalogue component fits>.
 
+## States
+
+For each new component, the states of the profile's list (`design.profiles`). Drop the section
+when the project names no profile or the change adds no component.
+
+| Component | States on the board | States that do not apply, and why |
+|---|---|---|
+| <component> | <default, hover, focus, disabled, …> | <state>: <why this component is never in it> |
+
 ## Critique
 
 | Principle of the brief | How the pick holds it, and what the critique changed |

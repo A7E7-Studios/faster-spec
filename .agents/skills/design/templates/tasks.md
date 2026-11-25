@@ -6,6 +6,9 @@ names has its own task and test. Where no automation reaches a path or a scenari
 names it under `## Not verified`; such a scenario has no task of its own. Each group ends by
 updating the README nearest the code it changes.
 
+Where the change alters something seen and the project names profiles (`design.profiles`), each of
+a profile's checks that applies is a task with its test.
+
 ## 1. <group: one module or concern>
 
 - [ ] 1.1 <work>; test: <path::selector or command>
