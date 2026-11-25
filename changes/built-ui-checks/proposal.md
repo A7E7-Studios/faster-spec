@@ -36,8 +36,8 @@ application having its UI standards and a headset application its drive-through 
   `tools/gate/lib/checks.mjs` (the design check), `tools/gate/config.template.json`.
 - **Design draws every state**: each new component on the board in every state of the profile's
   list that applies, listed in `look.md`; a screen that changes with its width at the narrowest
-  width too; each profile check a task, by the tasks template. Scenarios: "The board holds a new component's states", "A
-  screen that changes with its width is drawn narrow too". Paths:
+  width too; each profile check a task, by the tasks template. Scenarios: "The board holds a
+  new component's states", "A screen that changes with its width is drawn narrow too". Paths:
   `.agents/skills/design/SKILL.md` steps 0 and 1.7, `.agents/skills/design/templates/look.md` and
   `tasks.md`.
 - **Ship builds to the profile and tests it**: the Standards kept, each Check that applies a test
@@ -59,8 +59,9 @@ nothing changes for it.
 ## Review
 
 At a desk: read `tools/design/profiles/web.md`, design step 1.7, the tasks template, ship step
-2's "The built look" and the review checklist's check 8. Then, in a project that names the web profile, build
-its next change that adds a component and look at what the pull request lists under `## Tests`
+2's "The built look" and the review checklist's check 8. Then, in a project that names the web
+profile, build its next change that adds a component and look at what the pull request lists
+under `## Tests`
 and `## Not verified`, and at how much of the review still goes to states and sizes.
 
 ## Settled questions
