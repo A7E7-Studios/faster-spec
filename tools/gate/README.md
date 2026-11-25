@@ -14,6 +14,9 @@ node tools/gate/gate.mjs --local [--pr <n>]                          # this bran
 node tools/gate/gate.mjs --base <rev> --head <rev> [--pr <n>]        # CI (.github/workflows/gate.yml)
 ```
 
+In CI the job runs on GitHub's `ubuntu-latest`, or on the self-hosted runner label the repository's
+or organisation's Actions variable `CI_LINUX` names.
+
 | Option | Does |
 |---|---|
 | `--local` | head `HEAD`, base `origin/main` (or `--main`, or `--base`); always strict unless `--report-only`; with `--pr <n>` the description is read through `gh api` |
