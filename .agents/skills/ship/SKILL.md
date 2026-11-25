@@ -74,7 +74,8 @@ independent review are clean. Formats: `specs/README.md`, `changes/README.md`.
 Push, then `gh pr create --draft`. It stays a draft through the review rounds and is marked ready
 only on its final head (§6.4): a project's CI runs no job on a draft, so each change runs CI once,
 while the suites you run (§3.3) are the record of every head before it. Where the repository
-cannot hold drafts, open it ready; CI then runs on each head, and §6.4's ready steps fall away. Its title becomes the
+cannot hold drafts, open it ready: CI then runs on each head, §6.4's moves to ready and back to
+draft fall away, and its wait for the checks and the fix of a failing one stay. Its title becomes the
 squash commit's subject, so it follows AGENTS.md's commit style. The body:
 
 | Section | Holds |
