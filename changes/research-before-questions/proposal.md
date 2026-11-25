@@ -51,7 +51,7 @@ further questions only where something needs clarifying, not for the sake of ask
 - **Where the owner reviews** comes from AGENTS.md; it is asked only where AGENTS.md is silent.
   Scenario: "What each kind of decision becomes" (its last row). Path:
   `.agents/skills/spec/SKILL.md` step 3.
-- **The words that named rounds** follow: the triage skill's two references, the scenario
+- **The words that named rounds** follow: the triage skill's two references, the scenarios
   "Five questions in Claude Code" and "Questions asked as text" of `agents/owner-questions`, and
   README.md's diagram and its line on the skills. Paths: `.agents/skills/triage/SKILL.md`,
   `specs/agents/owner-questions/spec.md`, `README.md`.
