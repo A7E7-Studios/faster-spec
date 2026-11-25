@@ -75,7 +75,7 @@ CueReview runs on the owner's computer; on Windows, `cue` is
    a build without it, or on a feature whose spec text changed on main since, becomes a question.
 5. **Confirm once.** Show the whole list (in chat, or a local page) with the build and the day of
    the review, as the owner said them; ask for whatever was not said, and never guess a build.
-   Questions go to the owner as spec's Rounds ask: through the harness's question tool when there
+   Questions go to the owner as spec's step 4 asks: through the harness's question tool when there
    is one, else in spec's text format. The owner corrects the list; apply every correction. Write
    nothing before this.
 6. **Record**, per repository, on a new branch from a freshly fetched `origin/main`, in a worktree
@@ -84,7 +84,7 @@ CueReview runs on the owner's computer; on Windows, `cue` is
      else in the spec changes: no note, build or reviewer.
    - **each change folder** whose features are all `approved`: `git rm -r changes/<id>/`. A folder
      with any feature not `approved` stays.
-   - **questions:** answer each from the facts, or carry it into the new change's rounds.
+   - **questions:** answer each from the facts, or carry it into the new change's approach.
 7. **Land the results through ship.** Commit in AGENTS.md's commit style (for example
    `docs(specs): record the review of <features>`). The pull request's `## What and why` says when
    the owner reviewed and on which build, and lists each verdict with the owner's words and time,

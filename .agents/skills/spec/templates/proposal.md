@@ -27,13 +27,16 @@ person, against which account. One short paragraph.>
 
 ## Settled questions
 
-- **Q1 <short title>**: <the answer chosen>. Rejected: <option>; <option>.
-- **Q2 <short title>**: <the answer chosen>. Rejected: <option>.
+- **Q1 <short title>**: <the answer the owner chose>. Rejected: <option>; <option>.
+- **Q2 <short title>**: <the answer the owner chose>. Rejected: <option>.
+
+Only what the owner was asked. Write "None." when the owner confirmed the approach as it stood.
 
 ## Calls for the owner
 
-- <A decision taken without asking: what was chosen, the alternative, and what reversing it
-  costs.> Write "None." when every decision was asked.
+- <A decision taken without asking: what was chosen; its basis (the finding and its source: a
+  path in the repository, or a title and its URL); the alternative, and what reversing it costs.>
+  Write "None." when every decision was asked.
 
 ## Out of scope
 
