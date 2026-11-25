@@ -23,8 +23,9 @@ because answering a picker is faster and surer than answering a wall of text.
 #### Scenario: Five questions in Claude Code
 - **GIVEN** a request whose approach leaves five questions to the owner
 - **WHEN** the spec skill asks them in Claude Code
-- **THEN** the owner gets two question pickers, one of four questions and one of one, each
-  question headed with its number and its recommended option first
+- **THEN** the owner gets two question pickers, the first of four questions and the second of the
+  fifth and the go-ahead, each numbered question headed with its number and its recommended
+  option first
 
 ### Requirement: Without a question tool, each option is its own list item
 The skills SHALL write the questions as text only for a harness without a question tool, each

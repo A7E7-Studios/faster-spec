@@ -34,17 +34,18 @@ what a lookup answers has to send the agent to look it up anyway.
 
 ### Requirement: Only the owner's decisions are asked
 The spec skill SHALL ask the owner only a decision whose other answer changes what is built, that
-the research does not settle and that is costly to change after the build, and SHALL decide every
-other one itself and list it under the proposal's Calls for the owner with its basis, because a
-question whose recommended answer is always taken costs the owner a wait and teaches them to stop
-reading the questions.
+the research does not settle and that is costly to change after the build, and SHALL settle every
+other one without asking, as a call for the owner with its basis, a row of design's Decisions
+table or the proposal's Review, because a question whose recommended answer is always taken costs
+the owner a wait and teaches them to stop reading the questions.
 
 #### Scenario: What each kind of decision becomes
 | The decision | It becomes |
 |---|---|
-| what is in scope, and in which order | a question |
-| what costs money, or leaves the device | a question |
-| stored data that cannot be restored | a question |
+| settled by a fact, the standard or the product's own way, whatever it concerns | a call for the owner, with its basis |
+| not settled by the research: what is in scope, and in which order | a question |
+| not settled by the research: what costs money, or leaves the device | a question |
+| not settled by the research: stored data that cannot be restored | a question |
 | an edge case, a default or a wording | a call for the owner, with its basis |
 | a library, a data structure, the shape of a test | a row of design's Decisions table |
 | where the owner reviews, when AGENTS.md says | the proposal's Review, unasked |

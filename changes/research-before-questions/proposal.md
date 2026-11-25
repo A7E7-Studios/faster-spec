@@ -49,8 +49,12 @@ further questions only where something needs clarifying, not for the sake of ask
   open questions, and one "Go ahead?". Scenarios: "An approach with no open question", "A comment
   revises the approach". Path: `.agents/skills/spec/SKILL.md`.
 - **Where the owner reviews** comes from AGENTS.md; it is asked only where AGENTS.md is silent.
-- **The words that named rounds** follow: the triage skill's two references, the scenario names of
-  `agents/owner-questions`, and README.md's diagram and its line on the skills.
+  Scenario: "What each kind of decision becomes" (its last row). Path:
+  `.agents/skills/spec/SKILL.md` step 3.
+- **The words that named rounds** follow: the triage skill's two references, the scenario
+  "Five questions in Claude Code" and "Questions asked as text" of `agents/owner-questions`, and
+  README.md's diagram and its line on the skills. Paths: `.agents/skills/triage/SKILL.md`,
+  `specs/agents/owner-questions/spec.md`, `README.md`.
 
 ## Review
 
@@ -75,14 +79,21 @@ None.
 - **No fixed limit on questions.** The skill tests each again when it counts more than four.
   Basis: the six large sessions held about a handful of owner's decisions each by the reading
   under Why; a hard cap would hide a real decision in a large change. Alternative: a cap of four.
-- **The confirmation is the last question of the same call** as the open questions, so one answer
-  pass settles both. Alternative: a separate step after the answers, as the summary was.
-- **Design keeps its look pick and its approval.** Basis: the owner redirected or commented on 5 of
-  the 12 look picks, against about a fifth of the other decisions, so that is where asking pays. Design's
-  step 2.4 only gains the rule that a researched decision is no question.
+- **The go-ahead is asked with the last open question**, unnumbered. Basis: the owner asked for
+  an approach to confirm or comment on, so one answer pass settles the questions and the
+  approach. Alternative: a separate step after the answers, as the summary was; changing it is
+  one paragraph of spec step 4.
+- **Design keeps its look pick and its approval.** Basis: the owner redirected or commented on 5
+  of the 12 look picks, against about a fifth of the other decisions, so that is where asking
+  pays. Design's step 2.4 only gains the rule that a researched decision is no question.
+  Alternative: design's approval folded into spec's approach; it costs a rewrite of design's
+  steps 1 and 2 and loses the approval of what was drawn.
 - **Requests to act** (an install, a download, closing an app) leave the numbered questions.
-  Basis: 5 of the 188 were such requests and belong to no requirement.
-- **The credit to the `grilling` skill stays**, on the decision tree, which still comes from it.
+  Basis: 5 of the 188 were such requests and belong to no requirement. Alternative: they stay
+  numbered; changing it back is one line of spec step 4.
+- **The credit to the `grilling` skill stays**, on the decision tree. Basis: the tree and the
+  recommended option first still come from it, and its licence asks for the notice. Alternative:
+  the line dropped; restoring it is one line in the skill and one in README.md.
 
 ## Out of scope
 

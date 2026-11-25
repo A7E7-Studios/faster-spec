@@ -93,14 +93,15 @@ Bring the owner one approach, in chat, short enough to read in a minute or two:
 - **Out of scope.**
 - **Open**: the owner's decisions, each with its options and the one the research backs.
 
-Then ask once: the open questions, and last "Go ahead with this approach?" (`Go ahead
-(Recommended)`, `Change something`). With no open question, that one alone.
+Then ask the open questions, and with the last of them "Go ahead with this approach?" (`Go ahead
+(Recommended)`, `Change something`). A question that depends on another's answer goes in a later
+call, and the go-ahead with it. With no open question, ask the go-ahead alone. The go-ahead
+carries no number and is no settled question: its header is `Approach`.
 
 - The owner confirms, or comments. A comment changes the approach: revise it, research again where
   the comment names a product or a practice you did not look at, and show what changed. Ask a
   further question only when the comment opens a decision that is the owner's.
-- Never ask again what was answered, and never ask to fill a round. A question that depends on
-  another's answer waits for that answer.
+- Never ask again what was answered, and never ask a question for the sake of asking.
 - A request to act for you (install a tool, download files, close an app) is no question of the
   spec: ask it plainly when the work needs it, unnumbered.
 - Write nothing before the owner confirms the approach.
@@ -134,9 +135,8 @@ header starts `Q<n>`). Word each so "yes" accepts your recommendation.
    a new branch `<id>` from `origin/main`.
 2. **`changes/<id>/proposal.md`** from `templates/proposal.md`: every question asked under
    Settled questions, every decision you took without asking under Calls for the owner with its
-   basis, and
-   `## Review` saying what the owner looks at and where. A change triage handed over keeps each
-   remark of the owner's in Why as text, as triage wrote it.
+   basis, and `## Review` saying what the owner looks at and where. A change triage handed over
+   keeps each remark of the owner's in Why as text, as triage wrote it.
 3. **Spec edits** in `specs/<domain>/<capability>/spec.md`; a new capability starts from
    `templates/spec.md`. Keep to `specs/README.md` exactly: the gate refuses a front matter key
    other than `title`, `review` and `code`, a `##` section other than Summary, Looks and
@@ -168,7 +168,7 @@ header starts `Q<n>`). Word each so "yes" accepts your recommendation.
 ## 6. Hand over
 
 - Something seen or heard changes, or the work needs decisions (several modules, the network, a
-  format or contract, storage, the other repository): **design**.
+  format or contract, storage, the other repository, a choice step 3 left to design): **design**.
 - Otherwise: **ship**.
 
 Tell the owner the change id, the branch, the calls for the owner and the scenarios left untested.
