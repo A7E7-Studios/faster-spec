@@ -820,8 +820,8 @@ export function checkKit(ctx) {
 // ---------------------------------------------------------------------------------------------
 
 /**
- * The project's design system, config.json `design`: its tokens file and its style brief are
- * present at head. A config with no `design` block skips it.
+ * The project's design system, config.json `design`: its tokens file, its style brief and each
+ * profile it names are present at head. A config with no `design` block skips it.
  */
 export function checkDesign(ctx) {
   const d = ctx.config.design;
@@ -831,8 +831,12 @@ export function checkDesign(ctx) {
   for (const key of ['tokens', 'brief']) {
     if (!ctx.repo.has(ctx.head, d[key])) findings.push(fail(`design.${key}: no file ${d[key]} at head`, d[key]));
   }
+  const profiles = d.profiles ?? [];
+  profiles.forEach((p, i) => {
+    if (!ctx.repo.has(ctx.head, p)) findings.push(fail(`design.profiles[${i}]: no file ${p} at head`, p));
+  });
   const catalogues = d.catalogues ?? [];
-  return result('design', title, findings, `tokens ${d.tokens}, brief ${d.brief}, ${catalogues.length} catalogue(s)${d.render ? ', a render command' : ''}`);
+  return result('design', title, findings, `tokens ${d.tokens}, brief ${d.brief}, ${catalogues.length} catalogue(s)${d.render ? ', a render command' : ''}${profiles.length ? `, ${profiles.length} profile(s)` : ''}`);
 }
 
 // ---------------------------------------------------------------------------------------------

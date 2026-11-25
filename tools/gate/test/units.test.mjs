@@ -718,9 +718,10 @@ test('config: the starter config loads and is report-only; history rules match w
   }
 });
 
-test('config: the design block names a tokens file and a brief, and optionally catalogues and a render command', () => {
+test('config: the design block names a tokens file and a brief, and optionally catalogues, a render command and profiles', () => {
   const cfg = loadConfig(TEMPLATE);
-  assert.deepEqual(cfg.design, { tokens: 'tools/design/house-style/tokens.css', brief: 'tools/design/house-style/brief.md' }, 'the starter names the house style');
+  assert.deepEqual(cfg.design, { tokens: 'tools/design/house-style/tokens.css', brief: 'tools/design/house-style/brief.md', profiles: ['tools/design/profiles/web.md'] }, 'the starter names the house style and the web profile');
+  assert.ok(fs.existsSync(path.join(path.dirname(TEMPLATE), '..', '..', cfg.design.profiles[0])), 'the kit ships the profile its starter names');
   assert.equal(loadConfig().design, undefined, 'this repository names none');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-config-'));
   try {
@@ -729,10 +730,10 @@ test('config: the design block names a tokens file and a brief, and optionally c
       fs.writeFileSync(file, JSON.stringify({ ...cfg, design }));
       return loadConfig(file);
     };
-    const full = { tokens: 'design/tokens.css', brief: 'design/brief.md', catalogues: [{ name: 'icons', open: 'https://example.invalid/icons/{entry}' }], render: 'npm run render' };
+    const full = { tokens: 'design/tokens.css', brief: 'design/brief.md', catalogues: [{ name: 'icons', open: 'https://example.invalid/icons/{entry}' }], render: 'npm run render', profiles: ['design/profiles/web.md', 'design/profiles/headset.md'] };
     assert.deepEqual(load(full).design, full);
     for (const [design, want] of [
-      ['design/', /"design" is \{ "tokens", "brief", "catalogues"\?, "render"\? \}/],
+      ['design/', /"design" is \{ "tokens", "brief", "catalogues"\?, "render"\?, "profiles"\? \}/],
       [[], /"design" is \{/],
       [{ brief: 'b.md' }, /"design\.tokens" is a repository path to a file/],
       [{ tokens: 't.css', brief: '' }, /"design\.brief" is a repository path to a file: an empty path/],
@@ -745,6 +746,11 @@ test('config: the design block names a tokens file and a brief, and optionally c
       [{ ...full, catalogues: [full.catalogues[0], full.catalogues[0]] }, /"icons" appears twice/],
       [{ ...full, render: '' }, /"design\.render" is a command/],
       [{ ...full, render: ['npm'] }, /"design\.render" is a command/],
+      [{ ...full, profiles: 'design/profiles/web.md' }, /"design\.profiles" is a list of one or more repository paths to files/],
+      [{ ...full, profiles: [] }, /"design\.profiles" is a list of one or more/],
+      [{ ...full, profiles: ['design/profiles/'] }, /"design\.profiles" entry 0 is a repository path to a file/],
+      [{ ...full, profiles: ['../web.md'] }, /"design\.profiles" entry 0 is a repository path to a file: .*"\.\."/],
+      [{ ...full, profiles: ['a.md', 'a.md'] }, /"design\.profiles": "a\.md" appears twice/],
     ]) {
       assert.throws(() => load(design), want, JSON.stringify(design));
     }

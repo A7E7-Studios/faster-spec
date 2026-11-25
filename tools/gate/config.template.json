@@ -63,7 +63,8 @@
   ],
   "design": {
     "tokens": "tools/design/house-style/tokens.css",
-    "brief": "tools/design/house-style/brief.md"
+    "brief": "tools/design/house-style/brief.md",
+    "profiles": ["tools/design/profiles/web.md"]
   },
   "overview": {
     "excludeComponents": ["dev/**", "docs/**", "**/proof/**", "fixtures/**", "**/test/fixtures/**"],
