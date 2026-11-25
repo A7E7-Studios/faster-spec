@@ -17,8 +17,7 @@ merges, once, instead of every commit the review loop pushed.
 
 ### Requirement: The pull request is a draft until its final head
 The ship skill SHALL open the pull request as a draft and keep it one through the review rounds,
-because CI then spends nothing on the commits a review loop supersedes, which were most of the
-minutes CI spent in the projects that carry the kit.
+because CI then spends nothing on the commits a review loop pushes and supersedes.
 
 #### Scenario: A change with three review rounds runs CI once
 - **GIVEN** a project whose CI runs no job on a draft pull request
@@ -33,8 +32,17 @@ merges that the builder did not run itself.
 
 #### Scenario: A check fails after the pull request is marked ready
 - **WHEN** a CI check fails on the ready head
-- **THEN** the pull request goes back to a draft, the fix is self-checked and reviewed as a
-  round's fix is, and the pull request is marked ready again on the fixed head
+- **THEN** the pull request goes back to a draft, the fix is self-checked and reviewed by a fresh
+  reviewer in a round that counts toward the stop after round 3, and the pull request is marked
+  ready again on the fixed head
+
+#### Scenario: The gate's owner-merge result is no failure
+- **WHEN** the gate's CI check fails only because the pull request touches a protected path
+- **THEN** the pull request is handed to the owner to merge, and nothing is fixed or reviewed for it
+
+#### Scenario: Main moves after the pull request is ready
+- **WHEN** `origin/main` moves after the pull request is marked ready, and the builder merges it in
+- **THEN** the builder waits for CI's checks on the merged-in head before the merge
 
 #### Scenario: A check GitHub never started
 - **WHEN** CI's checks end without a runner starting, as when the account's Actions budget is spent

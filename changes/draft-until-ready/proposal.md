@@ -8,8 +8,10 @@ capabilities:
 ## Why
 
 The ship skill opens a pull request ready for review and then pushes every fix of its review
-rounds to it, so a project's CI runs in full on each of them. In six projects that carry the kit,
-over the nine days of the last month on which hosted CI was not blocked, 4,719 of 14,446 billable
+rounds, so a project's CI runs in full on each of them. Measured with the GitHub REST API (the
+`actions/runs` list and each run's `jobs`, billable minutes rounded up per job as GitHub bills,
+which the billing usage report confirms within 10 %), in six projects that carry the kit, over
+the nine days of the last month on which hosted CI was not blocked, 4,719 of 14,446 billable
 minutes (33 %) went to pull-request commits that were not the head that merged: pull requests
 pushed a median of 3 to 4 heads, up to 25. The builder had already run the same suites locally on
 each of those heads, and the owner's Actions budget runs out within days of each month whatever
@@ -51,13 +53,19 @@ None.
   first round, which runs CI on each round's fixes; changing it is one sentence of section 4.
 - **A failing check after ready goes back to a draft.** Basis: the fix is a new head, and a ready
   pull request would run CI on it and on every later fix as well. Alternative: stay ready and let CI
-  run on each fix.
+  run on each fix; changing it is one clause of step 6.4.
 - **A check that never started does not hold the merge.** Basis: the builder's local suites are the
   record of every earlier head already, and GitHub refusing a runner says nothing about the code.
   Alternative: hold the merge for the owner, which today would stop every merge for as long as the
-  budget is spent.
+  budget is spent; changing it is one sentence of step 6.4.
 - **The kit's workflows change nothing.** Basis: `gate.yml` already skips drafts; a project's own CI
-  is its own file, and the pull request of this change says what a project adds.
+  is its own file, and the pull request of this change says what a project adds. Alternative: a
+  starter CI workflow in the kit with the draft condition, which every project would then have to
+  reconcile with its own; adding one later is a change of its own.
+- **The gate's `protected` failure in CI is the owner's merge, not a failing check.** Basis: the
+  gate fails that check on purpose for every pull request the owner merges, so a builder that
+  fixed failing checks would loop on it. Alternative: none while the gate fails that check; the
+  change `owner-merge-narrowed` would make it pass with its own result.
 
 ## Out of scope
 
