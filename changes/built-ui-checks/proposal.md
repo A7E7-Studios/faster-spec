@@ -61,8 +61,8 @@ nothing changes for it.
 At a desk: read `tools/design/profiles/web.md`, design step 1.7, the tasks template, ship step
 2's "The built look" and the review checklist's check 8. Then, in a project that names the web
 profile, build its next change that adds a component and look at what the pull request lists
-under `## Tests`
-and `## Not verified`, and at how much of the review still goes to states and sizes.
+under `## Tests` and `## Not verified`, and at how much of the review still goes to states and
+sizes.
 
 ## Settled questions
 
