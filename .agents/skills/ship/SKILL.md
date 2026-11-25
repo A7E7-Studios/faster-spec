@@ -1,6 +1,6 @@
 ---
 name: ship
-description: Build an approved change end to end and merge it - worktree, sub-agents per independent task, existing code reused before new code is written, a test per scenario, the suites AGENTS.md names, docs, the review reset, the formality gate, a self-check of the whole change, a pull request, review rounds by fresh sub-agents until one finds no blocker or major, every finding fixed or answered and the fixes self-checked, the branch brought up to date with main, then a squash merge. Use when the owner says to build, implement, ship or merge a specified change, a refactor, tooling or docs change that needs no change folder, or a results branch from triage.
+description: Build an approved change end to end and merge it - worktree, sub-agents per independent task, existing code reused before new code is written, a test per scenario, the suites AGENTS.md names, docs, the review reset, the formality gate, a self-check of the whole change, a draft pull request, review rounds by fresh sub-agents until one finds no blocker or major, every finding fixed or answered and the fixes self-checked, the branch brought up to date with main, then a squash merge. Use when the owner says to build, implement, ship or merge a specified change, a refactor, tooling or docs change that needs no change folder, or a results branch from triage.
 ---
 
 # Ship a change
@@ -71,8 +71,12 @@ independent review are clean. Formats: `specs/README.md`, `changes/README.md`.
 
 ## 4. Pull request
 
-Push, then `gh pr create`, ready for review (not a draft). Its title becomes the squash commit's
-subject, so it follows AGENTS.md's commit style. The body:
+Push, then `gh pr create --draft`. It stays a draft through the review rounds and is marked ready
+only on its final head (§6.4): a project's CI runs no job on a draft, so each change runs CI once,
+while the suites you run (§3.3) are the record of every head before it. Where the repository
+cannot hold drafts, open it ready: CI then runs on each head, §6.4's moves to ready and back to
+draft fall away, and its wait for the checks and the fix of a failing one stay. Its title becomes the
+squash commit's subject, so it follows AGENTS.md's commit style. The body:
 
 | Section | Holds |
 |---|---|
@@ -126,6 +130,18 @@ A change with a side in the other repository: open both pull requests, each link
    `node tools/gate/gate.mjs --local --pr <n>` passes, or fails only on `protected`. The suites are
    green on the final commit (rerun any whose code changed after its run), and `## Tests` names that
    head. CI's gate may be report-only (`reportOnly`): its green proves nothing.
+
+   Then mark it ready, `gh pr ready <n>`, wait a minute for the runs to register, and wait for the
+   checks CI runs on that head (`gh pr checks <n> --watch`). A project whose CI runs nothing on
+   pull requests has none. The gate's check failing only on `protected` is the owner's merge
+   (step 5), not a failure. Any other failing check is a failing suite: put the pull request back
+   to a draft (`gh pr ready <n> --undo`), fix it as §3.3 says, self-check the fix as §5.3 does, and
+   have a fresh reviewer review it as a round of §5, briefed with the head last reviewed; it
+   counts toward §5.5's stop. Then come back to this step. A check that never started (GitHub
+   refused the runner, or the account's Actions budget is spent) proves nothing either way: name
+   it under `## Not verified`, tell the owner in one line, and go on on the local suites' record.
+   When step 7 sends you back because `origin/main` moved, the merged-in head is marked ready
+   already: its checks run, and you wait for them here again before the merge.
 5. **Owner merges.** When the gate fails only on `protected` (a protected path; the list is in
    `tools/gate/README.md`), or this is the other repository's side while that repository has no
    `specs/`, the owner merges it, never you: with everything else done, hand it to the owner with
