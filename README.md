@@ -10,16 +10,16 @@ no dependencies; a project takes them as a vendored copy pinned by a lock.
 
 ```
   request ──► spec ──► design ──► ship ──► (merged) ──► triage ──► approved, or a new change
-             rounds of   look and    build, test,          the owner's verdict
-             questions   technical   gate, review,         on each feature
-                         design      squash merge
+             research,   look and    build, test,          the owner's verdict
+             one         technical   gate, review,         on each feature
+             approach    design      squash merge
 ```
 
 | Piece | What it is |
 |---|---|
 | **Living specs**, `specs/<domain>/<capability>/spec.md` | what one feature does: a Summary and its Looks for people, requirements and scenarios for agents, each scenario proven by `test:` lines, and the owner's verdict in its front matter (`review: unreviewed`, `approved` or `changes-requested`). [Format](specs/README.md) |
 | **Change folders**, `changes/<id>/` | one change's working plan: the owner's request, the settled questions, the design picked, the tasks. They land on main with the code and go once the owner has approved every feature they name. [Format](changes/README.md) |
-| **Four skills**, `.agents/skills/` | `spec` settles the requirements in rounds of questions and lists every code path each covers; `design` draws two or three directions as HTML boards and the technical design; `ship` builds on the code that is there, tests, gates, runs the reviewer's checks on its own work and on each round's fixes, has fresh agents review it in rounds until one finds no blocker or major, and merges; `triage` turns the owner's review (notes, or a [CueReview](https://github.com/A7E7-Studios/cue-review) recording) into verdicts and new changes. Claude Code and Codex read the same files |
+| **Four skills**, `.agents/skills/` | `spec` researches how each open decision is settled elsewhere, brings the owner one approach to confirm with only the owner's own decisions as questions, and lists every code path each requirement covers; `design` draws two or three directions as HTML boards and the technical design; `ship` builds on the code that is there, tests, gates, runs the reviewer's checks on its own work and on each round's fixes, has fresh agents review it in rounds until one finds no blocker or major, and merges; `triage` turns the owner's review (notes, or a [CueReview](https://github.com/A7E7-Studios/cue-review) recording) into verdicts and new changes. Claude Code and Codex read the same files |
 | **The gate**, `tools/gate/` | a deterministic check of form on every pull request: spec and change formats, the review reset, no images, living docs free of history, byte budgets, links, the nearest README, the PR description, the design contract, the kit copy, and the protected paths only the owner merges. [Its README](tools/gate/README.md) |
 | **The overview**, `tools/overview/` | one JSON index (and a plain-text summary) of every feature, its systems, scenarios and tests, review state, the change folders and the components, across repositories. [Its README](tools/overview/README.md) |
 | **The Solution map**, `tools/solution-map/` | a local web page over the overview, on 127.0.0.1: what waits for the owner's review, every feature by domain or by system with its Looks and tests, and Start review, which opens CueReview to record the review. [Its README](tools/solution-map/README.md) |
@@ -107,5 +107,5 @@ node tools/gate/gate.mjs --local
 
 ## Licence
 
-MIT, see [LICENSE](LICENSE). The `spec` skill's round structure adapts the `grilling` skill from
+MIT, see [LICENSE](LICENSE). The `spec` skill's decision tree adapts the `grilling` skill from
 [mattpocock/skills](https://github.com/mattpocock/skills) (MIT).

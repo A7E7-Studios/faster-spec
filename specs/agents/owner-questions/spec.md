@@ -20,11 +20,12 @@ at most 4 questions per call and 2–4 options each, the recommended option firs
 ending "(Recommended)", one short description per option and a preview for any example to compare,
 because answering a picker is faster and surer than answering a wall of text.
 
-#### Scenario: A round of five questions in Claude Code
-- **GIVEN** a request whose first round holds five questions
+#### Scenario: Five questions in Claude Code
+- **GIVEN** a request whose approach leaves five questions to the owner
 - **WHEN** the spec skill asks them in Claude Code
-- **THEN** the owner gets two question pickers, one of four questions and one of one, each
-  question headed with its number and its recommended option first
+- **THEN** the owner gets two question pickers, the first of four questions and the second of the
+  fifth and the go-ahead, each numbered question headed with its number and its recommended
+  option first
 
 ### Requirement: Without a question tool, each option is its own list item
 The skills SHALL write the questions as text only for a harness without a question tool, each
@@ -32,8 +33,8 @@ option its own top-level list item with its details nested under it, never optio
 one line and never a plain line straight after a nested list, because Markdown folds such a line
 into the last bullet.
 
-#### Scenario: A round asked as text
+#### Scenario: Questions asked as text
 - **GIVEN** a harness with no question tool
-- **WHEN** the spec skill asks a round
+- **WHEN** the spec skill asks its questions
 - **THEN** each question is numbered, each option a list item of its own with the recommended one
   first, and every line renders where it was written

@@ -83,11 +83,12 @@ Skip to step 2 when nothing seen or heard changes.
    names the test that proves it. Mark which groups depend on which: ship gives independent groups
    to separate sub-agents. New logic, as the ship skill's Build step defines it, gets unit-test
    tasks.
-4. **Questions.** A question the design raises goes to the owner as spec's Rounds ask: through the
-   harness's question tool when there is one, else in spec's text format; numbered after the last
-   one asked (Q<n+1>), with options and the recommended one first. Fold each answer into
-   `design.md`, and into `proposal.md`'s Settled questions and the spec when it changes a
-   requirement.
+4. **Questions.** A decision the research of step 2.1 settles is no question: it goes in the
+   Decisions table with its sources. One that is the owner's by spec's step 3 goes to the owner as
+   spec's step 4 asks: through the harness's question tool when there is one, else in spec's text
+   format; numbered after the last one asked (Q<n+1>), with options and the recommended one
+   first. Fold each answer into `design.md`, and into `proposal.md`'s Settled questions and the
+   spec when it changes a requirement.
 5. **Wait for approval.** Give the owner the decisions, the calls for the owner and the scenarios
    no test reaches, in a few lines, and wait for the owner's approval in chat.
 
